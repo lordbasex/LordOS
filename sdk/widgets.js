@@ -6,7 +6,7 @@
 //
 //   registerWidgetType('note', NoteCard)              // NoteCard({ widget }) draws one
 //   setWidgets('note', [{ id, x, y, w, h, pinned }])  // replaces those of that type
-import { createElement as h } from 'react';
+import { createElement as h, memo } from 'react';
 import { View } from '@lordos/runtime';
 import { createStore, useStore } from './store.js';
 
@@ -22,7 +22,13 @@ export function setWidgets(type, list) {
   desktopWidgets.set((s) => ({ ...s, [type]: list }));
 }
 
+// The theme's <DesktopWidgets /> draws again with the whole desktop (a window's title, a clock): the layer itself only
+// for its own store, so the widgets' cards (a calendar, a graph, a clock face) don't draw again with it (BUG-9 of the
+// 0.8.9.6.2 QA: ~4300 nodes a second). A function for the theme API (sdk/themeapi.js wraps components), memo inside.
 export function DesktopWidgets({ layer = 'below' }) {
+  return h(WidgetLayer, { layer: layer === 'above' ? 'above' : 'below' });
+}
+const WidgetLayer = memo(function WidgetLayer({ layer }) {
   const all = useStore(desktopWidgets);
   const items = [];
   for (const [type, list] of Object.entries(all)) {
@@ -32,4 +38,4 @@ export function DesktopWidgets({ layer = 'below' }) {
   }
   if (!items.length) return null;
   return h(View, { style: { position: 'absolute', left: 0, top: 0, width: 0, height: 0 } }, ...items);
-}
+});

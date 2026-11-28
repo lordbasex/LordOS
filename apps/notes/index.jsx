@@ -5,16 +5,19 @@ import {
   View, Text, useTheme, useLocale, useAppWindow, useStore, useKeyboard, Button, TextInput, ScrollView, ThemeProvider, Segmented, speechItems, registerSelection, ContextMenu,
   Toolbar, ToolbarButton, ToolbarSpacer, MenuButton, SearchField, EmptyState, textDirection,
   Markdown, markdownHeadings, toggleTask, wm, fs, formatBytes, addListener, screen, t, print, FilePicker as SysFilePicker, useFilesDrop, FilesDropHint, registerWidgetKind,
-  useSidebar, SidebarToggle, SidebarOverlay, Layer, openFileWithApps,
+  useSidebar, SidebarToggle, SidebarOverlay, Layer, openFileWithApps, screenDisplays, displayFor, workAreaOf, SkinRegion, useSkinned, pickCommand, pickItem,
+  editorMenuRows, WritingPanel,
 } from '@lordos/sdk';
+import { notesModels } from './skinmodel.js';
 import { useEffect, useRef, useState } from 'react';
 import { NoteEditor } from './NoteEditor.jsx';
 import { editKey, editItems, formatItems, contextItems, fromReading } from './editmenu.js';
 import { CATEGORIES, EMOJIS, emojiFor, searchEmoji } from './emoji.js';
 import {
-  notesStore, loadNotes, updateNote, createNote, duplicateNote, deleteNote, flushAll, attachFile, pasteClipboardImage,
-  absFolder, COLORS, setupWidgets, attachmentPath, noteImageSrc,
+  notesStore, loadNotes, updateNote, editBody, commitLive, createNote, duplicateNote, deleteNote, flushAll, attachFile, pasteClipboardImage,
+  absFolder, COLORS, setupWidgets, attachmentPath, noteImageSrc, rescanNotes, importFile, importable, showNoteAt, toggleDesktop,
 } from './store.js';
+import { pickList } from './notesmodel.js';
 import { linkTarget, textual, imageKind } from './links.js';
 
 // ---- sticky-note colors (light in both modes, with dark text) ----
@@ -23,6 +26,8 @@ const PAPER = {
   yellow: ['#fff6a8', '#fde68a'], pink: ['#ffd9e8', '#ffc2db'], green: ['#d9f6cc', '#c1edab'],
   blue: ['#d6ecff', '#bcdfff'], purple: ['#e9ddff', '#d9c6ff'], gray: ['#eeeeee', '#dedede'],
 };
+// a done checklist circle: the note colour's deep tint, a white ✓ readable on it, the circle clear on the paper
+const TINT = { yellow: '#b07c00', pink: '#c2386f', green: '#2f8a34', blue: '#2a6fc9', purple: '#7048c8', gray: '#5f5f5f' };
 const ink = {
   text: '#2a2a2a', dim: '#6b6b6b', heading: '#151515', code: '#5b3fa0', accent: '#0a5fd0',
   selection: 'rgba(10,95,208,0.22)', caret: '#0a5fd0', popupBg: '#ffffff', popupText: '#222', border: 'rgba(0,0,0,0.15)',
@@ -124,28 +129,46 @@ function NoteBody({ note, mode, onMode, editorApi, compact, showToc, size = 14, 
   const [w, setW] = useState(300);
   const box = useRef(null);
   useEffect(() => {
-    const id = setInterval(() => { if (box.current) { const nw = lord.getLayout(box.current.id)[2]; if (Math.abs(nw - w) > 1) setW(nw); } }, 400);
+    const id = setInterval(() => { if (box.current) { const nw = lord.getLayout(box.current.id)[2]; if (nw > 1 && Math.abs(nw - w) > 1) setW(nw); } }, 400);
     return () => clearInterval(id);
   });
+  // the body's size as it is shown now (the reading view): the editor's first frame wraps at it, not at a guess
+  const size0 = useRef(null);
+  if (box.current) {
+    const [, , bw, bh] = lord.getLayout(box.current.id);
+    if (bw > 1 && bh > 1) size0.current = { w: bw, h: bh };
+  }
   // right click while editing: Cut, Copy, Paste, Select All and Speech (for the selection or the whole note)
   const [ctx, setCtx] = useState(null);
+  const [job, setJob] = useState(null);             // ✨ AI's panel on the selection (sdk/writing.jsx)
   // the open menu takes the keyboard for a while: that is not leaving the desktop note's editor
   const menuOpen = useRef(false);
   menuOpen.current = !!ctx;
   const speechText = () => editorApi.current?.selection?.() || note.body || '';
+  // leaving the editor (Read, another note, the window closing): what was typed goes into the note at once
+  const slug = note.slug;
+  useEffect(() => (mode === 'edit' ? () => commitLive(slug) : undefined), [mode, slug]);
   if (mode === 'edit') {
     return (
       <View ref={box} style={{ flex: 1 }}>
-        <NoteEditor value={note.body} onChange={(body) => updateNote(note.slug, { body })} size={size} colors={ink} autoFocus
+        <NoteEditor value={note.body} onChange={(body) => editBody(note.slug, body)} size={size} colors={ink} autoFocus initialSize={size0.current}
           apiRef={editorApi} emojiSearch={searchEmoji} padding={compact ? 8 : 14}
           onPasteImage={() => pasteClipboardImage(note.slug)} onEscape={() => onMode('read')} onBlur={compact ? () => { if (!menuOpen.current && !hold?.current) onMode('read'); } : undefined}
           onCommand={(b) => { if (b === 'e') onMode('read'); else onCommand?.(b); }}
           onContextMenu={(e) => {
-            const items = contextItems(t, { selected: !!editorApi.current?.selection?.(), empty: !note.body }, (a) => editorApi.current?.send?.(editKey(a)),
+            const ed = editorApi.current;
+            const base = contextItems(t, { selected: !!ed?.selection?.(), empty: !note.body }, (a) => ed?.send?.(editKey(a)),
               speechItems(speechText).filter((x) => x !== '-'));
-            setCtx({ ...(box.current ? e.local(box.current) : e), items });
+            // spelling first, ✨ AI with a selection (sdk/editorextras.jsx); the model's text comes back only on Replace
+            const at = box.current ? e.local(box.current) : e;
+            const range = ed?.selRange?.() || [0, 0], selected = ed?.selection?.() || '';
+            const items = editorMenuRows({ base, hit: ed?.spellHit?.(e), selected, onReplaceWord: (a, b, w) => ed?.replaceRange?.(a, b, w),
+              openWriting: (o) => setJob({ ...o, text: selected, range, at }), refresh: (rows) => setCtx((c) => (c && c.at === at ? { ...c, items: rows } : c)) });
+            setCtx({ ...at, at, items });
           }} />
         {ctx && <ContextMenu x={ctx.x} y={ctx.y} items={ctx.items} onClose={() => setCtx(null)} bounds={{ w, h: box.current ? lord.getLayout(box.current.id)[3] : 600 }} />}
+        {job && <WritingPanel anchor={box} at={job.at} job={job} bounds={{ w, h: box.current ? lord.getLayout(box.current.id)[3] : 600 }} onClose={() => setJob(null)}
+          onReplace={(txt) => { const ed = editorApi.current; if (!ed || ed.textNow().slice(job.range[0], job.range[1]) !== job.text) return false; ed.replaceRange(job.range[0], job.range[1], txt); return true; }} />}
       </View>
     );
   }
@@ -174,11 +197,21 @@ function NoteBody({ note, mode, onMode, editorApi, compact, showToc, size = 14, 
           {note.body.trim() ? (
             // breaks: a line break typed in the editor is a line break here too (GitHub #169)
             <Markdown source={note.body} breaks base={absFolder(note.slug)} resolveImage={(u) => noteImageSrc(note.slug, u)} width={Math.max(80, w - (showToc && toc.length > 1 ? 180 : 0) - (compact ? 20 : 56))} size={size}
+              taskStyle="round" taskTint={TINT[note.color] || TINT.yellow}
               emoji={emojiFor} onLink={(u) => openLink(note.slug, u)} onHeadingRef={(id, n) => { if (n) heads.current.set(id, n); }}
               onToggleTask={(line) => updateNote(note.slug, { body: toggleTask(note.body, line) })} />
           ) : <Text style={{ fontSize: 13, color: th.textDim }}>{t('notes.empty')}</Text>}
         </View>
       </ScrollView>
+    </View>
+  );
+}
+
+// the checklist button's drawing: a ring with a tick, like a done item
+function ChecklistGlyph({ color }) {
+  return (
+    <View style={{ width: 18, height: 18, borderRadius: 9, border: `1.5px solid ${color}`, alignItems: 'center', justifyContent: 'center' }}>
+      <Text style={{ fontSize: 11, fontWeight: 700, color }}>✓</Text>
     </View>
   );
 }
@@ -269,21 +302,84 @@ function NoteCard({ widget }) {
   );
 }
 setupWidgets(NoteCard);
-// the sticky note in the desktop's widget catalog (Lord Workspaces' Add widget): a new note shown on the desktop there
-registerWidgetKind({ type: 'note', nameKey: 'shell.widgets.note.name', descKey: 'shell.widgets.note.desc',
-  add: (x, y) => { try { if (!notesStore.get().loaded) loadNotes(); } catch (e) { /* the folder comes later */ } return createNote({ desktop: true, x, y }); } });
+
+// ---- the widget catalog's sticky note: a new note, or one already made ----
+
+const fmtDate = (iso, formatDate) => { try { return formatDate(new Date(iso), 'short'); } catch (e) { return ''; } };
+
+function ChooserRow({ t, on, onClick, onHover, children }) {
+  return (
+    <View onClick={onClick} onMouseEnter={onHover} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 46, paddingHorizontal: 12, paddingVertical: 6,
+      borderRadius: 12, backgroundColor: on ? t.hover : 'transparent', border: `1px solid ${on ? t.accent : 'transparent'}` }}>{children}</View>
+  );
+}
+
+// Shown in the catalog after the sticky note's card (sdk/widgetpicker.jsx Chooser): "New note" first, then every note
+// (searchable, most recently updated first, those already on the desktop marked). The folder is read again first, so a
+// note made outside the app is there. A note picked goes on the desktop where the widget is being added (x, y).
+function NoteChooser({ t, x, y, area, done }) {
+  const { t: tr, formatDate } = useLocale();
+  const list = useStore(notesStore, (s) => s.list);
+  const [q, setQ] = useState('');
+  const [hi, setHi] = useState(0);
+  useEffect(() => { try { rescanNotes(); } catch (e) { console.log(`notes: ${e.message}`); } }, []);
+  const rows = pickList(list, q);
+  const pickNew = () => { createNote({ desktop: true, x, y }); done(); };
+  const pick = (slug) => { showNoteAt(slug, x, y, area); done(); };
+  const choose = (i) => { if (i <= 0) pickNew(); else if (rows[i - 1]) pick(rows[i - 1].slug); };
+  const onKey = (e) => {
+    const step = { ArrowDown: 1, ArrowUp: -1 }[e.key];
+    if (step) { setHi((h) => Math.max(0, Math.min(rows.length, h + step))); e.preventDefault?.(); return; }
+    if (e.key === 'Enter') choose(hi);
+  };
+  return (
+    <View style={{ flex: 1, padding: 18, gap: 12 }}>
+      <Text style={{ fontSize: 13, color: t.textDim, textAlign: 'start' }}>{tr('notes.pick.hint')}</Text>
+      <SearchField value={q} onChange={(v) => { setQ(v); setHi(v ? 1 : 0); }} onKeyDown={onKey} autoFocus placeholder={tr('notes.search')} style={{ height: 36 }} />
+      <ScrollView style={{ flex: 1 }} contentStyle={{ gap: 2 }}>
+        <ChooserRow t={t} on={hi === 0} onClick={pickNew} onHover={() => setHi(0)}>
+          <View style={{ width: 28, height: 28, borderRadius: 6, alignItems: 'center', justifyContent: 'center', backgroundColor: t.accent }}>
+            <Text style={{ fontSize: 18, fontWeight: 700, color: t.onAccent || '#ffffff' }}>+</Text>
+          </View>
+          <Text style={{ flex: 1, fontSize: 14, fontWeight: 600, color: t.text, textAlign: 'start' }}>{tr('notes.new')}</Text>
+        </ChooserRow>
+        {rows.map((n, i) => (
+          <ChooserRow key={n.slug} t={t} on={hi === i + 1} onClick={() => pick(n.slug)} onHover={() => setHi(i + 1)}>
+            <View style={{ width: 28, height: 28, borderRadius: 4, backgroundColor: (PAPER[n.color] || PAPER.yellow)[0], border: '1px solid rgba(0,0,0,0.18)' }} />
+            <View style={{ flex: 1, gap: 2 }}>
+              <Text style={{ fontSize: 13, fontWeight: 600, color: t.text, textAlign: 'start', whiteSpace: 'nowrap', overflow: 'hidden' }}>{n.title || tr('notes.untitled')}</Text>
+              <Text style={{ fontSize: 11, color: t.textDim, textAlign: 'start' }}>{fmtDate(n.updated, formatDate)}</Text>
+            </View>
+            {n.desktop && (
+              <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, backgroundColor: t.chipBg || t.control }}>
+                <Text style={{ fontSize: 11, color: t.textDim }}>{tr('notes.onDesktop')}</Text>
+              </View>
+            )}
+          </ChooserRow>
+        ))}
+        {!rows.length && q ? <Text style={{ fontSize: 13, color: t.textDim, textAlign: 'center', paddingTop: 24 }}>{tr('notes.pick.noMatch')}</Text> : null}
+      </ScrollView>
+    </View>
+  );
+}
+
+// the sticky note in the desktop's widget catalog (Add widget in every theme): the chooser above; add() stays for a
+// caller without the chooser (a new note shown on the desktop there)
+registerWidgetKind({ type: 'note', nameKey: 'shell.widgets.note.name', descKey: 'shell.widgets.note.desc', Chooser: NoteChooser,
+  add: (x, y) => { try { rescanNotes(); } catch (e) { /* the folder comes later */ } return createNote({ desktop: true, x, y }); } });
 
 // notes are read when the session starts (and the desktop ones appear by themselves)
 queueMicrotask(() => { try { loadNotes(); } catch (e) { console.log(`notes: ${e.message}`); } });
 
 // ---- window ----
 
-const fmtDate = (iso, formatDate) => { try { return formatDate(new Date(iso), 'short'); } catch (e) { return ''; } };
+// what Import… offers: Markdown and plain text files (notesmodel.js IMPORT_EXT)
+const IMPORT_FILE = { test: (name) => importable(name) };
 
 export default function Notes() {
   const th = useTheme();
   const { t: tr, formatDate } = useLocale();
-  const { id: wid, args } = useAppWindow();
+  const { id: wid, args, focused } = useAppWindow();
   const { list, loaded } = useStore(notesStore);
   const [sel, setSel] = useState(null);
   const [q, setQ] = useState('');
@@ -294,7 +390,9 @@ export default function Notes() {
   // ❖Esc reads the selection aloud (sdk/voice.js); while reading a note there is no selection
   const editing = useRef(false);
   useEffect(() => registerSelection(wid, () => (editing.current ? api.current?.selection?.() || '' : '')), [wid]);
-  useEffect(() => { if (!loaded) loadNotes(); }, []);
+  // the folder is read again when the window opens and each time it gets the focus (never on a timer): notes made or
+  // deleted outside the app show up; a change not saved yet is kept (store.js rescanNotes)
+  useEffect(() => { if (focused !== false) { try { rescanNotes(); } catch (e) { console.log(`notes: ${e.message}`); } } }, [focused]);
   useEffect(() => { if (args?.slug) { setSel(args.slug); setMode('read'); } }, [args?.nonce]);
   useEffect(() => () => flushAll(), []);
   const needle = q.trim().toLowerCase();
@@ -309,6 +407,14 @@ export default function Notes() {
     const txt = block ? `\n${md}\n` : md;
     if (mode === 'edit' && api.current) { api.current.insert(txt); api.current.focus?.(); return; }
     pendingInsert.current = (pendingInsert.current || '') + txt;
+    setMode('edit');
+  };
+  // the toolbar's checklist button: the current line(s) become (or stop being) "- [ ] ", as ❖⇧9 does; from the reading
+  // view the editor opens first and it applies at its caret
+  const checklist = () => {
+    if (!note) return;
+    if (mode === 'edit' && api.current) { api.current.send(editKey('task')); api.current.focus?.(); return; }
+    pendingEdit.current = 'task';
     setMode('edit');
   };
   const toEdit = () => { if (mode !== 'edit') setMode('edit'); };
@@ -329,20 +435,55 @@ export default function Notes() {
     pendingInsert.current = null;
     if (ins && mode === 'edit' && api.current) api.current.insert(ins);
   }, [mode]);
+  // Import…: each .md/.txt picked (or dropped on the list) becomes a new note; the last one is shown
+  const importPaths = (paths) => {
+    let last = null;
+    for (const p of paths || []) last = importFile(p) || last;
+    if (last) { setSel(last); setMode('read'); }
+    return last;
+  };
   const newNote = () => { const s = createNote({ body: `# ${tr('notes.newTitle')}\n\n` }); setSel(s); setMode('edit'); };
   // files dragged from Files: copied into the open note (or a new one) as its images and attachments, like ⊕ does
-  const drop = useFilesDrop({ onDrop: ({ files }) => {
+  const attachDropped = (files) => {
     const slug = note ? note.slug : createNote({ body: `# ${tr('notes.newTitle')}\n\n` });
     const md = slug ? files.map((p) => attachFile(slug, p)).filter(Boolean) : [];
     if (!md.length) { if (slug) setSel(slug); return; }
     if (note) { insert(md.join('\n'), true); return; }
     setSel(slug);
     updateNote(slug, { body: `${noteBy(slug).body.replace(/\s*$/, '')}\n\n${md.join('\n')}\n` });
+  };
+  // on an open note: every file is its attachment (an image drawn in it, a 📎 link); with no note open, Markdown and
+  // text files are imported as notes and the rest go to a new note
+  const drop = useFilesDrop({ onDrop: ({ files }) => {
+    if (note) { attachDropped(files); return; }
+    const imp = files.filter(importable), rest = files.filter((p) => !importable(p));
+    importPaths(imp);
+    if (rest.length) attachDropped(rest);
   } });
+  // on the list: Markdown and text files are imported as notes; anything else is attached to the open note, as before
+  const listDrop = useFilesDrop({ onDrop: ({ files }) => {
+    const imp = files.filter(importable), rest = files.filter((p) => !importable(p));
+    importPaths(imp);
+    if (rest.length) attachDropped(rest);
+  } });
+  // what letting go does: Markdown and text files dropped on the list (or with no note open) are imported
+  const dropTitle = (files, imports) => {
+    if (!files.length) return tr('notes.drop.none');
+    const imp = imports ? files.filter(importable).length : 0;
+    if (imp) return tr('notes.drop.import', { count: imp });
+    return tr(note ? 'notes.drop.add' : 'notes.drop.addNew', { count: files.length });
+  };
   const cmd = {
     new: newNote,
     duplicate: () => note && setSel(duplicateNote(note.slug)),
-    desktop: () => note && updateNote(note.slug, { desktop: !note.desktop }, { touch: false }),
+    // a note whose saved place is off every display comes to the display the window is on
+    desktop: () => {
+      if (!note) return;
+      const w = wm.get(wid);
+      const d = w ? displayFor(wm.frame(w)) : null;
+      toggleDesktop(note.slug, screenDisplays(), workAreaOf(d));
+    },
+    import: () => setPanel('import'),
     folder: () => note && wm.open('files', { new: true, args: { path: absFolder(note.slug) } }),
     del: () => note && setPanel('delete'),
     toggle: () => setMode((m) => (m === 'edit' ? 'read' : 'edit')),
@@ -358,10 +499,11 @@ export default function Notes() {
     wm.setMenus(wid, [
       { label: tr('notes.menu.file'), items: [
         { label: tr('notes.new'), hint: '❖N', onClick: cmd.new },
+        { label: tr('notes.import'), onClick: cmd.import },
         { label: tr('notes.duplicate'), onClick: cmd.duplicate, disabled: !note },
         { label: tr('notes.showDesktop'), checked: !!note?.desktop, onClick: cmd.desktop, disabled: !note },
         { label: tr('notes.openFolder'), onClick: cmd.folder, disabled: !note }, '-',
-        { label: tr('notes.print'), onClick: () => note && print.open({ title: note.title || tr('notes.untitled'), text: note.body }), disabled: !note }, '-',
+        { label: tr('notes.print'), onClick: () => { if (!note) return; commitLive(note.slug); const cur = noteBy(note.slug) || note; print.open({ title: cur.title || tr('notes.untitled'), text: cur.body }); }, disabled: !note }, '-',
         { label: tr('notes.delete'), onClick: cmd.del, disabled: !note },
       ] },
       { label: tr('notes.menu.edit'), items: editItems(tr, { editing: mode === 'edit' && !!note, empty: !note?.body, none: !note }, runEdit) },
@@ -394,6 +536,7 @@ export default function Notes() {
         {/* New Note: a plain + with its name as the tooltip (the ✎ read as "edit", GitHub #238) */}
         <ToolbarButton icon="+" iconSize={18} title={tr('notes.new')} onClick={() => { newNote(); if (sb.narrow) sb.close(); }} />
       </View>
+      <View {...listDrop.props} style={{ flex: 1 }}>
       <ScrollView style={{ flex: 1 }}>
         {shown.map((n) => {
           const on = note && n.slug === note.slug;
@@ -415,24 +558,45 @@ export default function Notes() {
         })}
         {!shown.length && <Text style={{ fontSize: 12, color: th.textDim, margin: 10 }}>{loaded ? tr('notes.none') : '…'}</Text>}
       </ScrollView>
+      <FilesDropHint over={listDrop.over} title={listDrop.over && dropTitle(listDrop.over.files, true)} />
+      </View>
     </>
   );
+  // (0.8.9.6.2) app skins (docs/THEMES-GUIDE.md, "App skins → Notes"): the list and the note's toolbar may be a theme's
+  const skinned = useSkinned('notes');
+  const sk = skinned ? (() => {
+    const label = (id) => tr({ list: 'apps.notes', new: 'notes.new', read: 'notes.read', edit: 'notes.edit', checklist: 'notes.fmt.task', emoji: 'notes.insertEmoji',
+      image: 'notes.insertImage', attach: 'notes.insertFile', duplicate: 'notes.duplicate', desktop: 'notes.showDesktop', folder: 'notes.openFolder', delete: 'notes.delete' }[id]);
+    const run = { new: cmd.new, read: () => setMode('read'), edit: () => setMode('edit'), checklist, emoji: () => { toEdit(); setPanel('emoji'); },
+      image: () => { toEdit(); setPanel('image'); }, attach: () => { toEdit(); setPanel('attach'); }, duplicate: cmd.duplicate, desktop: cmd.desktop, folder: cmd.folder, delete: cmd.del };
+    const m = notesModels({ notes: shown.map((n) => ({ slug: n.slug, title: n.title || tr('notes.untitled'), date: fmtDate(n.updated, formatDate), selected: !!note && n.slug === note.slug })),
+      query: q, title: note ? note.title || tr('notes.untitled') : '', mode, onDesktop: !!note?.desktop, has: !!note }, label, {
+      select: (key) => { const k = pickItem(m.pane, key); if (k) { setSel(k); setMode('read'); } },
+      search: (v) => setQ(String(v || '')),
+      command: (id) => { const c = pickCommand(m.bar, id); if (c) run[c](); },
+    });
+    return m;
+  })() : null;
   return (
     <View ref={root} {...drop.props} style={{ flex: 1, flexDirection: 'row' }}>
       {sideInline && (
+      <SkinRegion app="notes" region="sidebar" model={sk && sk.sidebar}>
       <View style={{ width: sideW, backgroundColor: th.sidebarBg, paddingTop: 12, paddingHorizontal: 10, gap: 10 }}>
         <View style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 1, backgroundColor: th.separator }} />
         {side}
       </View>
+      </SkinRegion>
       )}
       {note ? (
         <View style={{ flex: 1 }}>
+          <SkinRegion app="notes" region="toolbar" model={sk && sk.toolbar}>
           <Toolbar>
             {sb.narrow && <SidebarToggle shown={sb.shown} onClick={sb.toggle} />}
             <Segmented appearance="neutral" value={mode} onChange={setMode} options={[['read', tr('notes.read')], ['edit', tr('notes.edit')]]} />
             {!compact && <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center', marginLeft: 8 }}>
               {COLORS.map((c) => <Dot key={c} color={c} size={14} selected={c === note.color} onClick={() => updateNote(note.slug, { color: c }, { touch: false })} />)}
             </View>}
+            <ToolbarButton icon={<ChecklistGlyph color={th.text} />} title={tr('notes.fmt.task')} onClick={checklist} />
             <ToolbarSpacer />
             <MenuButton icon="⊕" title={tr('notes.insert')} items={[
               { label: tr('notes.insertEmoji'), onClick: () => { toEdit(); setPanel('emoji'); } },
@@ -448,6 +612,7 @@ export default function Notes() {
               { label: tr('notes.delete'), destructive: true, onClick: cmd.del },
             ]} />
           </Toolbar>
+          </SkinRegion>
           <View style={{ flex: 1, backgroundColor: PAPER[note.color][0] }}>
             <ThemeProvider tokens={paperTokens(th)}>
               <NoteBody key={note.slug} note={note} mode={mode} onMode={setMode} editorApi={api} showToc={toc && winW - sideW >= 520} onCommand={(b) => (b === 'n' ? cmd.new() : b === 'e' ? cmd.toggle() : null)} />
@@ -479,8 +644,14 @@ export default function Notes() {
           <View style={{ flex: 1, paddingTop: 12, paddingHorizontal: 10, gap: 10 }}>{side}</View>
         </SidebarOverlay>
       )}
+      {panel === 'import' && (
+        <View onMouseDown={(e) => e.stopPropagation?.()} style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.2)' }}>
+          <SysFilePicker title={tr('notes.importTitle')} filter={IMPORT_FILE} multiple onClose={() => setPanel(null)}
+            onPick={(p) => { setPanel(null); importPaths(Array.isArray(p) ? p : [p]); }} />
+        </View>
+      )}
       {/* over everything else, so it is not drawn under the note */}
-      <FilesDropHint over={drop.over} title={drop.over && (drop.over.files.length ? tr(note ? 'notes.drop.add' : 'notes.drop.addNew', { count: drop.over.files.length }) : tr('notes.drop.none'))}
+      <FilesDropHint over={drop.over} title={drop.over && dropTitle(drop.over.files, !note)}
         note={drop.over?.skipped && drop.over.files.length ? tr('notes.drop.skipped', { count: drop.over.skipped }) : ''} />
     </View>
   );

@@ -1,5 +1,5 @@
 // quickglyphs.jsx — the glyphs of the quick settings, drawn with views (our own shapes: no icon font, no color emoji;
-// docs/DESIGN.md, "Icons"): Lord Classic's Quick Settings and (issue #114) Lord Flow's Control Center draw the same
+// docs/DESIGN.md, "Icons"): Classic's Quick Settings and (issue #114) Flow's Control Center draw the same
 // ones. Each takes a color and, where it cuts a hole, the color of what is behind it (bg).
 import { View } from '@lordos/runtime';
 

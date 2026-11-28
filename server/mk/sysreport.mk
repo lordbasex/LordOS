@@ -14,6 +14,7 @@ SYSREPORT_CODESIG_SRC := src/sec/codesig.c src/pkg/crypto.c
 build/lordos-sysreport: src/sysreport/cli.c src/sysreport/drmprobe.c $(SYSREPORT_SRC) $(SYSREPORT_HDR) $(SYSREPORT_BENCH_SRC) $(SYSREPORT_CODESIG_SRC) $(wildcard src/bench/*.h) src/sec/codesig.h build/gen/lord_version.h build/gen/codesig_build.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) -Ibuild/gen $(CFLAGS) $(WARN) -std=c11 -o $@ src/sysreport/cli.c src/sysreport/drmprobe.c $(SYSREPORT_SRC) $(SYSREPORT_BENCH_SRC) $(SYSREPORT_CODESIG_SRC) -lm -lpthread
+	chmod g-w $@
 # five fake machines full of serials, UUIDs, MACs and names that must not reach a report (periph.c is
 # lord.sysinfo.peripherals(): on screen only, so it is not in SYSREPORT_SRC and the commands can't print it);
 # `build/sysreport-test fixture <dir> amd|intel|nvidia|rpi5|vm` writes one for `--root`

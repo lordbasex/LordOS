@@ -117,7 +117,7 @@ Shape of the state:
 Inputs with `monitorOf >= 0` are the "monitor" of an output, what plays through it. The UI
 normally hides them from the microphone list.
 
-## Sound wave (0.8.8.10, Lord Workspaces' widget)
+## Sound wave (0.8.8.10, Workspaces' widget)
 
 `lord.sound.spectrum` opens one more recording stream from our own client, like the meter (mono float at 48 kHz,
 fragments of 1600 samples: 30 a second). The desktop is the monitor of an output; one app is that same monitor with
@@ -163,7 +163,7 @@ switched the headset to SCO audio, which that adapter can't carry.
   (an update always asks for a restart).
 - LordOS switches the profile itself, through `lord.sound.setProfile` (`SET_CARD_PROFILE`), with the
   rules of `sdk/btaudiomodel.js`, applied by `sound.setDefault` in `sdk/sound.js` (every output list
-  goes through it: Settings → Sound, Lord Flow's Control Center, Lord Classic's Quick Settings):
+  goes through it: Settings → Sound, Flow's Control Center, Classic's Quick Settings):
   - choosing a headset as the output gives it its high fidelity profile, unless its microphone is
     the chosen input (then it stays in headset mode, the only one with both). The output is made the
     default right away and again once the switched card's new output appears;

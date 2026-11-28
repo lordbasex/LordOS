@@ -364,6 +364,7 @@ MediaSrc *media_src_new(int kind, const char *app) {
         s->kind = kind;
         s->sock = s->in_fd = -1;
         s->cur_slot = -1;
+        s->nv_slot = -1;
         snprintf(s->app, sizeof s->app, "%s", app ? app : "");
         media_view_reset(s);
         return s;
@@ -378,74 +379,7 @@ MediaSrc *media_src_get(int id) {
     return NULL;
 }
 
-/* a node in crop_nodes still shows a part of this source? */
-static Node *crop_node(MediaSrc *s, int i) {
-    Node *n = s->crop_nodes[i] ? node_get(s->crop_nodes[i]) : NULL;
-    if (n && n->type == NODE_MEDIA && n->term == s->id && n->crop) return n;
-    s->crop_nodes[i] = 0;
-    return NULL;
-}
-
-int media_src_crop_count(MediaSrc *s) {
-    int k = 0;
-    for (int i = 0; i < MEDIA_CROP_NODES; i++) if (crop_node(s, i)) k++;
-    return k;
-}
-
-/* The part of a node that shows the picture's pixels x, y, w × h (where its last paint put them, media_paint), in the
- * node's logical coordinates, one pixel wider on each side for the scaled picture's filter; the whole node when that
- * paint is unknown, rotated or mirrored, or was of another size. 0 when nothing of it is in the box. */
-static int node_part(const MediaSrc *s, const Node *n, int x, int y, int w, int h, Box *out) {
-    const float *pd = node_padding(n);
-    float bl = node_border(n, EDGE_L), bt = node_border(n, EDGE_T), br = node_border(n, EDGE_R), bb = node_border(n, EDGE_B);
-    float cx = n->ax + pd[EDGE_L] + bl, cy = n->ay + pd[EDGE_T] + bt;
-    float cw = n->w - pd[EDGE_L] - pd[EDGE_R] - bl - br, ch = n->h - pd[EDGE_T] - pd[EDGE_B] - bt - bb;
-    *out = (Box){ floorf(n->ax), floorf(n->ay), ceilf(n->ax + n->w), ceilf(n->ay + n->h) };
-    if (!s->map_ok || s->map_w != s->w || s->map_h != s->h || cw <= 0 || ch <= 0) return 1;
-    float x0 = cx + cw * (s->map_fx + (float)(x - 1) * s->map_kx), x1 = cx + cw * (s->map_fx + (float)(x + w + 1) * s->map_kx);
-    float y0 = cy + ch * (s->map_fy + (float)(y - 1) * s->map_ky), y1 = cy + ch * (s->map_fy + (float)(y + h + 1) * s->map_ky);
-    x0 = fmaxf(floorf(x0) - 1, cx); y0 = fmaxf(floorf(y0) - 1, cy);
-    x1 = fminf(ceilf(x1) + 1, cx + cw); y1 = fminf(ceilf(y1) + 1, cy + ch);
-    if (x1 <= x0 || y1 <= y0) return 0;
-    *out = (Box){ floorf(x0), floorf(y0), ceilf(x1), ceilf(y1) };
-    return 1;
-}
-
-int media_src_damage_rect(MediaSrc *s, int x, int y, int w, int h) {
-    int k = 0;
-    media_pd_note(s, x, y, w, h);
-    Node *n = s->node ? node_get(s->node) : NULL;
-    if (n && n->type == NODE_MEDIA && n->term == s->id && !n->crop && n->prev_box.x1 > n->prev_box.x0) {
-        /* only where the picture changed (Machines: a pointer, a clock), as the crop nodes below: the rest of the
-         * node keeps its pixels (docs/MACHINES-GPU.md, Part 1 step 3) */
-        Box b;
-        if (node_part(s, n, x, y, w, h, &b)) { damage_add(b); k++; }
-    } else s->node = 0;
-    for (int i = 0; i < MEDIA_CROP_NODES; i++) {
-        Node *c = crop_node(s, i);
-        if (!c || c->prev_box.x1 <= c->prev_box.x0 || c->w <= 0 || c->h <= 0) continue;
-        const float *r = c->crop;
-        /* the changed area inside this node's part, in the node's coordinates (the part is stretched over the box) */
-        float x0 = fmaxf((float)x, r[0]), y0 = fmaxf((float)y, r[1]), x1 = fminf((float)(x + w), r[0] + r[2]), y1 = fminf((float)(y + h), r[1] + r[3]);
-        if (x1 <= x0 || y1 <= y0) continue;
-        float sx = c->w / r[2], sy = c->h / r[3];
-        damage_add((Box){ floorf(c->ax + (x0 - r[0]) * sx) - 1, floorf(c->ay + (y0 - r[1]) * sy) - 1,
-                          ceilf(c->ax + (x1 - r[0]) * sx) + 1, ceilf(c->ay + (y1 - r[1]) * sy) + 1 });
-        k++;
-    }
-    ui.dirty = 1;
-    return k;
-}
-
-void media_src_damage(MediaSrc *s) {
-    Node *n = s->node ? node_get(s->node) : NULL;
-    /* only the node's box (not the shadow margin): that way a new frame falls inside it (media_cover_node) */
-    if (n && n->type == NODE_MEDIA && n->term == s->id && n->prev_box.x1 > n->prev_box.x0)
-        damage_add((Box){ floorf(n->ax), floorf(n->ay), ceilf(n->ax + n->w), ceilf(n->ay + n->h) });
-    else s->node = 0;
-    if (s->w > 0 && s->h > 0) for (int i = 0; i < MEDIA_CROP_NODES; i++) if (s->crop_nodes[i] && crop_node(s, i)) { media_src_damage_rect(s, 0, 0, s->w, s->h); break; }
-    ui.dirty = 1;
-}
+/* the nodes that show a source, their damage and present: mviews.c */
 
 /* ---- pictures that are GPU textures (Machines: docs/MACHINES-GPU.md, "A vGPU's picture without a readback") ---- */
 
@@ -485,41 +419,6 @@ void media_src_tex_fresh(MediaSrc *s) {
 void media_src_need_cpu(MediaSrc *s) {
     if (!s || !s->cpu_stale || !s->cpu_read) return;
     if (!s->cpu_read(s->id)) s->cpu_stale = 0;
-}
-
-static Box present_box;
-static int present_on;
-
-void media_src_present(MediaSrc *s) {
-    Box b = { 0, 0, 0, 0 };
-    int k = 0;
-    Node *n = s->node ? node_get(s->node) : NULL;
-    if (n && n->type == NODE_MEDIA && n->term == s->id && !n->crop && n->prev_box.x1 > n->prev_box.x0) { b = n->prev_box; k = 1; }
-    for (int i = 0; i < MEDIA_CROP_NODES; i++) {
-        Node *c = crop_node(s, i);
-        if (!c || c->prev_box.x1 <= c->prev_box.x0) continue;
-        if (!k) b = c->prev_box;
-        else { b.x0 = fminf(b.x0, c->prev_box.x0); b.y0 = fminf(b.y0, c->prev_box.y0); b.x1 = fmaxf(b.x1, c->prev_box.x1); b.y1 = fmaxf(b.y1, c->prev_box.y1); }
-        k = 1;
-    }
-    if (!k) { s->painted_seq = s->frame_seq; return; }      /* not shown anywhere: nothing to present */
-    if (!present_on) present_box = b;
-    else {
-        present_box.x0 = fminf(present_box.x0, b.x0); present_box.y0 = fminf(present_box.y0, b.y0);
-        present_box.x1 = fmaxf(present_box.x1, b.x1); present_box.y1 = fmaxf(present_box.y1, b.y1);
-    }
-    present_on = 1;
-    /* the frame counts as read: the present that follows draws the texture it is in (js_vm_painted acknowledges it) */
-    s->painted_seq = s->frame_seq;
-}
-
-int media_present_pending(void) { return present_on; }
-
-int media_present_take(float *x0, float *y0, float *x1, float *y1) {
-    if (!present_on) return 0;
-    *x0 = present_box.x0; *y0 = present_box.y0; *x1 = present_box.x1; *y1 = present_box.y1;
-    present_on = 0;
-    return 1;
 }
 
 /* ---- a source's own pointer (Machines: the guest's CursorDefine) ---- */
@@ -580,6 +479,7 @@ int media_node_cursor(int id, const uint32_t **px, int *w, int *h, int *hx, int 
 }
 
 static void unmap_pixels(MediaSrc *s) {
+    media_nv_free(s);
     if (s->map) munmap(s->map, s->map_len);
     s->map = NULL;
     s->map_len = 0;
@@ -602,6 +502,8 @@ static void drop_helper(MediaSrc *s, int grace) {
     bury(s->pid, grace);
     s->pid = 0;
 }
+
+void media_helper_stop(MediaSrc *s) { drop_helper(s, 2000); }
 
 void media_src_close(MediaSrc *s) {
     if (!s || !s->used) return;
@@ -635,7 +537,7 @@ static const char *state_name(int st) {
 }
 
 /* Helper's shared memory: it has to be sealed against shrinking and be large enough. */
-static uint8_t *map_sealed(int fd, size_t need) {
+uint8_t *media_map_sealed(int fd, size_t need) {
     struct stat st;
     int seals = fcntl(fd, F_GET_SEALS);
     if (need == 0 || fstat(fd, &st) || (size_t)st.st_size < need || seals < 0 || !(seals & F_SEAL_SHRINK)) {
@@ -704,9 +606,13 @@ static void on_src_msg(MediaSrc *s, const MediaMsg *m, int *fds) {
         break;
     case MM_RING: {
         int64_t w = m->v[1], h = m->v[2], slots = m->v[3];
+        /* NV12 (mambient.c): only from a lord-media player; the layout from proto.c's rules, never the helper's sizes */
+        if (m->v[4] != MF_BGRA) { if (s->nv_capable) media_nv_ring(s, m, fds[0]); break; }
+        if (m->v[5] != 0) break;
         if (fds[0] < 0 || w < 1 || h < 1 || w > MP_MAX_DIM || h > MP_MAX_DIM || slots < 1 || slots > MP_RING_SLOTS) break;
+        if (s->nv) media_nv_reset(s);
         size_t need = (size_t)w * (size_t)h * 4 * (size_t)slots;
-        uint8_t *map = map_sealed(fds[0], need);
+        uint8_t *map = media_map_sealed(fds[0], need);
         if (!map) break;
         if (s->map) munmap(s->map, s->map_len);
         s->map = map;
@@ -720,6 +626,12 @@ static void on_src_msg(MediaSrc *s, const MediaMsg *m, int *fds) {
     }
     case MM_FRAME: {
         int gen = (int)(m->id >> 8), slot = (int)(m->id & 0xff);
+        if (s->nv_map && gen == s->ring_gen) {
+            if (slot >= s->nv_ring.slots) break;
+            mp_sendv(s->sock, MM_ACK, m->id, 0, 0, 0, 0);
+            media_nv_frame(s, slot, m->v[0]);
+            break;
+        }
         if (!s->map || gen != s->ring_gen || slot >= s->ring_slots) break;
         s->cur_slot = slot;
         s->w = s->ring_w;
@@ -727,9 +639,13 @@ static void on_src_msg(MediaSrc *s, const MediaMsg *m, int *fds) {
         s->frame_seq++;
         s->pos = m->v[0];
         mp_sendv(s->sock, MM_ACK, m->id, 0, 0, 0, 0);
+        if (s->nv_capable) media_src_format_check(s);      /* the GPU came (back): NV12 from the next frame */
         media_src_damage(s);
         break;
     }
+    case MM_DMAFRAME:
+        if (s->nv_capable) media_dma_frame(s, m, payload, fds);
+        break;
     case MM_POS:
         s->pos = m->v[0];
         s->dur = m->v[1];
@@ -901,7 +817,7 @@ static void job_finish(Job *j, int status, int fd) {
         if (s && s->kind == SK_IMAGE && (s->job == j->id || s->job == 0)) {
             int w = 0, h = 0;
             sscanf(payload, "{\"width\":%d,\"height\":%d", &w, &h);
-            uint8_t *map = (ok && fd >= 0 && w > 0 && h > 0 && w <= MP_MAX_DIM && h <= MP_MAX_DIM) ? map_sealed(fd, (size_t)w * h * 4) : NULL;
+            uint8_t *map = (ok && fd >= 0 && w > 0 && h > 0 && w <= MP_MAX_DIM && h <= MP_MAX_DIM) ? media_map_sealed(fd, (size_t)w * h * 4) : NULL;
             if (map) {
                 s->map = map;
                 s->map_len = (size_t)w * h * 4;
@@ -922,7 +838,7 @@ static void job_finish(Job *j, int status, int fd) {
     case JP_SVG: {
         int w = 0, h = 0;
         sscanf(payload, "{\"width\":%d,\"height\":%d", &w, &h);
-        uint8_t *map = (ok && fd >= 0 && w > 0 && h > 0 && w <= 256 && h <= 256) ? map_sealed(fd, (size_t)w * h * 4) : NULL;
+        uint8_t *map = (ok && fd >= 0 && w > 0 && h > 0 && w <= 256 && h <= 256) ? media_map_sealed(fd, (size_t)w * h * 4) : NULL;
         svgicon_done(j->params, w, h, (const uint32_t *)map);      /* premultiplied BGRA is the images' ARGB */
         if (map) munmap(map, (size_t)w * h * 4);
         break;
@@ -930,7 +846,7 @@ static void job_finish(Job *j, int status, int fd) {
     case JP_PIXELS: {
         int w = 0, h = 0;
         sscanf(payload, "{\"width\":%d,\"height\":%d", &w, &h);
-        uint8_t *map = (ok && fd >= 0 && w > 0 && h > 0 && w <= 1024 && h <= 1024) ? map_sealed(fd, (size_t)w * h * 4) : NULL;
+        uint8_t *map = (ok && fd >= 0 && w > 0 && h > 0 && w <= 1024 && h <= 1024) ? media_map_sealed(fd, (size_t)w * h * 4) : NULL;
         if (map) {
             int slot = 0;
             for (int i = 1; i < 16; i++) if (pix[i].at < pix[slot].at) slot = i;

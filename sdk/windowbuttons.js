@@ -1,7 +1,7 @@
 // windowbuttons.js — which side of a title bar the close, minimize and maximize buttons go on, no screen (issue #58).
-// Settings → Desktop & Dock → Title bars: 'auto' (each theme's own place: Lord Flow's circles at the start, Lord Classic's
+// Settings → Desktop & Dock → Title bars: 'auto' (each theme's own place: Flow's circles at the start, Classic's
 // buttons at the end), 'left' or 'right'. Left and right are the screen's sides in every language; 'auto' follows the
-// reading direction, as the themes always did (in Arabic Lord Flow's circles are on the right).
+// reading direction, as the themes always did (in Arabic Flow's circles are on the right).
 // node server/tests/windowbuttons_test.mjs
 
 export const WINDOW_BUTTON_SIDES = ['auto', 'left', 'right'];
@@ -10,7 +10,7 @@ export const WINDOW_BUTTON_SIDES = ['auto', 'left', 'right'];
 export const windowButtonsPref = (s) => (WINDOW_BUTTON_SIDES.includes(s && s.windowButtons) ? s.windowButtons : 'auto');
 
 // Whether the buttons go first in the title bar's row (the engine mirrors a row right to left). themeStart: the
-// theme's own place for 'auto' (Lord Flow: true, Lord Classic: false).
+// theme's own place for 'auto' (Flow: true, Classic: false).
 export function buttonsAtStart(pref, themeStart, rtl = false) {
   if (pref === 'left') return !rtl;
   if (pref === 'right') return !!rtl;

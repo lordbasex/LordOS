@@ -13,7 +13,7 @@
 // go into a "more apps" button at the end of the row, so the row never runs over the tray (../taskbarfit.js).
 //
 // One taskbar per display (0.8.8.6; Settings → Desktop & Dock → Taskbar → "Show the taskbar on every display", on by
-// default, the same settings.menuBarAllDisplays as Lord Flow's menu bar): each one is whole (start, pinned and
+// default, the same settings.menuBarAllDisplays as Flow's menu bar): each one is whole (start, pinned and
 // running apps, Trash, tray, clock) and every bar shows every app, as there is no per-display window list. `area`
 // is the display it is drawn on; the panels it opens go on that display (themes/classic/index.jsx). The bars share
 // one clock timer and one network poll, and each registers its own drop target for pins.
@@ -23,10 +23,14 @@ import {
   useTrash, openTrash, refreshTrash, trashMenu, StatusItems, PrivacyIndicators, keyboard, useSound, defaultSink, LordOSLogo,
   mainDisplay, toggleShowDesktop, menuBarPrefs, statusItems, useIndicators, wifiBars,
 } from '@lordos/sdk';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { Menu } from './Menu.jsx';
 import { taskbarFit, iconFor } from '../taskbarfit.js';
 import { SearchGlyph, TaskViewGlyph, NetworkGlyph, SpeakerGlyph, BellGlyph, TrashGlyph } from '../glyphs.jsx';
+// an icon draws again only for its own picture and size, not with every render of the bar (a window's title changing
+// re-renders the bar's list: BUG-9 of the 0.8.9.6.2 QA)
+const IconGlyph = memo(function IconGlyph({ Icon, size }) { return Icon ? <Icon size={size} /> : null; });
+
 
 export const BAR_H = 48;      // bar at the top or bottom
 export const BAR_W = 56;      // bar on the left or right (icons only)
@@ -206,7 +210,7 @@ export function Taskbar({ t, pos, align, area, start, onStart, onSearch, taskVie
         onClick={() => { hideTip(); click(e); }} onContextMenu={(ev) => { hideTip(); setJump({ entry: e, at: menuAt(ev) }); }}
         onMouseDown={(ev) => { if (!ev.button) beginDockDrag({ id: e.id, Icon: e.Icon, x: ev.x, y: ev.y, source: 'dock' }); }}
         onEnter={() => showTip(title, refs.current.get(e.id))} onLeave={hideTip} style={{ opacity: dragged ? 0.35 : 1 }}>
-        <e.Icon size={iconFor(fit.size)} />
+        <IconGlyph Icon={e.Icon} size={iconFor(fit.size)} />
         {indicator(e)}
         {/* a web app's unread count (SetBadge): a red badge, "99+" past 99 (the window count moves down then) */}
         {e.badge ? <View style={{ position: 'absolute', right: 1, top: 1, minWidth: 14, height: 14, paddingHorizontal: 3, borderRadius: 7,

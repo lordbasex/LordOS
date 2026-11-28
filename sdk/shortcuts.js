@@ -82,8 +82,8 @@ const fullClipboard = () => toggleClipboardPanel('full');
 // Ctrl+Space stays with the program in the Terminal (in emacs it marks the start of a selection).
 const notInTerminal = () => spotlightOpen.get() || String(wm.focused() || '').split('#')[0] !== 'terminal';
 
-// F10, or ⌥ alone, opens the menu bar of the window in front from the keyboard (Lord Flow's bar on the focused
-// window's display, Lord Classic's strip under the focused window's title): the first bar whose can() says yes.
+// F10, or ⌥ alone, opens the menu bar of the window in front from the keyboard (Flow's bar on the focused
+// window's display, Classic's strip under the focused window's title): the first bar whose can() says yes.
 // The Terminal keeps F10 (programs in it use it) and a Linux app has its own menus and gets its keys first (wl.c).
 let menuBars = [];
 export function addMenuBarKeys(bar) {
@@ -97,7 +97,7 @@ const frontBar = () => {
 };
 const openMenuBar = () => frontBar()?.run();
 
-// With `appsPaste` (Lord Flow) ❖V is paste in a LordOS app inside the session, as it is in a Linux app:
+// With `appsPaste` (Flow) ❖V is paste in a LordOS app inside the session, as it is in a Linux app:
 // the key goes to the app, and ❖⇧V is the clipboard. An isolated app never receives ❖V (wl.c).
 let appsPaste = false;
 const clipboardKeyIsOurs = () => {
@@ -153,7 +153,7 @@ function index() {
   return map;
 }
 
-// Is this combination the shell's right now? A menu shows another key for what the theme takes (Files in Lord Classic).
+// Is this combination the shell's right now? A menu shows another key for what the theme takes (Files in Classic).
 export function shortcutTaken(combo) {
   lookup = lookup || index();
   return (lookup.get(parseCombo(combo)) || []).some((e) => !e.when || e.when());
@@ -161,6 +161,14 @@ export function shortcutTaken(combo) {
 export function shortcutReserved(combo) {
   lookup = lookup || index();
   return (lookup.get(parseCombo(combo)) || []).length > 0;
+}
+
+// Is this combination one of the keys every theme shares (BASE)? A community theme's table never takes one
+// (sdk/themeapi.js themeUseShortcuts): a theme's entries come before BASE's in the lookup.
+let baseCombos = null;
+export function shortcutInBase(combo) {
+  if (!baseCombos) baseCombos = new Set(BASE.flatMap((e) => e.keys.map(parseCombo)));
+  return typeof combo === 'string' && baseCombos.has(parseCombo(combo));
 }
 
 // A field recording a new combination (an app's global shortcut) gets every press that is not a modifier, and
@@ -243,11 +251,11 @@ export function useShortcuts({ grabs = '', table = [], onSuperTap: tap = null, a
     changed();
     return () => { themeTable = []; onSuperTap = null; changed(); };
   }, []);
-  // a setting can change the table of keys while the theme runs (Lord Flow's ⌃ arrows, the switcher's keys)
+  // a setting can change the table of keys while the theme runs (Flow's ⌃ arrows, the switcher's keys)
   useEffect(() => { themeTable = table; setGrabs(grabs); changed(); }, [grabs]);
 }
 
-// Runs a module's entry by its id (Lord Classic's ❖⇧S is Screenshots' area capture).
+// Runs a module's entry by its id (Classic's ❖⇧S is Screenshots' area capture).
 export function runShortcut(id) { added.find((x) => x.id === id)?.run(); }
 
 export function addShortcuts(entries) {
@@ -259,6 +267,7 @@ export function addShortcuts(entries) {
 // ---- the list in Settings → Keyboard ----
 
 const SYMBOLS = { Meta: '❖', Ctrl: '⌃', Alt: '⌥', Shift: '⇧' };
+const LONE_MODS = new Set(Object.values(SYMBOLS));
 const KEY_LABELS = { Escape: 'Esc', ArrowLeft: '←', ArrowRight: '→', ArrowUp: '↑', ArrowDown: '↓' };
 export function comboLabel(combo) {
   const parts = combo.split('+');
@@ -276,7 +285,9 @@ export function shortcutList() {
   const from = new Map([...added.map((e) => [e, 'app']), ...themeTable.map((e) => [e, 'theme']), ...BASE.map((e) => [e, 'lordos'])]);
   for (const entry of [...added, ...themeTable, ...BASE]) {
     if (!entry.label || (entry.listed && !entry.listed())) continue;
-    const keys = entry.show || entry.keys.map(comboLabel);
+    // a modifier shown by itself is that key pressed and released alone ("❖ alone"), never part of the next one: Flow's
+    // Apps row read "❖ · F4" and was taken for ❖+F4 (ws170 QA BUG-21)
+    const keys = (entry.show || entry.keys.map(comboLabel)).map((k) => (LONE_MODS.has(k) ? t('shell.shortcuts.alone', { key: k }) : k));
     const list = groups.get(entry.group) || groups.get('system');
     const same = list.find((x) => x.labelKey === entry.label);
     if (same) same.keys.push(...keys.filter((k) => !same.keys.includes(k)));

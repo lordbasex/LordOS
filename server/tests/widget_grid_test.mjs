@@ -1,7 +1,7 @@
 // widget_grid_test.mjs — the desktop widgets' grid (sdk/widgetgrid.js): cells per work area, blocks by size, a widget's
 // cells reserved, the first free block from the top right and the nearest free one to a drop.
 // node server/tests/widget_grid_test.mjs
-import { gridOf, rectOf, occupancy, fits, firstFree, nearestFree, cellAt, SIZES, CELL, GAP, MARGIN } from '../../sdk/widgetgrid.js';
+import { gridOf, rectOf, occupancy, fits, firstFree, nearestFree, cellAt, pinBlocks, pinnedRect, SIZES, CELL, GAP, MARGIN } from '../../sdk/widgetgrid.js';
 
 let ok = 0, bad = 0;
 const eq = (name, a, b) => {
@@ -27,6 +27,21 @@ eq('nearestFree: dropped over another widget, a nearest free block (two cells aw
 eq('nearestFree: none when the grid is full', nearestFree({ ...g, cols: 2, rows: 2 }, [{ id: 'x', size: 'l', col: 0, row: 0 }], 's', 0, 0), null);
 eq('cellAt: the nearest cell corner', cellAt(g, g.x + CELL + GAP + 20, g.y + 5), { col: 1, row: 0 });
 eq('cellAt: clamped inside', cellAt(g, g.x - 900, g.y - 900), { col: 0, row: 0 });
+
+// QA 0.8.9.6.2: a new widget never lands on a pinned one. A small area, one row of cells, the sound wave pinned along
+// the bottom centre over the middle cells: the first free block skips them
+{
+  const a = { x: 0, y: 0, w: 4 * CELL + 3 * GAP + 2 * MARGIN, h: CELL + 2 * MARGIN };
+  const gg = gridOf(a);
+  const pins = [{ size: 'm', opts: { pin: 'bottom-center' } }];
+  const blocks = pinBlocks(gg, a, pins);
+  const pr = pinnedRect(a, 'm', 'bottom-center');
+  eq('pinned: its cells are blocked', blocks.map((b) => b.col).sort(), [1, 2]);
+  eq('pinned: really under it', blocks.every((b) => { const c = rectOf(gg, b.col, b.row, 's'); return c.x < pr.x + pr.w && pr.x < c.x + c.w; }), true);
+  eq('a new small widget goes beside it', firstFree(gg, blocks, 's'), { col: 3, row: 0 });
+  eq('a medium one has no room', firstFree(gg, blocks, 'm'), null);
+  eq('no pins, no blocks', pinBlocks(gg, a, [{ size: 'm', opts: {} }]), []);
+}
 
 console.log(bad ? `widget-grid-test: ${bad} FAILED` : `widget-grid-test: ${ok} ok`);
 if (bad) process.exit(1);

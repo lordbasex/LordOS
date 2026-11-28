@@ -162,6 +162,7 @@
     "other": "{count} để cập nhật"
   },
   "remove": "Gỡ",
+  "removeAsk": "Gỡ {name}?",
   "rescue.ask": "Không có tài khoản nào trên máy tính này là quản trị viên. Nếu bạn biết mật khẩu root, bạn có thể đặt tài khoản này làm quản trị viên. Thay đổi chỉ có hiệu lực sau khi khởi động lại máy tính.",
   "rescue.button": "Đặt tôi làm quản trị viên",
   "rescue.noSudo": "Không có tài khoản nào trên máy tính này là quản trị viên, và gói sudo chưa được cài. Với quyền root, hãy chạy apt install sudo, rồi thử lại ở đây.",
@@ -226,7 +227,7 @@
   },
   "suggest.nvidiaDriver.detail": "Hiện nó đang dùng nouveau, trình điều khiển tự do đi kèm LordOS. Trình điều khiển của hãng ({packages}) thường cho hiệu năng 3D và quản lý điện năng tốt hơn.",
   "suggest.nvidiaDriver.note.nouveau": "Cho đến khi bạn cài nó, trình điều khiển tự do nouveau vẫn được dùng; gỡ gói sẽ quay lại dùng nouveau.",
-  "suggest.nvidiaDriver.note.older": "Các card cũ hơn khoảng năm 2014 không được phiên bản trình điều khiển này hỗ trợ; hãy giữ trình điều khiển tự do cho chúng. Màn hình nền LordOS chưa được kiểm tra với trình điều khiển này.",
+  "suggest.nvidiaDriver.note.older": "Các card cũ hơn khoảng năm 2014 không được phiên bản trình điều khiển này hỗ trợ; hãy giữ trình điều khiển tự do trên chúng. Màn hình nền LordOS với trình điều khiển này là thử nghiệm: một báo cáo cộng đồng cho thấy nó được kết hợp trên card (một GTX 1070 với trình điều khiển 580); một báo cáo trước do bộ xử lý kết hợp.",
   "suggest.nvidiaDriver.note.secureBoot": "Trình điều khiển được dựng cho nhân của bạn trên máy tính này (DKMS) và dựng lại sau mỗi lần cập nhật nhân. Khi bật Secure Boot, bạn phải đăng ký khóa ký của nó ở lần khởi động lại tới, nếu không trình điều khiển sẽ không tải.",
   "suggest.nvidiaDriver.title": "Trình điều khiển đồ họa độc quyền",
   "suggest.nvidiaDriver.unavailable": "Trình điều khiển của hãng cần các thành phần contrib và non-free của Debian, và chúng chưa được bật cùng lúc trong nguồn gói của máy tính này. Trình điều khiển tự do nouveau vẫn tiếp tục hoạt động.",

@@ -162,6 +162,7 @@
     "other": "{count} untuk dikemas kini"
   },
   "remove": "Alih keluar",
+  "removeAsk": "Alih keluar {name}?",
   "rescue.ask": "Tiada akaun pada komputer ini ialah pentadbir. Jika anda tahu kata laluan root, anda boleh menjadikan akaun ini pentadbir. Ia berkuat kuasa hanya selepas komputer dimulakan semula.",
   "rescue.button": "Jadikan Saya Pentadbir",
   "rescue.noSudo": "Tiada akaun pada komputer ini ialah pentadbir, dan pakej sudo tidak dipasang. Sebagai root, jalankan apt install sudo, kemudian cuba lagi di sini.",
@@ -226,7 +227,7 @@
   },
   "suggest.nvidiaDriver.detail": "Kini ia menggunakan nouveau, pemacu bebas yang disertakan dengan LordOS. Pemacu vendor ({packages}) biasanya memberikan prestasi 3D dan pengurusan kuasa yang lebih baik.",
   "suggest.nvidiaDriver.note.nouveau": "Sehingga anda memasangnya, pemacu bebas nouveau terus digunakan; mengalih keluar pakej akan kembali kepadanya.",
-  "suggest.nvidiaDriver.note.older": "Kad yang lebih lama daripada kira-kira 2014 tidak disokong oleh versi pemacu ini; kekalkan pemacu bebas padanya. Desktop LordOS belum diuji dengan pemacu ini.",
+  "suggest.nvidiaDriver.note.older": "Kad yang lebih lama daripada kira-kira 2014 tidak disokong oleh versi pemacu ini; kekalkan pemacu bebas padanya. Desktop LordOS dengan pemacu ini adalah eksperimen: satu laporan komuniti menunjukkannya digubah pada kad (GTX 1070 dengan pemacu 580); laporan lebih awal digubah oleh pemproses.",
   "suggest.nvidiaDriver.note.secureBoot": "Pemacu dibina untuk kernel anda pada komputer ini (DKMS) dan sekali lagi selepas setiap kemas kini kernel. Dengan Secure Boot dihidupkan, anda perlu mendaftarkan kunci tandatangannya pada permulaan semula seterusnya, atau pemacu tidak akan dimuatkan.",
   "suggest.nvidiaDriver.title": "Pemacu grafik proprietari",
   "suggest.nvidiaDriver.unavailable": "Pemacu vendor memerlukan komponen contrib dan non-free Debian, dan kedua-duanya tidak didayakan dalam sumber pakej komputer ini. Pemacu bebas, nouveau, terus berfungsi.",

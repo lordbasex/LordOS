@@ -54,7 +54,7 @@
         ["06-tab-user", "User", "Your administrator account: full name, user name and a password typed twice. Only a one-way hash of the password goes on the card. Automatic login is optional."],
         ["07-tab-wifi", "Wi-Fi", "The network name exactly as it appears (capitals count) and its password. The card keeps the network's derived key, never the password you typed. Hidden and open networks work too."],
         ["08-tab-remote", "Remote access", "Remote login (SSH): off, keys only (recommended) or password and keys. You can also turn on LordOS remote desktop; it stays on your local network."],
-        ["09-tab-look", "Appearance", "Lord Flow or Lord Classic, light or dark, an accent color and a wallpaper."],
+        ["09-tab-look", "Appearance", "Flow or Classic, light or dark, an accent color and a wallpaper."],
         ["10-tab-cooling", "Cooling", "Tell LordOS what keeps the board cool and it picks the fan curve to match. Not sure? See [Which cooling do I have?](#cooling)."],
         ["11-tab-cooling-overclock", "Mild overclock", "Only with a fan: 2.6 GHz instead of 2.4 GHz, with no extra voltage. The warning explains how to undo it."],
         ["12-tab-more", "More", "Bluetooth, automatic update checks, and a promise: LordOS collects nothing."],

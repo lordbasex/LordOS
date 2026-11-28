@@ -15,6 +15,8 @@ const instances = new Map();          // native id → reconciler instance
 const listeners = { navigate: new Set(), pointermove: new Set(), pointerdown: new Set(), pointerup: new Set(), keydown: new Set(), keyup: new Set(), swipe: new Set(), pinch: new Set(), pointerlock: new Set() };
 
 export const register = (inst) => instances.set(inst.id, inst);
+// the instance a native node id belongs to (Hands' reader resolves what the hit test found: sdk/hands.jsx)
+export const instanceOf = (id) => instances.get(id) || null;
 
 // ---- for lord-server's stall detector (server/src/ui/js.c) ----
 // What React did in the run in progress (index.js counts it) and the node the last pointer event was for. When a run

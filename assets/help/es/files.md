@@ -18,7 +18,7 @@ El explorador de archivos.
 - **Pestañas** (❖T) y **ventanas nuevas** (❖N).
 - **Vista rápida:** Espacio muestra la imagen, el texto, el PDF o el video sin abrirlo; las
   flechas pasan al siguiente.
-- **Ver información** (❖I): tamaño, ubicación, fechas, permisos y «Abrir con».
+- **Propiedades** (❖I): tamaño, ubicación, fechas, permisos y «Abrir con».
 
 ## Trabajar con archivos
 

@@ -11,7 +11,7 @@ Think of a reader who sits next to you and only ever reads what you point at. Th
 ## Where you find it
 
 - **Speech in every app with text.** *Edit → Speech* in the Text Editor and the Terminal (in Notes, under View), and the same in the right-click menu of the Text Editor, the Terminal and Notes: *Start Speaking*, *Stop Speaking* and *Save as Audio…*. Start Speaking reads the selection, or the whole text when nothing is selected.
-- **Linux apps too.** A Linux app gets an *Edit* menu with Speech in the menu bar (in Lord Classic, in its window's menu strip), which reads what you selected in it.
+- **Linux apps too.** A Linux app gets an *Edit* menu with Speech in the menu bar (in Classic, in its window's menu strip), which reads what you selected in it.
 - **A small player.** While it reads, a pill shows the voice's wave in color, with read again, pause and go on, stop, and close. You can drag it anywhere, even to another display, and the next reading opens there.
 - **Save as Audio…** asks where to save with the usual dialog and writes a WAV file.
 - **Live Speech** (❖⇧Esc): a box where you type, press Enter, and it is said with your chosen voice. Recent phrases stay below, in memory only, to be said again. It helps anyone who can't or would rather not speak.

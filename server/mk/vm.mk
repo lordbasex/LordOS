@@ -56,6 +56,7 @@ test: build/lord-vm-testpaths
 build/lordos-guest: ../tools/guest/lordos-guest.c ../tools/guest/gshell.c ../tools/guest/gshell.h ../tools/guest/x11clip.c ../tools/guest/x11clip.h ../tools/guest/perf.c ../tools/guest/perf.h ../tools/guest/dbusmin.c ../tools/guest/dbusmin.h ../tools/guest/gsend.c ../tools/guest/gsend.h ../tools/guest/gnotes.c ../tools/guest/gnotes.h src/vm/vmagent.c src/vm/vmagent.h src/pkg/crypto.c
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) -O2 $(WARN) -std=gnu11 -static -o $@ ../tools/guest/lordos-guest.c ../tools/guest/gshell.c ../tools/guest/x11clip.c ../tools/guest/perf.c ../tools/guest/dbusmin.c ../tools/guest/gsend.c ../tools/guest/gnotes.c src/vm/vmagent.c src/pkg/crypto.c
+	chmod g-w $@
 
 # The "LordOS Guest Tools" disc (docs/VIRTUALIZATION.md 6.17): for a Linux machine without qemu-guest-agent, a read-only
 # ISO 9660 image with lordos-guest (stripped), install.sh, its checksum and a README, made here by our own small writer
@@ -304,13 +305,14 @@ test: build/guest-fuzz
 build/lordos-guest-asan: $(GUEST_ASAN_SRC) ../tools/guest/gshell.h ../tools/guest/x11clip.h ../tools/guest/perf.h ../tools/guest/dbusmin.h ../tools/guest/gsend.h ../tools/guest/gnotes.h src/vm/vmagent.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -fno-sanitize-recover=undefined $(WARN) -std=gnu11 -o $@ $(GUEST_ASAN_SRC)
+	chmod g-w $@
 build/guest-fuzz: tests/guest_fuzz.c ../tools/guest/dbusmin.c src/vm/vmagent.c src/pkg/crypto.c build/lordos-guest-asan
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=gnu11 -o $@ tests/guest_fuzz.c ../tools/guest/dbusmin.c src/vm/vmagent.c src/pkg/crypto.c
 	./$@ build/lordos-guest-asan 2>build/guest-fuzz.err || { cat build/guest-fuzz.err; rm -f $@; exit 1; }
 
 # lord-server's side: lord.vm (ui/js_vm.c), machine.json reading, and the admin actions vm-enable and vm-kvm
-VM_SRV_SRC := src/ui/js_vm.c src/vm/vmkeysrv.c src/vm/vmexport.c src/vm/machine.c src/vm/vmgroup.c src/vm/vmlink.c src/vm/vmops.c src/vm/vm_admin.c src/vm/vmnet.c src/vm/vmnet_admin.c src/vm/vmgpu.c src/vm/vmgpu_admin.c src/vm/vmimage_admin.c src/vm/vmcatalog.c src/vm/vmurl.c src/vm/vmsig.c src/vm/vmthumb.c src/vm/vmagent.c src/vm/vmrecv.c src/vm/vmpin.c src/vm/vmisoans.c src/vm/vmusb.c src/vm/vmusb_admin.c src/remote/seat.c
+VM_SRV_SRC := src/ui/js_vm.c src/vm/vmlistcache.c src/vm/vmkeysrv.c src/vm/vmexport.c src/vm/machine.c src/vm/vmgroup.c src/vm/vmlink.c src/vm/vmops.c src/vm/vm_admin.c src/vm/vmnet.c src/vm/vmnet_admin.c src/vm/vmgpu.c src/vm/vmgpu_admin.c src/vm/vmimage_admin.c src/vm/vmcatalog.c src/vm/vmurl.c src/vm/vmsig.c src/vm/vmthumb.c src/vm/vmagent.c src/vm/vmrecv.c src/vm/vmpin.c src/vm/vmisoans.c src/vm/vmusb.c src/vm/vmusb_admin.c src/remote/seat.c
 VM_SRV_OBJ := $(VM_SRV_SRC:src/%.c=build/obj/%.o)
 $(VM_SRV_OBJ): $(VM_HDR) src/ui/js_vm.h src/media/media_int.h src/pkg/pkg.h src/admin.h
 build/lord-server: $(VM_SRV_OBJ)
@@ -362,3 +364,12 @@ build/vmwatch-test: tests/vmwatch_test.c src/vm/vmwatch.h src/vm/vmproto.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=undefined $(WARN) -std=gnu11 -o $@ tests/vmwatch_test.c
 	./$@ || { rm -f $@; exit 1; }
 build/obj/ui/js_vm.o: src/vm/vmwatch.h
+
+# lord.vm.list's cache over fixture machine folders (vm/vmlistcache.c: inotify, the time limit, a lord-vm gone, the
+# firmware hashed once per file version)
+test: build/vmlistcache-test
+build/vmlistcache-test: tests/vmlistcache_test.c src/vm/vmlistcache.c src/vm/vmlistcache.h src/pkg/crypto.c src/pkg/crypto.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) -O1 -g $(WARN) -std=c11 -D_GNU_SOURCE -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer \
+	    -o $@ tests/vmlistcache_test.c src/vm/vmlistcache.c src/pkg/crypto.c
+	./$@ || { rm -f $@; exit 1; }

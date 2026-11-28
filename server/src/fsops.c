@@ -106,6 +106,7 @@ static const char *const protect[] = { "/.local/share/applications", "/.config/a
                                            "/.local/share/flatpak",         /* Flatpak installations, the trusted keys, overrides and exports: only `flatpak` run by the Store (docs/FLATPAK.md, E6) */
                                            "/.config/lordos/wl-sessions",   /* Linux apps' window sessions (xdg-session-management): only lord-server (src/wl/xsstore.h) */
                                            "/.config/lordos/sentinela",     /* (0.8.9.6) Sentinela's blocklist (programs ended whenever they start): only lord.sentinela.block/unblock (src/llm/blockwatch.h) */
+                                           "/.local/share/lordos/themes",   /* (0.8.9.6.2) community themes: the code LordOS built and the person's confirmation, only lord-server (ui/themestore.c) */
                                            NULL };
 
 void fsops_protect_file(int slot, const char *real) {
@@ -813,6 +814,8 @@ int fsops_mount_type_in(const char *mounts, const char *real, char *ty_out, size
     fclose(f);
     return found ? 0 : -1;
 }
+
+int fsops_remote_type(const char *ty) { return ty && remote_type(ty); }
 
 int fsops_remote_path(const char *real) {
     char ty[64];

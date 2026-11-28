@@ -13,15 +13,15 @@ You can have up to nine.
 
 The Overview shows the windows of this desktop and, along the top, all your desktops.
 
-- **Lord Flow:** Overview in the Window menu, or ⌃↑ when the Ctrl arrows are on (see below).
-- **Lord Classic:** ❖Tab, or the button next to search.
+- **Flow:** Overview in the Window menu, or ⌃↑ when the Ctrl arrows are on (see below).
+- **Classic:** ❖Tab, or the button next to search.
 
 Click a window to go to it. Click a desktop to see it. Press **+** to add a desktop, and the × on a desktop
 to close it: its windows move to the next one. Drag a window onto a desktop to move it there.
 
 ## Switching
 
-| | Lord Flow | Lord Classic |
+| | Flow | Classic |
 |---|---|---|
 | Previous or next desktop | ❖⌃← ❖⌃→ (also ⌃← ⌃→ when on) | ❖⌃← ❖⌃→ |
 | New desktop | In the Overview | ❖⌃D |
@@ -39,7 +39,7 @@ Window menu → **Move to Desktop**. Apps with their own title bar have it in th
 
 ## Ctrl and the arrows
 
-In many apps ⌃← and ⌃→ move by word, so in Lord Flow they stay with the app. To use ⌃↑ ⌃↓ ⌃← ⌃→ for
+In many apps ⌃← and ⌃→ move by word, so in Flow they stay with the app. To use ⌃↑ ⌃↓ ⌃← ⌃→ for
 desktops instead, turn on **Use Ctrl + arrow keys for Desktops** in
 [Settings → Desktop & Dock](settings:dock). ❖⌃← and ❖⌃→ always switch desktops.
 

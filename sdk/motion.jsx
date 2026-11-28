@@ -10,18 +10,23 @@ import { media } from './media.js';
 import { settings, useSettings } from './settings.js';
 import { createStore, useStore } from './store.js';
 import { admin } from './admin.js';
-import { windows } from './windows.js';
 import { battery } from './hardware.jsx';
-import { userWallpaperName } from './wallpapers.js';
-import { displayCovered, motionCodecs, nextRandom, pauseReason, pickVariant } from './motionmodel.js';
+import { userWallpaperName, refreshStillFiles, stillFiles, stillStore } from './wallpapers.js';
+import { motionCacheMb, motionCodecs, motionFpsCap, nextRandom, pauseReason, pickVariant, retryDelay, openFailure } from './motionmodel.js';
+import { notify } from './notify.js';
+import { t, tOptional } from './i18n.js';
+import { errorText } from './errors.js';
+import { motionCatalog, onDisk } from './wallpapergallery.js';
 
 const STORE = '/var/lib/lordos/wallpapers';
 export const MOTION_RATES = [100, 75, 50, 25];
 export const MOTION_SECTIONS = ['dynamic', 'landscape', 'urban', 'underwater', 'earth'];
-export const motionItems = catalog.items;
+// The catalog's moving wallpapers: its still pictures (variants with codec jpeg, since 0.8.9.6.2) are Settings →
+// Wallpaper's gallery's (sdk/wallpapers.js), never played here.
+export const motionItems = motionCatalog(catalog.items);
 export const motionThumb = (it) => `asset:wallpapers/motion/${it.id}.thumb.jpg`;
 export const motionPoster = (it) => `asset:wallpapers/motion/${it.id}.poster.jpg`;
-export const motionDownloads = createStore({});     // id → percent while downloading
+export const motionDownloads = createStore({});     // catalog id → percent while downloading (a video or a still picture)
 
 // What this machine can play: empty until lord-media answers, and empty for good without the hardware.
 export function currentCodecs() {
@@ -41,23 +46,29 @@ const pathOf = (v) => `${STORE}/${v.sha256}.mp4`;
 // a display's own entry wins, even null (a still picture chosen for that display: sdk/wallpapers.js wallpaperPatch)
 const wanted = (s, display) => { const m = s.motion || {}; return display in m ? m[display] || null : m['*'] || null; };
 
-export function downloadMotion(it, variant) {
-  const arg = `${it.id} ${variant.name}`;
+// One file of the catalog, by its item and variant name: root keeps it in the store (a video as .mp4, a picture as .jpg,
+// from the catalog's codec) after checking its size and SHA-256. The progress goes to motionDownloads.
+export function fetchCatalogFile(it, name) {
   motionDownloads.set((d) => ({ ...d, [it.id]: 0 }));
-  const done = () => motionDownloads.set((d) => { const x = { ...d }; delete x[it.id]; return x; });
-  return admin.run('wallpaper-get', arg, (line) => {
+  const done = () => { motionDownloads.set((d) => { const x = { ...d }; delete x[it.id]; return x; }); refreshStillFiles(); motionFileChanged(); };
+  return admin.run('wallpaper-get', `${it.id} ${name}`, (line) => {
     const m = /^PROGRESS (\d+)/.exec(line);
     if (m) motionDownloads.set((d) => ({ ...d, [it.id]: Number(m[1]) }));
-  }, { quiet: true }).then(() => {
-    done();
+  }, { quiet: true }).then(() => { done(); }, (e) => { done(); throw e; });
+}
+// Deletes one (administrators only: the store is every user's).
+export const removeCatalogFile = (it, name) => admin.run('wallpaper-remove', `${it.id} ${name}`, null, { quiet: true }).finally(refreshStillFiles);
+
+export function downloadMotion(it, variant) {
+  return fetchCatalogFile(it, variant.name).then(() => {
     settings.set({ motionFiles: { ...(settings.get().motionFiles || {}), [it.id]: variant.name } });
-  }, (e) => { done(); throw e; });
+  });
 }
 
 export async function removeMotion(it) {
   const s = settings.get();
   const name = (s.motionFiles || {})[it.id];
-  if (name) await admin.run('wallpaper-remove', `${it.id} ${name}`, null, { quiet: true });
+  if (name) await removeCatalogFile(it, name);
   const files = { ...(s.motionFiles || {}) };
   delete files[it.id];
   const motion = Object.fromEntries(Object.entries(s.motion || {}).filter(([, v]) => v !== it.id));
@@ -82,11 +93,12 @@ function resolve(s, choice, w, h_, codecs) {
   const on = (s.motionFiles || {});
   let id = choice;
   if (id === 'random') id = randomFor(Object.keys(on));
-  const it = catalog.items.find((x) => x.id === id);
+  const it = motionItems.find((x) => x.id === id);
   if (!it || !on[id]) return null;
   const v = it.variants.find((x) => x.name === on[id]);
-  // only a format this machine decodes in hardware, however it was downloaded
-  return v && codecs.includes(v.codec) ? pathOf(v) : null;
+  // only a format this machine decodes in hardware, however it was downloaded, and only the catalog's file: one of
+  // another size under its name (ws170 QA BUG-13) is not played (its still poster shows; Settings offers to fetch it)
+  return v && codecs.includes(v.codec) && onDisk(v, stillFiles()) && !broken.has(pathOf(v)) ? pathOf(v) : null;
 }
 let lastRandom = null, randomPick = null;
 function randomFor(ids) {
@@ -99,30 +111,39 @@ function randomFor(ids) {
 const players = new Map();                // path → { id, refs, views, paused }
 let lastInput = Date.now(), cpu = null, busy = 0, ticking = 0;
 
+// What JS alone decides (Reduce motion, idle, battery, a busy CPU) and the settings lord-server applies: which display's
+// view shows is lord-server's (media/mambient.c), per display, so a covered or fullscreen monitor pauses only its own
+// copy and the player pauses when no copy shows (docs/MOVING-WALLPAPERS.md).
+const ambientOptions = (s, bat) => ({
+  fpsCap: motionFpsCap({ cap: s.motionFpsCap, batteryMode: s.motionBattery, battery: bat }),
+  cacheMb: motionCacheMb(s.motionCacheMb),
+});
+
 function evaluate() {
   const s = settings.get();
-  const ws = windows.get();
-  const live = ws.filter((w) => !w.minimized);
+  const bat = battery.get();
   let b = false;
   try {
     const [t, i] = lord.system.cpuTimes();
     if (cpu) { const dt = t - cpu[0]; const load = dt > 0 ? 1 - (i - cpu[1]) / dt : 0; busy = load > 0.85 ? busy + 1 : 0; b = busy >= 2; }
     cpu = [t, i];
   } catch (e) { /* no reading: not busy */ }
+  const opts = ambientOptions(s, bat);
   for (const p of players.values()) {
-    const rects = live.map((w) => ({ x: w.x, y: w.y, w: w.w, h: w.h }));
-    const covered = p.views.size > 0 && [...p.views.values()].every((d) => displayCovered(d, rects));
-    const why = pauseReason({ reduceMotion: s.reduceMotion, idleSec: (Date.now() - lastInput) / 1000, battery: battery.get(),
-      covered, fullscreen: live.some((w) => w.fullscreen), busy: b });
+    const why = pauseReason({ reduceMotion: s.reduceMotion, idleSec: (Date.now() - lastInput) / 1000, battery: bat,
+      batteryMode: s.motionBattery || 'pause', busy: b });
     if (!!why !== p.paused) { p.paused = !!why; media.control(p.id, why ? 'pause' : 'play'); }
+    if (opts.fpsCap !== p.fpsCap) { p.fpsCap = opts.fpsCap; media.control(p.id, 'fpsCap', opts.fpsCap); }
+    if (opts.cacheMb !== p.cacheMb) { p.cacheMb = opts.cacheMb; media.control(p.id, 'cacheMb', opts.cacheMb); }
   }
 }
 
 function startTicking() {
   if (ticking) return;
   ticking = setInterval(evaluate, 5000);
-  windows.subscribe(() => { if (players.size) evaluate(); });
   settings.subscribe(() => { if (players.size) evaluate(); });
+  // the power source changes: applied at once (On battery: pause, lower the frame rate or keep playing)
+  battery.subscribe(() => { if (players.size) evaluate(); });
   const seen = () => { const was = Date.now() - lastInput > 300000; lastInput = Date.now(); if (was) evaluate(); };
   addListener('keydown', seen);
   addListener('pointerdown', seen);
@@ -132,7 +153,21 @@ function startTicking() {
 // A new player can start while the last one still holds the decoder, and a moving wallpaper never falls back to software:
 // its helper stops. So a stop that nobody asked for is tried again, a few times, before the still image stays.
 export const motionBusy = createStore(false);       // a chosen wallpaper is starting
-const RETRIES = 4, RETRY_MS = 500;
+// Files lord-media could not open, given up for this session (motionmodel.js openFailure): their still poster shows,
+// and a notice says so once. A new download of the file (Settings) clears it.
+const broken = new Set();
+const brokenRev = createStore(0);
+let openFails = {};
+function giveUp(file) {
+  if (broken.has(file)) return;
+  broken.add(file);
+  brokenRev.set((n) => n + 1);
+  const it = motionItems.find((x) => x.variants.some((v) => pathOf(v) === file));
+  const name = it ? tOptional(`settings.motion.item.${it.id}`) || it.name || it.id : file.split('/').pop();
+  try { notify({ app: 'settings', title: t('settings.motion.title'), body: `${name}: ${errorText('media.cannotOpen')}` }); } catch (e) { /* no notifications */ }
+}
+// A download finished: whatever it replaced may play again.
+export function motionFileChanged() { if (broken.size || Object.keys(openFails).length) { broken.clear(); openFails = {}; brokenRev.set((n) => n + 1); } }
 
 function acquire(file, rate, key, display, onLost) {
   const tag = `${file}|${rate}`;
@@ -140,12 +175,25 @@ function acquire(file, rate, key, display, onLost) {
   if (!p) {
     let id = 0;
     motionBusy.set(true);
-    try { id = media.play('wallpaper', file, { loop: true, audio: 0, hwOnly: 1, rate, appName: 'LordOS' }); } catch (e) { motionBusy.set(false); return null; }
+    const opts = ambientOptions(settings.get(), battery.get());
+    // ambient: lord-server pauses it where no display shows it, stops it after a while unseen and keeps its loop on the GPU
+    try { id = media.play('wallpaper', file, { loop: true, audio: 0, hwOnly: 1, rate, appName: 'LordOS', ambient: 1, ...opts }); } catch (e) { motionBusy.set(false); return null; }
     if (!id) { motionBusy.set(false); return null; }
-    p = { id, tag, views: new Map(), paused: false, playing: createStore(false) };
+    p = { id, tag, views: new Map(), paused: false, playing: createStore(false), ...opts };
     media.on(id, (type, d) => {
-      if (type === 'state' && d.state === 'playing') { p.playing.set(true); motionBusy.set(false); }
-      else if (type === 'error' || type === 'closed') { p.playing.set(false); if (players.get(tag) === p) { players.delete(tag); p.onLost?.(); } }
+      if (type === 'state' && d.state === 'playing') {
+        p.playing.set(true);
+        motionBusy.set(false);
+        if (openFails[file]) { openFails = { ...openFails }; delete openFails[file]; }
+      } else if (type === 'error' || type === 'closed') {
+        if (type === 'error') {
+          const r = openFailure(openFails, file, d && d.message);
+          openFails = r.counts;
+          if (r.broken) giveUp(file);
+        }
+        p.playing.set(false);
+        if (players.get(tag) === p) { players.delete(tag); if (broken.has(file)) motionBusy.set(false); else p.onLost?.(); }
+      }
     });
     players.set(tag, p);
     startTicking();
@@ -168,7 +216,8 @@ function Layer({ path, rate, display, style }) {
     const key = {};
     let timer = 0;
     const lost = () => {
-      if (tries.current++ < RETRIES) timer = setTimeout(() => setTurn((n) => n + 1), RETRY_MS);
+      const wait = retryDelay(tries.current++);
+      if (wait >= 0) timer = setTimeout(() => setTurn((n) => n + 1), wait);
       else motionBusy.set(false);
     };
     const mine = acquire(path, rate, key, display, lost);
@@ -184,15 +233,19 @@ const idle = createStore(false);
 export function MotionWallpaper({ display }) {
   const [s] = useSettings();
   const codecs = useCodecs();
+  useStore(stillStore);          // the store's listing changed (a download, a removal)
+  useStore(brokenRev);           // a file given up, or fetched again
   const px = (display.scale || 100) / 100;
   const path = codecs.length ? resolve(s, wanted(s, display.id), display.w * px, display.h * px, codecs) : null;
   const chosen = wanted(s, display.id);
-  const it = catalog.items.find((x) => x.id === chosen);
+  const it = motionItems.find((x) => x.id === chosen);
   if (!path) {
-    // chosen, but this machine can't play it: its still poster
-    return it && !codecs.length ? h(Image, { src: motionPoster(it), style: { position: 'absolute', left: display.x, top: display.y, width: display.w, height: display.h, objectFit: 'cover' } }) : null;
+    // chosen, but this machine can't play it, or its file isn't the catalog's or can't be opened: its still poster
+    return it && (!codecs.length || (s.motionFiles || {})[it.id]) ? h(Image, { src: motionPoster(it), style: { position: 'absolute', left: display.x, top: display.y, width: display.w, height: display.h, objectFit: 'cover', pointerEvents: 'none' } }) : null;
   }
-  return h(Layer, { path, rate: MOTION_RATES.includes(s.motionRate) ? s.motionRate : 100, display, style: { position: 'absolute', left: display.x, top: display.y, width: display.w, height: display.h } });
+  // pointerEvents none: the picture is drawn over the still wallpaper, whose node takes the desktop's clicks (its right-click
+  // menu, a drop, a click that ends a selection); before 0.8.9.6.2 the video took them and the desktop's menu never opened
+  return h(Layer, { path, rate: MOTION_RATES.includes(s.motionRate) ? s.motionRate : 100, display, style: { position: 'absolute', left: display.x, top: display.y, width: display.w, height: display.h, pointerEvents: 'none' } });
 }
 
 export const variantFor = (it, codecs, display) => pickVariant(it, codecs, display.w, display.h);

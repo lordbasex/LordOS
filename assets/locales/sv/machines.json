@@ -712,6 +712,7 @@
   "agent.toolsAutoFailed": "Den automatiska uppdateringen fungerade inte ({have} → {want}).",
   "agent.toolsUpdateBtn": "Uppdatera",
   "agent.st.needsTools": "Behöver verktygen",
+  "agent.st.oldLordos": "Uppdatera LordOS i den",
   "agent.st.needsXclip": "Behöver xclip",
   "agent.toolsInstalled": "LordOS-verktygen är installerade och körs i maskinen; de startar igen vid varje inloggning.",
   "agent.timesync": "Ställ klockan",
@@ -880,6 +881,8 @@
   "un.how.preseed": "Svaren läggs i installationsprogrammets egna startfiler, ditt lösenord bara som hash, och de tas bort när systemet har installerats.",
   "un.how.autoinstall": "Svaren läggs på en liten disk som installationsprogrammet läser, ditt lösenord bara som hash, och disken tas bort när systemet har installerats.",
   "un.how.kickstart": "Svaren läggs på en liten disk som installationsprogrammet läser, ditt lösenord bara som hash, och disken tas bort när systemet har installerats.",
+  "un.how.kali": "Svaren läggs i installationsprogrammets egna startfiler, ditt lösenord bara som hash, och de tas bort när systemet har installerats.",
+  "un.how.lordos": "Svaren läggs på en liten disk som installationsprogrammet läser, ditt lösenord bara som hash, och disken tas bort när systemet har installerats.",
   "un.image": "Installerar från {file}, även kontrollerad mot tillverkarens signerade lista",
   "un.review": "Utan frågor: kontot {user} på {host}",
   "un.reviewOff": "Du svarar på installationsprogrammets frågor",
@@ -1100,6 +1103,7 @@
   "apps.menu": "Program",
   "apps.needsAgent": "Appläget behöver maskinens agent, ansluten",
   "win.appsNeedsTools": "Appläget behöver LordOS eller Windows i maskinen, med LordOS-verktygen",
+  "win.appsOldLordos": "Appläget behöver LordOS {version} eller senare i maskinen. Uppdatera LordOS i maskinen; LordOS-verktygen räcker inte ensamma.",
   "apps.noApps": "Maskinen har inte listat sina appar än",
   "apps.gone": "Det här fönstret stängdes i maskinen",
   "apps.dropTitle": "Släpp för att ge de här filerna till det här fönstret i maskinen",
@@ -2027,5 +2031,7 @@
   "req.row.answers": "Installationssvar",
   "req.use.answers": "Görs av Machines självt: inget att installera",
   "req.st.download": "Vid skapande",
-  "req.st.builtin": "Inbyggt"
+  "req.st.builtin": "Inbyggt",
+  "cfg.closeOnStop": "Stäng fönstret när maskinen stannar",
+  "cfg.closeOnStopNote": "Efter en avstängning eller Stäng av. Om den stannar på grund av ett problem förblir fönstret öppet och visar vad som hände."
 }

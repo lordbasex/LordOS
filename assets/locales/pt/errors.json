@@ -234,6 +234,7 @@
   "fs.moveRemoveFailed": "Copiado, mas não foi possível remover o original: {errno}",
   "fs.noTrash": "Não há Lixeira para esse local",
   "fs.notFile": "Não é um arquivo",
+  "fs.notFolder": "Não é uma pasta",
   "fs.notInTrash": "Não está na Lixeira",
   "fs.notRegular": "Não é um arquivo comum (é um link?)",
   "fs.openFailed": "Não foi possível abrir o arquivo: {errno}",
@@ -243,11 +244,13 @@
   "fs.systemFolder": "O Arquivos não mostra as pastas internas do sistema (/proc, /sys, /dev e /run)",
   "fs.tooLarge": "O arquivo é grande demais (máx. {max})",
   "fs.tooManyCopies": "Há cópias demais em andamento; tente de novo quando uma terminar",
+  "fs.tooManyWatches": "Há pastas demais sendo observadas (máx. {max})",
   "fs.trashBadOrigin": "O local original não é válido",
   "fs.trashEntryFailed": "Não foi possível criar a entrada da Lixeira",
   "fs.trashOriginGone": "A pasta original não existe mais",
   "fs.trashOtherDisk": "Está em outro disco que a sua Lixeira",
   "fs.trashRestoreExists": "Já existe um arquivo com esse nome no local original",
+  "fs.watchRemote": "Não é possível acompanhar as alterações em pastas da nuvem ou de rede; a pasta é listada de novo em vez disso",
   "fw.bpfConfig": "não foi possível configurar o BPF: {errno}",
   "fw.bpfMaps": "não foi possível criar os mapas BPF: {errno}",
   "fw.bpfMissing": "falta o programa {program}",
@@ -963,5 +966,9 @@
   "sentinela.notBlocked": "Esse programa não está na lista de bloqueio.",
   "sentinela.noAppNetwork": "Este processo não tem um app próprio cuja rede possa ser bloqueada.",
   "sys.failed": "Algo deu errado.",
-  "sys.unsupported": "Esta versão do LordOS não consegue fazer isso."
+  "sys.unsupported": "Esta versão do LordOS não consegue fazer isso.",
+  "theme.notAllowed": "{call} não está disponível para temas da comunidade",
+  "theme.noHost": "Falta a parte do LordOS do estilo de área de trabalho",
+  "hands.refused": "Só você pode fazer isto: nunca a entrada de um agente de IA",
+  "install.diskTooManyParts": "Este disco tem partições demais para o instalador listá-las"
 }

@@ -14,6 +14,7 @@
  *       lord-server opens /dev/hidrawN and passes the fd to lord-vault; the app never sees it.
  *   lord.vault.promptDone(prompt, ok)          → answer to Secret Service's unlock prompt
  * Everything is validated here; none of this runs programs or opens caller paths without validating them. */
+#include "js_hands.h"
 #include "js_vault.h"
 #include "js_sys.h"
 #include "js_err.h"
@@ -62,6 +63,7 @@ static JSValue f_available(JSContext *c, JSValueConst t, int argc, JSValueConst 
 }
 
 static JSValue f_request(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    HANDS_GUARD(c);                         /* never on an AI agent's input (Hands) */
     (void)t;
     if (argc < 1 || !JS_IsString(argv[0])) return js_throw_code(c, "sys.badArgument", NULL);
     size_t len;

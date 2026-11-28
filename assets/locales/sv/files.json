@@ -95,7 +95,7 @@
   "menu.emptyTrash": "Töm papperskorgen",
   "menu.file": "Fil",
   "menu.forward": "Framåt",
-  "menu.getInfo": "Visa info",
+  "menu.getInfo": "Egenskaper",
   "menu.go": "Gå",
   "menu.groupBy": "Gruppera efter",
   "menu.newFolder": "Ny mapp",
@@ -342,5 +342,9 @@
   "readOnly.denied": "Den här mappen är skrivskyddad: dess behörigheter låter dig inte ändra den. Använd Terminal eller en annan app för att ändra den.",
   "fromMachineNoRun": "”{name}” kom från maskinen {machine}. Filer öppnar inte program eller installationsprogram från en maskin: använd Öppna med om du litar på den.",
   "info.from": "Från",
-  "info.fromMachine": "Maskinen {machine}"
+  "info.fromMachine": "Maskinen {machine}",
+  "skin.address": "Adress",
+  "skin.tasks": "Fil- och mappåtgärder",
+  "skin.otherPlaces": "Andra platser",
+  "skin.details": "Detaljer"
 }

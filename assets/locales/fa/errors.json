@@ -234,6 +234,7 @@
   "fs.moveRemoveFailed": "کپی شد، اما اصل آن حذف نشد: {errno}",
   "fs.noTrash": "برای آن مکان سطل زباله‌ای نیست",
   "fs.notFile": "فایل نیست",
+  "fs.notFolder": "این یک پوشه نیست",
   "fs.notInTrash": "در سطل زباله نیست",
   "fs.notRegular": "فایل عادی نیست (آیا پیوند است؟)",
   "fs.openFailed": "فایل باز نشد: {errno}",
@@ -243,11 +244,13 @@
   "fs.systemFolder": "فایل‌ها پوشه‌های داخلی سیستم (/proc، /sys، /dev و /run) را نشان نمی‌دهد",
   "fs.tooLarge": "فایل بیش از حد بزرگ است (حداکثر {max})",
   "fs.tooManyCopies": "کپی‌های زیادی در جریان است؛ وقتی یکی تمام شد دوباره تلاش کنید",
+  "fs.tooManyWatches": "پوشه‌های زیادی زیر نظر هستند (حداکثر {max})",
   "fs.trashBadOrigin": "مکان اصلی معتبر نیست",
   "fs.trashEntryFailed": "مدخل سطل زباله ساخته نشد",
   "fs.trashOriginGone": "پوشهٔ اصلی دیگر وجود ندارد",
   "fs.trashOtherDisk": "روی دیسکی غیر از دیسک سطل زباله‌اش است",
   "fs.trashRestoreExists": "در مکان اصلی از قبل فایلی با آن نام هست",
+  "fs.watchRemote": "تغییرات پوشه‌های ابری و شبکه را نمی‌توان دنبال کرد؛ به جای آن پوشه دوباره فهرست می‌شود",
   "fw.bpfConfig": "پیکربندی BPF ممکن نشد: {errno}",
   "fw.bpfMaps": "نگاشت‌های BPF ساخته نشد: {errno}",
   "fw.bpfMissing": "برنامهٔ {program} موجود نیست",
@@ -963,5 +966,9 @@
   "sentinela.notBlocked": "آن برنامه در فهرست مسدودها نیست.",
   "sentinela.noAppNetwork": "این فرایند برنامهٔ مستقلی ندارد که بتوان شبکه‌اش را مسدود کرد.",
   "sys.failed": "مشکلی پیش آمد.",
-  "sys.unsupported": "این نسخهٔ LordOS نمی‌تواند این کار را انجام دهد."
+  "sys.unsupported": "این نسخهٔ LordOS نمی‌تواند این کار را انجام دهد.",
+  "theme.notAllowed": "{call} برای پوسته‌های جامعه در دسترس نیست",
+  "theme.noHost": "بخش LordOS سبک میز کار وجود ندارد",
+  "hands.refused": "فقط شما می‌توانید این کار را انجام دهید: هرگز ورودی یک عامل هوش مصنوعی",
+  "install.diskTooManyParts": "این دیسک پارتیشن‌های بیش از حدی دارد و نصب‌کننده نمی‌تواند آن‌ها را فهرست کند"
 }

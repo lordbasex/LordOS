@@ -18,7 +18,7 @@ The numbers below come from one PC:
 
 - 3 displays at 1920×1080 on an RX 580 (Mesa radeonsi);
 - Debian 13 with THP (transparent huge pages) set to `always`;
-- the Lord Workspaces theme;
+- the Workspaces theme;
 - 7 widgets on one display;
 - one Terminal running Claude Code (`claude --continue`), left alone.
 

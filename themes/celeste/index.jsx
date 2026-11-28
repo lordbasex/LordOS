@@ -1,9 +1,9 @@
-// Lord Celeste (id celeste), a community theme: a frame around each display with rounded inner corners, a bar on its
+// Celeste (id celeste), a community theme: a frame around each display with rounded inner corners, a bar on its
 // thick side and drawers that slide out of its edges (dashboard on top, app launcher at the bottom, session and
 // sidebar at the end). Layout inspired by Caelestia (caelestia-dots/shell, GPL-3.0); no code or assets from it.
 //
 // Several displays: every display gets the frame and the bar unless Settings → Desktop & Dock → Menu Bar → "Show the
-// menu bar on every display" is off or the displays are mirrored, as Lord Flow's menu bar (sdk/menubarmodel.js
+// menu bar on every display" is off or the displays are mirrored, as Flow's menu bar (sdk/menubarmodel.js
 // hasBar); the wallpaper is each display's own (wallpaperIdFor, by connector). In Arabic and Hebrew the frame is
 // mirrored. The theme's options (colour scheme, frame, hover edges, wallpaper effect) are in theme.json and shown by
 // Settings → Appearance.
@@ -16,9 +16,10 @@ import {
   startShell, switcherGrabs, switcherHold, switcherKeys, t as tr, themeOptionPatch, toggleOverview, toggleShowDesktop, useSettings,
   useShortcuts, useStore, useWindows, wallpaperIdFor, wallpaperSrc, widgetPicker, wm,
   titleBarPx,
+  windowFrameKey,
 } from '@lordos/sdk';
 import { apps } from '@lordos/apps';
-import { Fragment, useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { makeTheme } from './tokens.js';
 import { minimizeStarts } from './minimize.js';
 import { OPTIONS, THEME_ID, caeTokens, option } from './cae.js';
@@ -29,7 +30,7 @@ import { Bar } from './components/Bar.jsx';
 import { Backdrop } from './components/Backdrop.jsx';
 import { Drawer } from './components/Drawer.jsx';
 import { Dashboard, Launcher, SessionPanel, Sidebar, launcherHeight } from './components/Panels.jsx';
-import { Window, TITLE_H } from './components/Window.jsx';
+import { Window, TITLE_H, MENU_H } from './components/Window.jsx';
 import { Menu } from '../classic/components/Menu.jsx';
 
 const MIN_MS = 260;
@@ -37,8 +38,9 @@ const rtlNow = () => direction() === 'rtl';
 const framed = (d, s) => hasBar(d, menuBarEveryDisplay(s), screen.mirror);
 const areaFn = (d) => workArea(d, framed(d, settings.get()), rtlNow());
 
-// chrome: borders (1 + 1) and the title bar with its separator; snapping on (Settings → Desktop & Dock → Windows)
-configureWindows({ apps, workArea: areaFn, chrome: () => ({ w: 2, h: titleBarPx(TITLE_H) + 3 }), snap: true });
+// chrome: borders (1 + 1), the title bar with its separator and the menu strip of a window with menus (a Linux app's
+// Edit menu with Speech); snapping on (Settings → Desktop & Dock → Windows)
+configureWindows({ apps, workArea: areaFn, chrome: () => ({ w: 2, h: titleBarPx(TITLE_H) + 3, menu: MENU_H }), snap: true });
 
 // The minimize effect: a window that was just minimized shrinks towards the bar for MIN_MS (none with reduce motion).
 function useMinimizing(windows) {
@@ -75,7 +77,7 @@ function SnapPreview({ cx }) {
 const onFront = (fn) => () => { const id = wm.focused(); if (id) fn(id); };
 const frontSettings = () => { const id = wm.focused(); return id ? appSettingsItem(id) : null; };
 const shortcutTable = (toggleLauncher) => [
-  { id: 'launcher', keys: ['F4'], show: ['❖', 'F4'], run: toggleLauncher, label: 'shell.shortcuts.launcher', group: 'system' },
+  { id: 'launcher', keys: ['F4', 'Meta+F4'], show: ['❖', 'F4'], run: toggleLauncher, label: 'shell.shortcuts.launcher', group: 'system' },
   { id: 'showDesktop', keys: ['Meta+F11'], run: toggleShowDesktop, label: 'shell.shortcuts.showDesktop', group: 'system' },
   { id: 'switchApps', keys: switcherKeys('meta'), run: (e) => openSwitcher(switcherHold(e), e.shift), label: 'shell.shortcuts.switchApps', group: 'windows' },
   { id: 'cycleWindows', keys: ['Meta+`', 'Meta+Shift+`'], run: (e) => cycleAppWindows(e.shift), label: 'shell.shortcuts.cycleWindows', group: 'windows' },
@@ -90,7 +92,7 @@ const shortcutTable = (toggleLauncher) => [
 function App() {
   startDeskWidgets();
   const [s] = useSettings();
-  const t = makeTheme(s);
+  const t = useMemo(() => makeTheme(s), [s]);   // the same tokens until a setting changes (memo Window, components/Window.jsx)
   const cx = caeTokens(s);
   const reduce = !!s.reduceMotion;
   const rtl = rtlNow();
@@ -233,10 +235,10 @@ function App() {
         {mounted.map((w) => (
           <Fragment key={w.id}>
             {preview && w === top ? <SnapPreview cx={cx} /> : null}
-            <Window win={w} app={getApp(w.id)} t={t} focused={w.id === focused} fx={minFx(w.id)} />
+            <Window win={w} app={getApp(w.id)} t={t} focused={w.id === focused} fx={minFx(w.id)} frameKey={windowFrameKey(w)} />
           </Fragment>
         ))}
-        {minimizing.filter((x) => !mounted.includes(x.win)).map(({ win }) => <Window key={win.id} win={win} app={getApp(win.id)} t={t} focused={false} fx={minFx(win.id)} />)}
+        {minimizing.filter((x) => !mounted.includes(x.win)).map(({ win }) => <Window key={win.id} win={win} app={getApp(win.id)} t={t} focused={false} fx={minFx(win.id)} frameKey={windowFrameKey(win)} />)}
         <DesktopWidgets layer="above" />
         <WidgetPicker />
 
@@ -278,7 +280,7 @@ function App() {
 
         {askLogout ? (
           <Layer name="modal">
-            <ConfirmDialog title={tr('shell.celeste.session.logoutTitle')} detail={tr('shell.celeste.session.logoutDetail')} okLabel={tr('shell.menu.logout')}
+            <ConfirmDialog handsDeny title={tr('shell.celeste.session.logoutTitle')} detail={tr('shell.celeste.session.logoutDetail')} okLabel={tr('shell.menu.logout')}
               cancelLabel={tr('shell.celeste.cancel')} cautious area={main}
               onCancel={() => setAskLogout(false)} onOk={() => { setAskLogout(false); session.quit(); }} />
           </Layer>

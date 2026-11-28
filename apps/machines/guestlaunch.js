@@ -6,9 +6,9 @@
 // budget, a bridged network's or a vGPU's preparation), turn apps mode on and, once the guest's own fresh list holds that
 // exact token, launch it there (launchGuest: lord.vm.launch sends nothing but a token the guest listed). Nothing on this
 // computer runs a guest's token or name.
-import { createStore, guestLauncherApps, guestLauncherItems, cleanGuestApps, sameGuestApps, appsOff } from '@lordos/sdk';
+import { createStore, guestLauncherApps, guestLauncherItems, cleanGuestApps, sameGuestApps, appsOff, settings, vmState, vmLibraryChanged, keptGuestItems, shownGuestItems } from '@lordos/sdk';
 import { readMeta, writeMeta, isProtectedMachine } from './meta.js';
-import { stateView, unreadableOf, saveDelay } from './model.js';
+import { unreadableOf, saveDelay } from './model.js';
 
 // dir → { token, name, at }: a launch the launcher asked for, taken by the machine's window (vmwindow.jsx)
 export const launchAsks = createStore({});
@@ -21,7 +21,9 @@ function writeApps(dir, apps) {
   const clean = cleanGuestApps(apps);
   if (!dir || !clean.length) return false;
   if (sameGuestApps(readMeta(dir).guestApps, clean)) return false;
-  return writeMeta(dir, { guestApps: clean });
+  const ok = writeMeta(dir, { guestApps: clean });
+  if (ok) refreshGuestLauncher();
+  return ok;
 }
 export function saveGuestApps(dir, apps) {
   if (!dir) return false;
@@ -40,23 +42,33 @@ export function saveGuestApps(dir, apps) {
 
 const has = () => typeof lord !== 'undefined' && lord.vm && typeof lord.vm.list === 'function';
 let opener = null;           // library.jsx's openMachine, given at the start (no import cycle)
-const keyOf = (l) => l.map((a) => `${a.id}\t${a.name}\t${a.machine}`).join('\n');
+const keyOf = (l) => l.map((a) => `${a.id}\t${a.name}\t${a.machine}\t${a.dir}`).join('\n');
 let lastKey = '';
 
-export function refreshGuestLauncher() {
+// The launcher's entries without asking Machines (docs/VIRTUALIZATION.md, "The shell and the machines"): the entries of
+// every machine that shows its apps are kept in settings.json (guestLauncherKept) and shown without the ones that run
+// (vmState, from lord-server's events). The list is read again (lord.vm.list, then each app.json) only when it can have
+// changed: apps mode saved a new list (saveGuestApps), Configure's switch (refreshGuestLauncher from there), or the
+// library changed while there are entries (a machine renamed or removed); once at the first login that has nothing kept.
+function show() {
   let items = [];
-  if (has() && !appsOff().includes('machines')) {
-    let list = [];
-    try { list = lord.vm.list() || []; } catch (e) { list = []; }
-    items = guestLauncherItems(list, readMeta, {
-      active: (m) => stateView(m.state, m.reason).active,
-      locked: (m) => !!unreadableOf(m) || isProtectedMachine(m.dir, m),
-    });
-  }
+  if (has() && !appsOff().includes('machines')) items = shownGuestItems(keptGuestItems(settings.get().guestLauncherKept) || [], vmState.get().active);
   const k = keyOf(items);
   if (k === lastKey) return;
   lastKey = k;
   guestLauncherApps.set(items.map((it) => ({ ...it, launch: () => launchFromLauncher(it) })));
+}
+
+export function refreshGuestLauncher() {
+  if (!has()) return;
+  let list = [];
+  try { list = lord.vm.list() || []; } catch (e) { return; }
+  const all = guestLauncherItems(list, readMeta, {
+    locked: (m) => !!unreadableOf(m) || isProtectedMachine(m.dir, m),
+  });
+  const kept = keptGuestItems(settings.get().guestLauncherKept);
+  if (!kept || keyOf(kept) !== keyOf(all)) settings.set({ guestLauncherKept: all });
+  show();
 }
 
 // the machine by its id (a rename keeps it), started in its window, the app asked for
@@ -72,10 +84,14 @@ export function launchFromLauncher(it) {
 
 export const dropLaunchAsk = (dir) => launchAsks.set((x) => { if (!x[dir]) return x; const n = { ...x }; delete n[dir]; return n; });
 
-let timer = null;
+let started = false;
 export function startGuestLauncher(openMachine) {
   opener = openMachine;
-  if (timer) return;
-  refreshGuestLauncher();
-  timer = setInterval(refreshGuestLauncher, 3000);
+  if (started) return;
+  started = true;
+  if (keptGuestItems(settings.get().guestLauncherKept) === null) refreshGuestLauncher();   // never read: once
+  else show();
+  vmState.subscribe(show);
+  settings.subscribe(show);           // Machines deactivated or back; the kept entries written
+  vmLibraryChanged.subscribe(() => { if ((keptGuestItems(settings.get().guestLauncherKept) || []).length) refreshGuestLauncher(); });
 }

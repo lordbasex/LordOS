@@ -1,4 +1,4 @@
-// state.js — Lord Workspaces' runtime state: the activities' own data (icon, colour, pins, layouts) by desktop id, kept
+// state.js — Workspaces' runtime state: the activities' own data (icon, colour, pins, layouts) by desktop id, kept
 // in settings.workspaces by position (model/activities.js), and what the shell has open. The desktops themselves (how
 // many, which one shows, their names) are the SDK's (sdk/desktops.js), so the Overview, Settings and session restore
 // keep working as in the other themes.

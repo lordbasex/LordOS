@@ -4,7 +4,7 @@
 // lord-server offers the press before the app under the pointer sees it (server/src/main.c: never while an app has the
 // pointer locked or confined, holds the shortcuts, is full screen, or LordOS's own pointer lock runs), the runtime finds
 // the window (runtime/events.js setModGrab) and this module answers: taken, the window moves or resizes through the
-// same path as its title bar and borders (wm.beginMove / wm.beginResize: lord-server follows it in C, Lord Workspaces'
+// same path as its title bar and borders (wm.beginMove / wm.beginResize: lord-server follows it in C, Workspaces'
 // tiler and snapping still apply), and the app gets neither the press nor its release. A native LordOS window, a
 // Wayland app and an X11 app (Xwayland) alike.
 //

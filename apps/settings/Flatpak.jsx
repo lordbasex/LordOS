@@ -5,7 +5,7 @@
 // password asked (as Cleaner removes a package). Nothing of Flatpak runs in the background either way; this page only
 // lets a person who tried it leave nothing behind.
 import {
-  View, Text, useLocale, useTheme, useAppWindow, useStore, Button, Toggle, ConfirmDialog, Layer, formatBytes, errorText, wm,
+  View, Text, useLocale, useTheme, useStore, Button, Toggle, ConfirmDialog, WindowSheet, formatBytes, errorText, wm,
   spacing, typeScale, flathub as F, admin, useSettings, fs,
 } from '@lordos/sdk';
 import { useEffect, useState } from 'react';
@@ -14,11 +14,8 @@ import { Stack, Section, SettingRow, ValueRow, Note, Actions, Message } from './
 // the libraries installing flatpak brought (docs/FLATPAK.md, test plan step 1): removed with it when nothing else needs them
 const WITH = ['libostree-1-1', 'libappstream5', 'libmalcontent-0-0'];
 
-function Over({ children }) {
-  const win = useAppWindow();
-  const g = wm.frame(wm.get(win.id) || {}) || {};
-  return <Layer name="modal">{children({ x: g.x || 0, y: g.y || 0, w: g.w || 640, h: g.h || 480 })}</Layer>;
-}
+// a dialog over this Settings window's content, never above other windows (sdk/layers.js WindowSheet)
+const Over = WindowSheet;
 
 // The folders' sizes, measured on one of lord-server's workers (fs.duAsync): ~/.local/share/flatpak holds hundreds of
 // thousands of files, and walking it here froze the pointer for up to 2 s on every visit (2026-11-23). Each answer is

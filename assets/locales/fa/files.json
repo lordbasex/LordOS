@@ -95,7 +95,7 @@
   "menu.emptyTrash": "خالی کردن سطل زباله",
   "menu.file": "فایل",
   "menu.forward": "جلو",
-  "menu.getInfo": "اطلاعات",
+  "menu.getInfo": "ویژگی‌ها",
   "menu.go": "رفتن",
   "menu.groupBy": "گروه‌بندی بر اساس",
   "menu.newFolder": "پوشهٔ جدید",
@@ -342,5 +342,9 @@
   "readOnly.denied": "این پوشه فقط‌خواندنی است: مجوزهای آن به شما اجازهٔ تغییرش را نمی‌دهند. برای تغییر آن، از پایانه یا برنامهٔ دیگری استفاده کنید.",
   "fromMachineNoRun": "«{name}» از ماشین {machine} آمده است. فایل‌ها برنامه‌ها یا نصب‌کننده‌های یک ماشین را باز نمی‌کند: اگر به آن اعتماد دارید از «باز کردن با» استفاده کنید.",
   "info.from": "منبع",
-  "info.fromMachine": "ماشین {machine}"
+  "info.fromMachine": "ماشین {machine}",
+  "skin.address": "نشانی",
+  "skin.tasks": "کارهای پرونده و پوشه",
+  "skin.otherPlaces": "جاهای دیگر",
+  "skin.details": "جزئیات"
 }

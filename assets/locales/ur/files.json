@@ -95,7 +95,7 @@
   "menu.emptyTrash": "ردی کی ٹوکری خالی کریں",
   "menu.file": "فائل",
   "menu.forward": "آگے",
-  "menu.getInfo": "معلومات دیکھیں",
+  "menu.getInfo": "خصوصیات",
   "menu.go": "جائیں",
   "menu.groupBy": "گروپ بندی",
   "menu.newFolder": "نیا فولڈر",
@@ -342,5 +342,9 @@
   "readOnly.denied": "یہ فولڈر صرف پڑھنے کے لیے ہے: اس کی اجازتیں آپ کو اسے تبدیل کرنے نہیں دیتیں۔ اسے تبدیل کرنے کے لیے ٹرمینل یا کوئی دوسری ایپ استعمال کریں۔",
   "fromMachineNoRun": "«{name}» مشین {machine} سے آئی ہے۔ فائلز کسی مشین کے پروگرام یا انسٹالر نہیں کھولتا: اگر آپ کو بھروسا ہے تو «اس کے ساتھ کھولیں» استعمال کریں۔",
   "info.from": "ماخذ",
-  "info.fromMachine": "مشین {machine}"
+  "info.fromMachine": "مشین {machine}",
+  "skin.address": "پتا",
+  "skin.tasks": "فائل اور فولڈر کے کام",
+  "skin.otherPlaces": "دیگر مقامات",
+  "skin.details": "تفصیلات"
 }

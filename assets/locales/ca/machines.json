@@ -712,6 +712,7 @@
   "agent.toolsAutoFailed": "L'actualització automàtica no ha funcionat ({have} → {want}).",
   "agent.toolsUpdateBtn": "Actualitza",
   "agent.st.needsTools": "Calen les eines",
+  "agent.st.oldLordos": "Actualitzeu-hi LordOS",
   "agent.st.needsXclip": "Cal xclip",
   "agent.toolsInstalled": "Les eines de LordOS estan instal·lades i funcionant a la màquina; tornen a arrencar a cada inici de sessió.",
   "agent.timesync": "Ajusta el rellotge",
@@ -880,6 +881,8 @@
   "un.how.preseed": "Les respostes van als fitxers d’inici del mateix instal·lador, la contrasenya només com a hash, i s’eliminen quan el sistema està instal·lat.",
   "un.how.autoinstall": "Les respostes van en un disc petit que llegeix l’instal·lador, la contrasenya només com a hash, i el disc s’elimina quan el sistema està instal·lat.",
   "un.how.kickstart": "Les respostes van en un disc petit que llegeix l’instal·lador, la contrasenya només com a hash, i el disc s’elimina quan el sistema està instal·lat.",
+  "un.how.kali": "Les respostes van als fitxers d’inici del mateix instal·lador, la contrasenya només com a hash, i s’eliminen quan el sistema està instal·lat.",
+  "un.how.lordos": "Les respostes van en un disc petit que llegeix l’instal·lador, la contrasenya només com a hash, i el disc s’elimina quan el sistema està instal·lat.",
   "un.image": "S’instal·la des de {file}, també comprovat amb la llista signada del seu fabricant",
   "un.review": "Sense preguntes: compte {user} a {host}",
   "un.reviewOff": "Respons tu les preguntes de l’instal·lador",
@@ -1100,6 +1103,7 @@
   "apps.menu": "Aplicacions",
   "apps.needsAgent": "El mode d'aplicacions necessita l'agent de la màquina, connectat",
   "win.appsNeedsTools": "El mode d'aplicacions necessita LordOS o Windows a la màquina, amb les eines de LordOS",
+  "win.appsOldLordos": "El mode d'aplicacions necessita LordOS {version} o posterior dins la màquina. Actualitzeu LordOS dins la màquina; les eines de LordOS soles no ho poden afegir.",
   "apps.noApps": "La màquina encara no ha llistat les seves aplicacions",
   "apps.gone": "Aquesta finestra s'ha tancat a la màquina",
   "apps.dropTitle": "Deixa anar per donar aquests fitxers a aquesta finestra de la màquina",
@@ -2027,5 +2031,7 @@
   "req.row.answers": "Respostes d'instal·lació",
   "req.use.answers": "Les fa Machines: no cal instal·lar res",
   "req.st.download": "En crear",
-  "req.st.builtin": "Inclòs"
+  "req.st.builtin": "Inclòs",
+  "cfg.closeOnStop": "Tanca la finestra quan la màquina s’aturi",
+  "cfg.closeOnStopNote": "Després d’una aturada o d’Apaga. Si s’atura per un problema, la finestra queda oberta per mostrar què ha passat."
 }

@@ -1,0 +1,9 @@
+{
+  "name": "Luna",
+  "description": "A tribute to the desktops of 2001: blue title bars with rounded tops, a green start button on a blue taskbar, and Files with a task pane.",
+  "author": "Federico Pereira",
+  "email": "fpereira@iperfex.com",
+  "organization": "IPERFEX",
+  "license": "MIT",
+  "sketch": { "taskbar": true, "frame": true }
+}

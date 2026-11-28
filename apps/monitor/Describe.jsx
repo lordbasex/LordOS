@@ -125,6 +125,10 @@ export function DescriptionPanel({ p, d, own }) {
         <Line label={tr('monitor.desc.lumo')}>
           <Text style={{ fontSize: typeScale.body, color: t.text, textAlign: 'start', lineHeight: 1.35 }} numberOfLines={4}>{inv.result.what}</Text>
           {inv.result.why ? <Text style={{ fontSize: typeScale.caption, color: t.textDim, textAlign: 'start', lineHeight: 1.35 }} numberOfLines={3}>{inv.result.why}</Text> : null}
+          {inv.result.floored ? (
+            <Text style={{ fontSize: typeScale.caption, color: RISK_COLOR[inv.result.risk], textAlign: 'start', lineHeight: 1.35 }} numberOfLines={3}>
+              {tr(`sentinela.why.${inv.result.floored}`, { place: tr(`sentinela.place.${inv.result.flooredPlace || 'other'}`) })}</Text>
+          ) : null}
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.s, flexWrap: 'wrap' }}>
             <View style={{ paddingHorizontal: 6, height: 17, borderRadius: 4, justifyContent: 'center', backgroundColor: `${RISK_COLOR[inv.result.risk]}26`, border: `1px solid ${RISK_COLOR[inv.result.risk]}66` }}>
               <Text style={{ fontSize: 10.5, fontWeight: 600, color: RISK_COLOR[inv.result.risk] }}>{tr(`monitor.desc.risk.${inv.result.risk}`)}</Text>

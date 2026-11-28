@@ -416,6 +416,8 @@ int vm_budget_fits(const VmHost *h, long running_mb, long want_mb);
 /* A machine folder whose run.json says it is active (starting, running, paused, stopping) with its lord-vm alive
  * (alive(pid); NULL: run.json alone): 1, else 0. run.json is read with O_NOFOLLOW, at most 2 KB. */
 int vm_dir_active(const char *dir, int (*alive)(long pid));
+/* The same, with its lord-vm's pid in *pid_out (0 when not active; pid_out may be NULL). */
+int vm_dir_active_pid(const char *dir, int (*alive)(long pid), long *pid_out);
 /* Backups (docs/VIRTUALIZATION.md 6.14): a path relative to the home folder that is a machine's disks folder or saved
  * session ("<...>.lordvm/disks" or "<...>.lordvm/suspend.state", a machine at any depth, a group's members included):
  * the length of its machine folder's part ("<...>.lordvm"), else 0. Backups holds those back while the machine runs:

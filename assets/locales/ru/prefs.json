@@ -203,6 +203,7 @@
   "power.healthNormal": "Состояние аккумулятора: {pct}% (нормальное)",
   "power.healthService": "Состояние аккумулятора: {pct}% (рекомендуется обслуживание)",
   "power.healthUnknown": "Состояние аккумулятора: неизвестно",
+  "power.h": "{h} ч",
   "power.hm": "{h} ч {m} мин",
   "power.immediately": "Сразу",
   "power.left": "Осталось {time}",

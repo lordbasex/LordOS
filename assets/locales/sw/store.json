@@ -167,6 +167,7 @@
     "other": "{count} za kusasisha"
   },
   "remove": "Ondoa",
+  "removeAsk": "Ondoa {name}?",
   "rescue.ask": "Hakuna akaunti kwenye kompyuta hii iliyo msimamizi. Ikiwa unajua nenosiri la root, unaweza kuifanya akaunti hii kuwa msimamizi. Inaanza kufanya kazi baada ya kuwasha upya kompyuta tu.",
   "rescue.button": "Nifanye Msimamizi",
   "rescue.noSudo": "Hakuna akaunti kwenye kompyuta hii iliyo msimamizi, na kifurushi cha sudo hakijasakinishwa. Kama root, endesha apt install sudo, kisha ujaribu tena hapa.",
@@ -233,7 +234,7 @@
   },
   "suggest.nvidiaDriver.detail": "Kwa sasa inatumia nouveau, kiendeshi huria kilichojumuishwa na LordOS. Kiendeshi cha mtengenezaji ({packages}) kwa kawaida hutoa utendaji bora wa 3D na usimamizi wa nishati.",
   "suggest.nvidiaDriver.note.nouveau": "Hadi utakapokisakinisha, kiendeshi huria cha nouveau kinaendelea kutumika; kuondoa kifurushi kunarudi kwacho.",
-  "suggest.nvidiaDriver.note.older": "Kadi za zamani kuliko takriban mwaka 2014 haziauniwi na toleo hili la kiendeshi; endelea kutumia kiendeshi huria kwazo. Eneo-kazi la LordOS bado halijajaribiwa na kiendeshi hiki.",
+  "suggest.nvidiaDriver.note.older": "Kadi za zamani kuliko takriban 2014 hazitumiki na toleo hili la kiendeshi; endelea na kiendeshi huru kwenye kadi hizo. Eneo-kazi la LordOS na kiendeshi hiki ni la majaribio: ripoti moja ya jumuiya inaonyesha likiundwa kwenye kadi (GTX 1070 yenye kiendeshi 580); ripoti ya awali liliundwa na kichakataji.",
   "suggest.nvidiaDriver.note.secureBoot": "Kiendeshi kinajengwa kwa ajili ya kerneli yako kwenye kompyuta hii (DKMS) na tena baada ya kila sasisho la kerneli. Secure Boot ikiwa imewashwa, lazima usajili ufunguo wake wa sahihi katika uwashaji upya ujao, la sivyo kiendeshi hakitapakia.",
   "suggest.nvidiaDriver.title": "Kiendeshi cha michoro cha umiliki",
   "suggest.nvidiaDriver.unavailable": "Kiendeshi cha mtengenezaji kinahitaji vijenzi vya contrib na non-free vya Debian, na havijawashwa vyote viwili katika vyanzo vya vifurushi vya kompyuta hii. Kiendeshi huria, nouveau, kinaendelea kufanya kazi.",

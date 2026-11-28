@@ -96,7 +96,7 @@ export function StreamsView({ onStart }) {
       {form && form.list === undefined ? (
         <View style={{ gap: 6, paddingHorizontal: 10 }}>
           <TextInput value={form.name} onChange={(v) => setForm({ ...form, name: v })} placeholder={tr('shell.widgets.video.namePlaceholder')} />
-          <TextInput value={form.addr} onChange={(v) => setForm({ ...form, addr: v })} placeholder="rtsp://user:password@192.168.1.10:554/stream" onSubmit={openAddr} autoFocus />
+          <TextInput spellCheck={false} value={form.addr} onChange={(v) => setForm({ ...form, addr: v })} placeholder="rtsp://user:password@192.168.1.10:554/stream" onSubmit={openAddr} autoFocus />
           <Text style={{ fontSize: typeScale.caption, color: th.textDim, textAlign: 'start' }}>{tr('shell.widgets.video.urlHint')}</Text>
           <View style={{ flexDirection: 'row', gap: 8, justifyContent: 'flex-end' }}>
             <Button small label={tr('clock.cancel')} onClick={() => setForm(null)} />

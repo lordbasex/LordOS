@@ -1,8 +1,8 @@
-// Lord Classic theme glyphs, drawn with views (our own shapes: no icon font, no color emoji; see
+// Classic theme glyphs, drawn with views (our own shapes: no icon font, no color emoji; see
 // docs/DESIGN.md, "Icons"). Each one takes a color and, where it needs to cut a hole, the color
 // of what is behind it (bg).
 import { View } from '@lordos/sdk';
-// The quick settings' glyphs are the SDK's, shared with Lord Flow's Control Center (sdk/quickglyphs.jsx, issue #114).
+// The quick settings' glyphs are the SDK's, shared with Flow's Control Center (sdk/quickglyphs.jsx, issue #114).
 export { MoonGlyph, SunGlyph, ContrastGlyph, LayersGlyph, BluetoothGlyph, SignalGlyph as NetworkGlyph } from '@lordos/sdk';
 
 const box = (s, extra) => ({ width: s, height: s, alignItems: 'center', justifyContent: 'center', ...extra });

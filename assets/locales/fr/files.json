@@ -95,7 +95,7 @@
   "menu.emptyTrash": "Vider la Corbeille",
   "menu.file": "Fichier",
   "menu.forward": "Avancer",
-  "menu.getInfo": "Afficher les informations",
+  "menu.getInfo": "Propriétés",
   "menu.go": "Aller",
   "menu.groupBy": "Grouper par",
   "menu.newFolder": "Nouveau dossier",
@@ -342,5 +342,9 @@
   "readOnly.denied": "Ce dossier est en lecture seule : ses autorisations ne vous permettent pas de le modifier. Pour le modifier, utilisez le Terminal ou une autre app.",
   "fromMachineNoRun": "« {name} » vient de la machine {machine}. Fichiers n'ouvre pas les programmes ni les installateurs d'une machine : utilisez Ouvrir avec si vous lui faites confiance.",
   "info.from": "Provenance",
-  "info.fromMachine": "La machine {machine}"
+  "info.fromMachine": "La machine {machine}",
+  "skin.address": "Adresse",
+  "skin.tasks": "Gestion des fichiers et dossiers",
+  "skin.otherPlaces": "Autres emplacements",
+  "skin.details": "Détails"
 }

@@ -1,0 +1,2 @@
+{ "name": "Test Clicker", "description": "A test fixture: a click and a timer that mount new nodes, launcher icons, a shortcut table.",
+  "community": true, "author": "LordOS tests", "license": "MIT", "version": "1.0.0" }

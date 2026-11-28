@@ -234,6 +234,7 @@
   "fs.moveRemoveFailed": "Imenakiliwa, lakini asili haikuweza kuondolewa: {errno}",
   "fs.noTrash": "Hakuna Tupio kwa mahali hapo",
   "fs.notFile": "Si faili",
+  "fs.notFolder": "Hii si folda",
   "fs.notInTrash": "Haiko kwenye Tupio",
   "fs.notRegular": "Si faili ya kawaida (je, ni kiungo?)",
   "fs.openFailed": "Haikuweza kufungua faili: {errno}",
@@ -243,11 +244,13 @@
   "fs.systemFolder": "Faili haionyeshi folda za ndani za mfumo (/proc, /sys, /dev na /run)",
   "fs.tooLarge": "Faili ni kubwa mno (upeo {max})",
   "fs.tooManyCopies": "Unakili mwingi mno unaendelea; jaribu tena mmoja ukimalizika",
+  "fs.tooManyWatches": "Folda nyingi mno zinafuatiliwa (upeo {max})",
   "fs.trashBadOrigin": "Mahali asili si sahihi",
   "fs.trashEntryFailed": "Haikuweza kuunda ingizo la Tupio",
   "fs.trashOriginGone": "Folda asili haipo tena",
   "fs.trashOtherDisk": "Iko kwenye diski tofauti na Tupio lake",
   "fs.trashRestoreExists": "Tayari kuna faili yenye jina hilo mahali asili",
+  "fs.watchRemote": "Mabadiliko katika folda za wingu na mtandao hayawezi kufuatiliwa; badala yake folda inaorodheshwa upya",
   "fw.bpfConfig": "haikuweza kusanidi BPF: {errno}",
   "fw.bpfMaps": "haikuweza kuunda ramani za BPF: {errno}",
   "fw.bpfMissing": "programu {program} haipo",
@@ -963,5 +966,9 @@
   "sentinela.notBlocked": "Programu hiyo haiko kwenye orodha ya kuzuia.",
   "sentinela.noAppNetwork": "Mchakato huu hauna programu yake yenyewe ambayo mtandao wake unaweza kuzuiwa.",
   "sys.failed": "Hitilafu fulani imetokea.",
-  "sys.unsupported": "Toleo hili la LordOS haliwezi kufanya hivyo."
+  "sys.unsupported": "Toleo hili la LordOS haliwezi kufanya hivyo.",
+  "theme.notAllowed": "{call} haipatikani kwa mandhari ya jamii",
+  "theme.noHost": "Sehemu ya LordOS ya mtindo wa eneo-kazi haipo",
+  "hands.refused": "Ni wewe tu unayeweza kufanya hivi: kamwe si ingizo la wakala wa AI",
+  "install.diskTooManyParts": "Diski hii ina sehemu nyingi mno kwa kisakinishi kuziorodhesha"
 }

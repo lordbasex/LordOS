@@ -9,10 +9,11 @@ Read first, if you can: [`themes/README.md`](../themes/README.md) (the short ref
 events and the supported style subset), [DESIGN.md](DESIGN.md) (tokens and the shared controls),
 [LAYERS.md](LAYERS.md) (stacking order) and [WINDOWS.md](WINDOWS.md) (moving and resizing).
 
-> **Today a theme only runs on a development build of LordOS.** A release build loads only JavaScript
-> that is listed in LordOS's signed code manifest, and a theme you build yourself is not in it. See
-> [Verified code](#verified-code-what-happens-to-a-theme-that-lordos-did-not-sign) for exactly what happens and what
-> would be needed.
+> **A theme you make runs on a normal LordOS as a community theme** (in development after 0.8.9.6.2): package its
+> source as a `.zip` and install it from Settings → Appearance → Install from a File… LordOS checks it, builds it
+> itself and runs it with a restricted API ([Community themes](#6-community-themes-installed-from-a-file)). Copying a
+> built bundle next to LordOS's own themes still only works on a development build
+> ([Verified code](#verified-code-what-happens-to-a-theme-that-lordos-did-not-sign)).
 
 ## 1. What a theme is
 
@@ -50,10 +51,11 @@ its own layout (for example what the Super key alone does).
 
 | Theme | Folder | Layout |
 |---|---|---|
-| Lord Flow | `themes/default` | menu bar on top (with the app's menus), magnifying Dock, app launcher, Control Center |
-| Lord Classic | `themes/classic` | taskbar (bottom, top or a side), start menu with search, quick settings, notification panel, menus in each window, snapping and the SDK's Overview |
-| Lord Workspaces (since 0.8.9) | `themes/workspaces` | activities (desktops with an icon, a colour, pinned apps and a layout per display), a Context Spine, group frames with static tiling, its own Search panel and Control Center, menus in each window, three effects styles ([WORKSPACES.md](WORKSPACES.md)) |
-| Lord Celeste (community, since 0.8.9.5) | `themes/celeste` | a frame around each display with rounded inner corners, a bar on its thick side (running apps, status items, privacy indicators, clock), drawers that slide out of the frame's edges (dashboard, launcher, session, sidebar with the notifications), menus in each window, mirrored right to left; the theme options of `theme.json` and a node-tested geometry (`model.js`). Layout inspired by Caelestia (caelestia-dots/shell); no code from it |
+| Flow | `themes/default` | menu bar on top (with the app's menus), magnifying Dock, app launcher, Control Center |
+| Classic | `themes/classic` | taskbar (bottom, top or a side), start menu with search, quick settings, notification panel, menus in each window, snapping and the SDK's Overview |
+| Workspaces (since 0.8.9) | `themes/workspaces` | activities (desktops with an icon, a colour, pinned apps and a layout per display), a Context Spine, group frames with static tiling, its own Search panel and Control Center, menus in each window, three effects styles ([WORKSPACES.md](WORKSPACES.md)) |
+| Luna (in development after 0.8.9.6.1) | `themes/luna` | a tribute to the desktops of 2001: glossy blue title bars with rounded tops, a green start button on a blue taskbar with quick launch and a button per window; the demo of [style packs and app skins](#style-packs-and-app-skins): its own icons, pointers, sounds and font, and Files as that era's explorer |
+| Celeste (since 0.8.9.5; a community theme until 0.8.9.6.1, official since) | `themes/celeste` | a frame around each display with rounded inner corners, a bar on its thick side (running apps, status items, privacy indicators, clock), drawers that slide out of the frame's edges (dashboard, launcher, session, sidebar with the notifications), menus in each window, mirrored right to left; the theme options of `theme.json` and a node-tested geometry (`model.js`). Layout inspired by Caelestia (caelestia-dots/shell); no code from it |
 
 `themes/greeter` is the login and lock screen: it is a separate program, not a desktop theme (see
 [The login and lock screen](#the-login-and-lock-screen-are-not-your-theme)).
@@ -63,7 +65,7 @@ since 0.8.5 lists every installed theme (the only place to choose one). It is a 
 (`apps/settings/ThemeGallery.jsx`, with its pure parts in `sdk/themegallery.js`): a search field
 (name, description, author and id, without accents), the filters All / Official / Community /
 Installed and a grid of cards that wraps with the window; the arrow keys move over the cards and
-Enter opens one. The official themes come first (Lord Flow, Lord Classic, then by name), then the
+Enter opens one. The official themes come first (Flow, Classic, then by name), then the
 community ones by name; a theme with `"hidden": true` in its `theme.json` is not listed. A card opens
 the theme's page: a larger picture, its description, author, license and version, its own options
 and **Apply**. A theme that couldn't start in this session (lord-server went back to the one before,
@@ -90,7 +92,7 @@ How a session starts: `lord-sessiond` always starts `lord-server` with
 `sess.c`), and `lord-server` starts the theme the user chose instead (`chosen_theme` in `server/src/main.c` reads
 `theme` from the settings), so no theme is loaded only to switch; if the default one did start anyway, its
 `startShell()` switches to the chosen one. If the chosen theme can't be loaded, the session starts in the default
-theme (then Lord Classic, then the recovery screen) and its `startShell()` puts the choice back and says why.
+theme (then Classic, then the recovery screen) and its `startShell()` puts the choice back and says why.
 
 ## 2. Anatomy of a theme
 
@@ -118,19 +120,24 @@ The theme's **id is its folder name**: letters, digits, `-` and `_`, at most 64 
   `shell.theme.<id>.name` / `shell.theme.<id>.description` (the bundled themes translate theirs
   that way; `themes.list` in `sdk/index.js`). A missing or invalid `theme.json` shows the id.
 - `hidden: true` keeps it out of Settings (the login screen uses it).
+- The name is the theme's own, never "Lord …" (`tools/brand-check.mjs` refuses one, in `theme.json` and in every
+  language's `shell.theme.<id>.name`), and `author` names a real person or project (with `email` and `organization`
+  when there is one: the official themes say Federico Pereira, fpereira@iperfex.com, IPERFEX). The official themes
+  are developed in LordOS-themes and synced into `themes/` (`themes/README.md`).
 - It is read as text of at most 4 KB. It is data, not code, so it is not in the code manifest.
-- (0.8.9) Three optional fields for Settings, which knows only Lord Flow and Lord Classic by id. `sdk/thememeta.js`
-  checks them and drops anything else (labels must be `shell.*` locale keys, values short plain strings):
+- (0.8.9) Three optional fields for Settings, which knows only Flow and Classic by id. `sdk/thememeta.js`
+  checks them and drops anything else (labels must be `shell.*` locale keys or, from 0.8.9.6.2, keys of the theme's
+  own namespace `theme-<id>`, see [Translations](#translations); values short plain strings):
   - `"sketch": { "rail": true, "pills": true, "frame": true }` (also `menubar`, `dock`, `taskbar`): the drawn picture
     in Appearance → Desktop style.
   - `"options": [{ "key", "label", "hint", "choices": [[value, label], …] | "toggle": true, "default" }]`: the theme's
     own choices, shown under Desktop style and on Desktop & Dock while it is the current theme, stored in
     `settings.themeOptions[<theme id>][key]`; read them with `themeOptionValue` (`@lordos/sdk`).
-  - `"desktopArrows": true`: the Desktops section offers Settings → Keyboard's ⌃-arrows switch, as for Lord Flow
+  - `"desktopArrows": true`: the Desktops section offers Settings → Keyboard's ⌃-arrows switch, as for Flow
     (the theme then uses `flowDesktopKeys` and `flowGrabs()`).
 
-  Lord Workspaces' `theme.json` uses all three.
-- Four optional fields that Settings → Appearance shows on the theme's card and page (checked by
+  Workspaces' `theme.json` uses all three.
+- Five optional fields that Settings → Appearance shows on the theme's card and page (checked by
   `cleanThemeMeta` in `sdk/thememeta.js`; an invalid value is dropped):
 
   | Field | Value | Shown as |
@@ -139,26 +146,30 @@ The theme's **id is its folder name**: letters, digits, `-` and `_`, at most 64 
   | `author` | plain text, one line, at most 80 characters, no control or bidi-override characters | the author; missing, invalid or the placeholder `"author pending"` reads **"Unknown author"** |
   | `license` | an SPDX expression: `"MIT"`, `"GPL-3.0-or-later"`, `"MIT OR Apache-2.0"` (up to four terms joined by `OR`, `AND` or `WITH`) | the license; missing reads "Not stated" |
   | `version` | `1`, `1.2`, `1.2.3` or `1.2.3.4`, with an optional `-beta.1` or `+build` suffix | "Version 1.2.3" |
+  | `minLordOS` | (0.8.9.6.2) the oldest LordOS release it runs on: `"0.8.9.6.2"` (two to six numbers, no suffix) | on an older release, "Needs LordOS 0.8.9.6.2" on the card and "Needs LordOS 0.8.9.6.2 or later" instead of Apply; `themes.use` refuses it with a notification |
+  | `email` (0.8.9.6.2) | the author's address, one `local@domain.tld`, at most 120 characters | an "Email" row on the theme's page, as text (never opened by itself) |
+  | `organization` (0.8.9.6.2) | plain text, one line, at most 60 characters, the same rules as `author` | an "Organization" row on the theme's page |
 
-  The official themes (no `community: true`) declare none of them: Settings shows LordOS as their author, MIT as
-  their license and the release's version as theirs. A community theme should declare all four:
+  Luna declares its author, email and organization (it is official, so its license and version are LordOS's).
+  The other official themes (no `community: true`) declare none of them: Settings shows LordOS as their author, MIT as
+  their license and the release's version as theirs. A community theme should declare all five:
 
   ```json
   { "name": "Aurora", "description": "Soft colors and a floating dock.",
-    "community": true, "author": "Ana Pérez", "license": "MIT", "version": "1.0.0",
+    "community": true, "author": "Ana Pérez", "license": "MIT", "version": "1.0.0", "minLordOS": "0.8.9.6.2",
     "sketch": { "dock": true, "menubar": true } }
   ```
 
   `community` is the author's own statement for now: an installed community theme still needs its bundle in the
   code manifest to run (below). From stage 2 of the themes plan, a theme installed from a file is a community
   theme whatever it says.
-  Credit any work a community theme was inspired by in `THIRD_PARTY.md` (Lord Celeste is an example).
+  Credit any work a community theme was inspired by in `THIRD_PARTY.md` (Celeste is an example).
 
 ### `tokens.js`: the contract with the apps
 
 Every app reads its colors with `useTheme()` (`sdk/theme.js`), so it looks right in any theme. The
 theme passes its tokens to `<ThemeProvider tokens={…}>`; whatever it leaves out falls back to
-`DEFAULT_TOKENS` (Lord Flow's dark colors), and its own extra keys pass through untouched. Isolated
+`DEFAULT_TOKENS` (Flow's dark colors), and its own extra keys pass through untouched. Isolated
 apps (their own processes) receive the same tokens through the broker, and Linux apps get the mode,
 the accent and the title-bar button order through the settings portal (`publishTokens` and
 `syncPortal` in `sdk/theme.js`). So the tokens must be plain JSON values (no functions).
@@ -203,6 +214,13 @@ the accent and the title-bar button order through the settings portal (`publishT
   in the returned `order` (`'close'`, `'minimize'`, `'maximize'`, close always nearest the corner). Left
   and Right are the screen's sides in every language; Automatic follows the reading direction (#58).
 - `radius`: a general corner radius (default 8).
+- Richer tokens (0.8.9.6.2, part 4 of the community-themes plan; all plain JSON, `null` keeps LordOS's flat look):
+  `toolbarBg` (the apps' toolbars: a colour or a two-stop `linear-gradient`, the toolbar "texture"), `buttonBg` (neutral
+  buttons' fill), `bevel: { light, dark }` (neutral buttons drawn raised, an active toolbar button sunken) and
+  `stateBorders: { normal, hover, pressed, disabled, toolbar }` (the border of buttons and toolbar buttons per state;
+  `toolbar` is a toolbar button at rest). `Button`, `Toolbar` and `ToolbarButton` read them (`sdk/components.jsx`,
+  `sdk/controls.jsx`; `stateBorder` and `bevelStyle` in `sdk/theme.js`), so every app gets the look without a change.
+  The engine's gradients have two stops: a `linear-gradient` with more uses its first and last colours.
 
 `ThemeProvider` adds two tokens from the user's settings: `scrollBars` and `reduceMotion`. The
 user's choices that a theme turns into tokens itself are in `settings` (`sdk/settings.js`): `mode`,
@@ -249,7 +267,7 @@ startShell(<App />);
 - `chrome: { w, h }`: how much the frame adds around the content (borders plus title bar), so a
   Linux window opens at the size it asked for.
 - `snap: true`: window snapping (drag to the edges, `wm.snap`, `wm.snapKey`, the `snapPreview`
-  store to draw the preview; [WINDOWS.md](WINDOWS.md#snapping-083)). Lord Classic turns it on.
+  store to draw the preview; [WINDOWS.md](WINDOWS.md#snapping-083)). Classic turns it on.
 
 **`startShell(element)`** (`sdk/index.js`): switches to the user's theme if it isn't this one, turns
 the layers on, reopens the windows after a theme switch, renders your element inside a root that
@@ -280,7 +298,7 @@ Inside it:
 - a title bar whose `onMouseDown` calls **`wm.beginMove(w.id)`**. Moving and resizing are then done
   by `lord-server` in C (`server/src/ui/grab.c`): React gets no event per frame, and the moving
   window is painted from a cached layer ([WINDOWS.md](WINDOWS.md)). `beginMove` returns `false` when
-  it can't (a maximized window, no button held); Lord Classic then drags out of the maximized place
+  it can't (a maximized window, no button held); Classic then drags out of the maximized place
   in JS with `wm.move`;
 - **`<AppHost id={w.id} focused={…} />`** for the content, in a `flex: 1` box;
 - no background under the content when `getApp(w.id).transparent` (the Terminal). Such a window has
@@ -312,10 +330,10 @@ The SDK gives menus as **item lists**; the theme draws them. An item is
 | `windowMenuItems(winId)` | the Window menu, the same in every theme: Minimize, Zoom, Fill, Center, Move & Resize (halves, quarters, thirds, arrangements), Move to *display*, Bring All to Front, the window list (`sdk/windowmenu.js`) |
 | `dockMenu(entry)` | a Dock or taskbar item's context menu |
 | `trashMenu({ onEmpty })` | the Trash's menu |
-| `recentItems(n)`, `storeUpdates()`, `runningApps()`, `forceQuit(key)`, `appGroup(winId)` | for a system menu like Lord Flow's crown menu |
+| `recentItems(n)`, `storeUpdates()`, `runningApps()`, `forceQuit(key)`, `appGroup(winId)` | for a system menu like Flow's crown menu |
 
-Where they go is the theme's choice: Lord Flow shows the app menus in its top menu bar
-(`themes/default/components/MenuBar.jsx`), Lord Classic in a strip under each window's title bar
+Where they go is the theme's choice: Flow shows the app menus in its top menu bar
+(`themes/default/components/MenuBar.jsx`), Classic in a strip under each window's title bar
 (`themes/classic/components/Window.jsx`). A theme without either must still give the app's menus a
 place, or the apps lose commands. Each bundled theme has its own `components/Menu.jsx` that puts the
 menu in the `popover` layer.
@@ -355,7 +373,7 @@ There are no ready-made panels in the SDK: each theme draws its own from SDK sto
 
 - **App launcher / start menu:** `useLauncherApps()` (LordOS apps and installed Linux apps, sorted by
   name, with `name`, `Icon`, `kind`), `launchApp(id)`, `appCategory(app)`, `APP_CATEGORIES`;
-  system-wide search results from `searchEverything` (Lord Classic's start menu).
+  system-wide search results from `searchEverything` (Classic's start menu).
 - **Control Center / quick settings:** `Toggle`, `Slider`, `Segmented`; `useSound`, `sound`,
   `defaultSink`; `useBluetooth`; `useBattery`, `BatteryGlyph`; `nightActive`, `setNightManual`;
   `notifyPrefs`, `dndActive` (Do Not Disturb); `NowPlayingTile`; `useCpuUsage`, `useSystemInfo`;
@@ -411,7 +429,7 @@ With Arabic or Hebrew the engine flips rows and alignment by itself. Your part
 - The accent comes as a name (`settings.accent`) mapped through your `accents`.
 - `settings.effects === false` means "no transparency": draw opaque bars and `blur: 0`.
 - **Reduce motion** (`settings.reduceMotion`, also `useTheme().reduceMotion`): skip decorative
-  animation (both themes skip the Dock's "poof" when an item is removed, Lord Flow also the Dock's
+  animation (both themes skip the Dock's "poof" when an item is removed, Flow also the Dock's
   reorder glide; `ScrollView` stops fading).
 
 ### Several displays
@@ -420,12 +438,12 @@ Use `screenDisplays()` (`[{ id, name, x, y, w, h, scale, main }]`), `mainDisplay
 `displayAt(x, y)`, `displayFor(rect)` and `screen.mirror` ([DISPLAYS.md](DISPLAYS.md#the-theme-and-the-sdk)).
 The bundled themes draw a wallpaper per display at its pixel size
 (`wallpaperSrc(w, d.w * d.scale / 100, d.h * d.scale / 100)`), and put the Dock on the main display.
-Lord Flow draws a menu bar on every display (`<MenuBars>` in `themes/default/components/MenuBar.jsx`;
+Flow draws a menu bar on every display (`<MenuBars>` in `themes/default/components/MenuBar.jsx`;
 off with `settings.menuBarAllDisplays === false`, read it with `menuBarEveryDisplay(settings)`):
 `barDisplays`, `hasBar`, `activeBarId`, `pinBar` and `panelLeft` (`sdk/menubarmodel.js`) say which
 displays get a bar, which work areas reserve it, which bar has the app's menus lit and where a panel
 opens; `sharedTicker` (`sdk/ticker.js`) gives every bar's clock one timer; `spotlight.toggle(display)`
-opens Search on that display. Lord Classic draws a taskbar on every display under the same setting
+opens Search on that display. Classic draws a taskbar on every display under the same setting
 (`themes/classic/placement.js`; each bar registers its own `registerDockTarget`, and a drop goes to the first
 bar that is hit). Your `workArea` function receives each display; `workAreaOf(d)` and
 `pointerWorkArea()` read it back. New windows open on the display under the pointer, or the one the
@@ -443,14 +461,14 @@ Linux apps. A slow theme makes the whole desktop slow.
   it with reduce motion. `lord.setStyle` takes the engine's own keys (`rotate` in degrees, `scaleX`,
   `scaleY`), not a CSS `transform` string: an unknown key changes nothing and is logged once.
 - **`transform` scale and rotate are cheap**: the subtree is painted once into a cached raster and
-  composited (Lord Flow's minimize effect scales a whole window). The raster is freed 30 s after its last use
+  composited (Flow's minimize effect scales a whole window). The raster is freed 30 s after its last use
   (0.8.9.1), so an animation costs its memory only while it runs and shortly after.
 - **Blur costs**: `backdropFilter: blur(r)` reads a margin of 2×r around the surface, and any change
   touching it repaints the whole surface ([LAYERS.md](LAYERS.md#blurred-surfaces-and-partial-repaints)).
   Keep blurred surfaces few and small, and turn blur off with `effects: false`.
 - **Subscribe narrowly**: `useStore(store, selector)` re-renders only when the selected value changes;
   a clock that renders every second should only re-render its own text.
-- **Don't poll** when a store exists (sound, battery, Bluetooth and displays arrive as events). Lord
+- **Don't poll** when a store exists (sound, battery, Bluetooth and displays arrive as events).
   Classic's network glyph polls every 5 s; that is the upper bound to aim for.
 - The style subset has no CSS animations, dashed borders, skew or 3D (`themes/README.md`). An
   unknown style key is logged as `js: unsupported style '<key>'`, once per key per process (an
@@ -461,7 +479,8 @@ Linux apps. A slow theme makes the whole desktop slow.
 
 `<Image src="assets/x.png">` is resolved against the theme's folder; `asset:wallpapers/…` against
 LordOS's `assets/`; an absolute path as is (`server/src/ui/js.c`). PNG and JPEG. Text uses the
-bundled Inter (400/500/600/700). The `.deb` packaging copies only `theme.json`, `theme.bundle.js`
+bundled Inter (400/500/600/700); a style pack can name an installed font for `fontFamily: 'theme'`
+([Style packs](#level-1-a-style-pack)). The `.deb` packaging copies only `theme.json`, `theme.bundle.js`
 and `assets/` of each theme (`tools/iso/mkdeb.sh`), so keep your files there.
 
 ### Translations
@@ -474,6 +493,244 @@ the `shell` catalog (`assets/locales/<lang>/shell.json`, in every one of the 35 
 `assets/locales/` (`f_locale_catalog` in `js_sys.c`). A missing key shows the key itself. Inside the
 LordOS tree, `node tools/i18n-check.mjs` checks every `t()` key in `themes/` against the English
 catalog and every language against English.
+
+**A community theme's own namespace (0.8.9.6.2): `theme-<id>`.** A theme that LordOS didn't make keeps its texts in
+`theme-<id>` (`themeNamespace` in `sdk/thememeta.js`; its id at most 26 characters), as
+`assets/locales/<lang>/theme-<id>.json`: [lordos-theme-kit](https://github.com/lordbasex/lordos-theme-kit) keeps
+them as `locales/<lang>.json` in the theme and copies them there when it builds. The theme's code calls
+`t('theme-<id>.bar.apps')`; its `theme.json` option labels, hints and choices may use the same keys
+(`"label": "theme-aurora.opt.glass"`), never another theme's (they are dropped); and `theme-<id>.theme.name` /
+`theme-<id>.theme.description` translate its name and description in Settings. Settings shows those texts through
+`themeText`: one line, without control or bidi-override characters, cut with "…" at 48 characters for a name or label,
+24 for a choice, 160 for a hint and 240 for a description. Like every text of LordOS, a theme's are in all 35
+languages: `node tools/i18n-check.mjs` checks each `theme-<id>.json` like LordOS's own catalogs, and every label in
+`themes/*/theme.json` against English. No `.lpk` package may have an id that starts with `theme-`.
+## Style packs and app skins
+
+(In development after 0.8.9.6.1; part 4 of the community-themes plan, approved on 2026-11-26.) A theme draws the
+desktop and gives the apps their colours through tokens. Two more levels let it go further without touching an app's
+logic. Both are registered at module level, before `startShell`, and both are the person's to turn off: **Settings →
+Appearance → From this style** lists only the parts the style in use brings, each with its own switch
+(`settings.themeParts[part] === false`), so someone can keep a theme's frames and use LordOS's icons. The rules are in
+`sdk/appskinmodel.js` (node-tested by `server/tests/appskin_test.mjs`), the session side in `sdk/appskins.jsx`. Lord
+Luna (`themes/luna`) uses all of it.
+
+### Level 1: a style pack
+
+```jsx
+import { registerStylePack } from '@lordos/sdk';
+registerStylePack({
+  icons: {
+    apps: { files: FilesIcon },                     // app icons, by app id
+    files: { folder: Folder, text: Page, pdf: Pdf }, // file-type icons: 'folder' and the kinds of sdk/filekinds.js
+    toolbar: { back: Back, forward: Fwd, up: Up },   // toolbar icons, by our names (TOOLBAR_ICONS)
+  },
+  cursors: { fill: '#ffffff', outline: '#000000' },
+  sounds: { startup: [[392, 160], [523.25, 160], [783.99, 420]], notify: [[880, 90], [1174.66, 220]], error: [[220, 110]], emptyTrash: [[988, 60]] },
+  fonts: { family: 'DejaVu Sans' },
+});
+```
+
+| Part | What it is | Where it shows |
+|---|---|---|
+| `icons.apps` | a component `({ size }) => …` or an image the theme carries (`"assets/….png"` or `.svg`, never `..`, an absolute path or a URL), by app id | every native app's icon (`getApp(id).Icon`: the Dock, the taskbar, the launcher, the title bars) |
+| `icons.files` | the same, for `folder` and each kind: `text`, `code`, `pdf`, `archive`, `audio`, `video`, `image`, `doc`, `deb`, `lpk`, `other` | Files and the file dialog (`EntryIcon` in `sdk/fileglyphs.jsx`); thumbnails of pictures and videos stay |
+| `icons.toolbar` | the same, for our names: `back`, `forward`, `up`, `newFolder`, `search`, `views`, `icons`, `list`, `columns`, `gallery`, `sort`, `tags`, `refresh`, `terminal`, `more`, `go`, `copy`, `cut`, `paste`, `trash`, `info`, `sidebar` | a `ToolbarButton` with that `iconName` (Files' toolbar names all of its buttons) |
+| `cursors` | `fill` and `outline`, two `#rrggbb` colours | every pointer shape lord-server draws (`lord.input.pointerScheme`, `cursor_set_scheme` in `server/src/cursor.c`); the shapes and the shadow stay ours |
+| `sounds` | for `startup`, `notify`, `error`, `emptyTrash`: up to 8 notes `[Hz, ms]` (60–5000 Hz, or 0 for a rest; 10–1000 ms; 2.5 s in all) | synthesized by lord-server like LordOS's own sounds (`lord.sound.scheme`, `snd_set_scheme` in `server/src/sound/snd.c`): the default notification sound, errors, emptying the Trash, and the startup tune once per session (not again after a theme switch). A notification sound chosen per app in Settings stays that sound |
+| `fonts` | `family`: the name of a font installed on the system (LordOS's own folder or the system's font folders) | text styled `fontFamily: 'theme'`: `useThemeFont()` returns `'theme'` while the pack brings a font and the person keeps it, else nothing (Inter). The theme's frames and its skins use it; the apps' own text stays Inter |
+
+A community theme (installed from a file, running under the restricted API) may register a style pack too, through its
+facade (`sdk/themeapi.js`): its pointer colours, its tunes, an installed font and icons as image files of its own; the
+three native calls are on the restricted API's allowlist (`server/src/ui/js_theme.c`) because they take data only.
+Component icons and app skins stay an official theme's: they would draw inside LordOS's apps.
+
+What a pack can't do, by design: a theme brings no audio file, no cursor image and no font file for lord-server to
+parse. Sounds are notes, pointers are two colours, and a font is one that is already installed (a Debian package, so its
+licence is a free one: Luna names DejaVu Sans of `fonts-dejavu-core`, which LordOS recommends). Anything the
+checks don't accept is dropped, and the rest of the pack still applies.
+
+### Level 2: app skins
+
+A native app names the regions a theme may draw (`APP_REGIONS` in `sdk/appskinmodel.js`) and keeps all its logic. A theme
+registers a component per region:
+
+```jsx
+import { registerAppSkins } from '@lordos/sdk';
+registerAppSkins({ files: { toolbar: MyToolbar, addressBar: MyAddress, sidebar: MyTaskPane, itemView: MyItems, statusBar: MyStatus, contextMenu: MyMenu } });
+```
+
+The app draws each region through `<SkinRegion app="files" region="toolbar" model={vm}>{its own}</SkinRegion>`: the
+theme's component gets `{ model }` and is drawn instead. **The rule that keeps it safe:** a skin only **asks** for
+actions through `model.actions`; the app does them with its own checks (`lord.fs`'s rules, the protected folders, the
+confirmations, the Trash instead of deleting). A skin never calls `lord.fs`, never opens a terminal and never gets one
+of the app's internal objects: the model is plain data, frozen, plus the app's actions as functions. It also has to
+work under the restricted theme API of part 2. A skin that throws is replaced by the app's own region for the rest of
+the session (logged once as `skin files.itemView failed, using the app's own`). Unknown apps, regions and anything that
+isn't a component are dropped when registered. App layouts off in Settings brings every app's own regions back at once.
+
+#### Files
+
+| Region | Where | Files' own | The skin's `model` |
+|---|---|---|---|
+| `toolbar` | the top row | Back, Forward, New Folder, the views, sort, tags, terminal, ⋯, search | the view model below |
+| `addressBar` | under the toolbar | none (Files' path bar is at the bottom) | the view model |
+| `sidebar` | the start side, resizable (Files keeps the width) | Favorites, Locations, Tags | the view model |
+| `itemView` | the content | icons, list, columns or gallery | the view model |
+| `statusBar` | the bottom | the path bar and the status line with the zoom | the view model |
+| `contextMenu` | over the window | Files' menu | `{ x, y, items, close, bounds }`: the items Files built (`{ label, onClick, hint, disabled, checked, danger, submenu, header, note, swatches }` or `'-'`); clicking one runs Files' action |
+
+The view model (`apps/files/skinmodel.js`, `filesViewModel`):
+
+- `location`: `{ type, path, title, crumbs: [{ label, folder, index }], readOnly, readOnlyText, writable }` (`type` is
+  `dir`, `recent`, `trash`, `network`, `apps`, `tag`, `search` or `archive`; `path` only for a folder);
+- `history`: `{ back, forward, up }`, booleans;
+- `view` (`icons`, `list`, `columns`, `gallery`), `views`, `sort: { by, desc }`, `zoom`, `query`;
+- `items`: `[{ key, name, label, dir, size, mtime, kind, ext, selected, cut, renaming }]`, fresh copies (`key` is what
+  the actions take; `mtime` in milliseconds, as `new Date(mtime)` takes it, 0 when unknown: Files' own list shows
+  `formatDate(d, 'numeric')` and `formatTime(d)`);
+- `selection`: `{ count, keys, first }`; `renaming`: `{ key, value }` or null; `details`: the first selected item or the
+  folder shown (`{ name, kind, dir, size, mtime, count }`), for a "Details" box;
+- `places`: `[{ id, label, kind, selected }]` for `home`, `desktop`, `documents`, `downloads`, `pictures`, `music`,
+  `videos`, `computer`, `network`, `recent`, `trash` (those that exist here);
+- `status`: `{ text, message, job: { label, fraction } | null }`; `empty` (the text for an empty folder), `loading`,
+  `canPaste`;
+- `FileIcon`: a component `({ item, size })` that draws the item's own icon (a thumbnail, the pack's, or ours);
+- `actions`: `back()`, `forward()`, `up()`, `goPlace(id)`, `goCrumb(index)`, `goAddress(text)` (`~`, `~/…`, an absolute
+  path or one under the folder shown; false and a status message when there is no folder there), `open(key)`,
+  `openSelection()`, `select(key, { add, range })`, `selectAll()`, `clearSelection()`, `menu(key | null, event)` (Files'
+  context menu at the event's place), `newFolder()`, `rename(key?)`, `renameChange(text)`, `renameCommit()`,
+  `renameCancel()`, `copy()`, `cut()`, `paste()`, `trash()`, `duplicate()`, `info()`, `quickLook()`, `terminal()`,
+  `emptyTrash()`, `setView(view)`, `sortBy(by)`, `zoom(±1)`, `search(text)`, `newWindow()`. The object stays the same
+  across renders; each call runs what the current render offers, exactly as Files' own button would (a new folder in a
+  folder Files only browses shows Files' read-only notice; Move to Trash in a cloud folder asks first).
+
+#### The shared shapes, and the apps that use them
+
+Most apps' regions take one of two shapes from `sdk/appskinmodel.js`, so one skin component can draw them all:
+
+- **A command bar** (`commandBar`): `{ title, commands: [{ id, label, disabled, active, group }], actions: { command(id) } }`.
+  The app lists only its own commands for the place shown; `command(id)` runs one only while it is on that list and not
+  disabled (`pickCommand`), exactly as the app's own button or menu item does.
+- **A list pane** (`listPane`): `{ title, items: [{ key, label, detail, selected, group }], actions: { select(key) } }`;
+  `select(key)` opens only a listed item (`pickItem`).
+- **A header** (`SkinHeader` in `sdk/appskins.jsx`), for an app that has no bar of its own: region `header`, a command
+  bar with the app's title (and its commands where the app gives them). Without a skin the app is drawn exactly as before,
+  with no wrapper; Machines and Databases give it to their main window only.
+
+| App | Regions (shape) | What stays the app's | Stub scene |
+|---|---|---|---|
+| Notes | `sidebar` (list pane with the search: titles and dates only), `toolbar` (command bar) | the note, its text and editor, every dialog | `notes_skin_scene.mjs` (14 checks) |
+| Calculator | `display` (`{ expression, result }`), `keypad` (`{ keys: [[{ id, label, kind }]], actions: { press(id) } }`, only a key of the keypad) | the arithmetic | `calculator_skin_scene.mjs` (9 checks) |
+| Photos | `sidebar` (list pane: All Photos, the folders, the cloud places), `toolbar` (command bar: smaller, larger, refresh) | the photos, the viewer, every edit and the Trash | `photos_skin_scene.mjs` (13 checks) |
+| Player | `sidebar` (list pane: the views), `toolbar` (command bar: the title, Back), `transport` (command bar: previous, play or pause, next, with `position` and `duration`; only while something plays) | the lists, the playing, the volume and the streams | `player_skin_scene.mjs` (12 checks) |
+| Monitor | `toolbar` (command bar: the tabs this computer has, the one shown `active`) | every tab's content and every action on a process | `monitor_skin_scene.mjs` (10 checks) |
+| Clock | `toolbar` (command bar: the four tabs, the one shown `active`, and Add where the tab has one) | the clocks, alarms, timer and stopwatch | `clock_skin_scene.mjs` (11 checks) |
+| Screenshots | `toolbar` (command bar: close, the five modes with the chosen one `active`, the color picker, text, and Capture or Record) | the capturing, the options menu, the files and the markup editor | `screenshots_skin_scene.mjs` (10 checks) |
+| Disks | `sidebar` (list pane: each disk and its partitions, grouped by disk) | the details, every disk action and the administrator prompt | `disks_skin_scene.mjs` (9 checks) |
+| About | `banner` (`{ version, build, code, codeNote, tagline, rows: [{ label, value }] }`; one action, `systemReport()`) | every number it reads and the rest of the window | `about_skin_scene.mjs` (8 checks) |
+| Help | `sidebar` (list pane with the search: the tour and the articles by section, or the search's results) | the articles and the tour | `help_skin_scene.mjs` (9 checks) |
+| Characters | `toolbar` (command bar: the emoji and symbols tabs), `sidebar` (list pane: the emoji groups or the symbol blocks) | the grid, the search, the skin tones and the copying | `characters_skin_scene.mjs` (12 checks) |
+| Fonts | `sidebar` (list pane with the search: the collections and the families) | the samples, installing and removing | `fonts_skin_scene.mjs` (9 checks) |
+| Logs | `sidebar` (list pane: the journal sources and the log files by group), `toolbar` (command bar: Live, Export) | the reading, the filters and the export's file dialog | `logs_skin_scene.mjs` (12 checks) |
+| System Information | `toolbar` (command bar: the six tabs and Refresh) | every tab's content, the checks, the benchmark and the report | `sysinfo_skin_scene.mjs` (9 checks) |
+| Backups | `toolbar` (command bar: the Snapshots and Settings tabs) | the backups, restoring and every setting | `backup_skin_scene.mjs` (9 checks) |
+| PDF Viewer | `toolbar` (command bar: the sidebar, zoom, rotate, the four tools, invert, print; disabled with no document; the page in the title) | the pages, the annotations, the search, the password and printing | `pdf_skin_scene.mjs` (10 checks) |
+| Force Quit | `list` (list pane of the running apps, plus `commands` with Force Quit, disabled until one is chosen, and `error`) | quitting (forceQuit, only an app on the list) | `forcequit_skin_scene.mjs` (9 checks) |
+| About App | `banner` (About's banner shape for one app: `name`, `version`, `code` (its kind), `codeNote`, `tagline`, `AppIcon`; no action) | the rest of the window | `appabout_skin_scene.mjs` (6 checks) |
+| Scanner | `header` (command bar with the app's title; the app has no bar of its own: `SkinHeader`) | everything: the header is added above the app, which is drawn as before | `scanner_skin_scene.mjs` (8 checks) |
+| Voice Recorder | `header` (command bar with the app's title; the app has no bar of its own: `SkinHeader`) | everything: the header is added above the app, which is drawn as before | `recorder_skin_scene.mjs` (8 checks) |
+| Camera | `header` (command bar with the app's title; the app has no bar of its own: `SkinHeader`) | everything: the header is added above the app, which is drawn as before | `camera_skin_scene.mjs` (8 checks) |
+| LordOS Imager | `header` (command bar with the app's title; the app has no bar of its own: `SkinHeader`) | everything: the header is added above the app, which is drawn as before | `imager_skin_scene.mjs` (8 checks) |
+| Install LordOS | `header` (command bar with the app's title; the app has no bar of its own: `SkinHeader`) | everything: the header is added above the app, which is drawn as before | `installer_skin_scene.mjs` (8 checks) |
+| Databases | `header` (command bar with the app's title; the app has no bar of its own: `SkinHeader`) | everything; only the main window gets the header (a machine's screen, a console are drawn as before) | `databases_skin_scene.mjs` (8 checks) |
+| Machines | `header` (command bar with the app's title; the app has no bar of its own: `SkinHeader`) | everything; only the main window gets the header (a machine's screen, a console are drawn as before) | `machines_skin_scene.mjs` (8 checks) |
+| Cleaner | `header` (command bar with the app's title; the app has no bar of its own: `SkinHeader`) | everything: the header is added above the app, which is drawn as before | `cleaner_skin_scene.mjs` (2 checks) |
+| LordOS Studio | `header` (command bar with the app's title; the app has no bar of its own: `SkinHeader`) | everything: the header is added above the app, which is drawn as before | `studio_skin_scene.mjs` (8 checks) |
+| Remote Desk | `header` (command bar with the app's title; the app has no bar of its own: `SkinHeader`) | everything: the header is added above the app, which is drawn as before | `remote-desk_skin_scene.mjs` (8 checks) |
+
+A region drawn in the SDK's floating layer (Screenshots' capture bar, a picture-in-picture window) is outside the theme's
+tree: `useTheme()` there gives the default tokens, so a skin for it makes its own (Luna calls its `makeTheme`).
+
+`server/tests/app_skin_helpers.js` gives each scene the common checks (the stubs drawn, the model frozen, a command not on
+the list refused, layouts off, no React errors); `server/tests/luna_apps_scene` screenshots Luna's skin of each
+(`tests/app_scene_headless.sh luna_apps_scene OUT luna en light|dark`).
+
+**Isolated apps can't be skinned this way.** Mail, Calendar, Contacts, Passwords and Reminders run as their own processes
+(`"process": "isolated"`), where the theme's code never runs: they receive the tokens (richer ones included, as JSON
+through the broker), never a pack's components or a skin. Skinning them would need a declarative, data-only form of
+skins, which is not built.
+
+What a skin doesn't get in Files: drag and drop (Files' own item view keeps it), tabs, the search scope bar, the
+read-only banner and Files' sheets (Get Info, Quick Preview, Connect to Server, the confirmations), which stay Files'
+own over any skin. `server/tests/files_skin_scene.mjs` runs Files with every region replaced by a minimal stub
+(`node tests/menubar_test.mjs files_skin_scene.mjs`, in `make test`): the stubs get the model, the actions go through
+Files (`lord.fs.trash`, no `mkdir` in a read-only folder), a throwing stub gives the region back and layouts off brings
+Files' own regions. `server/tests/luna_scene` screenshots Luna's skins
+(`tests/app_scene_headless.sh luna_scene OUT luna en light|dark`).
+
+#### Settings
+
+| Region | Where | Settings' own | The skin's `model` |
+|---|---|---|---|
+| `sidebar` | the start side | the search field, the user card and the sections in four groups | the view model below |
+| `home` | the content, before a section is open | none: Settings opens on the last section | the view model; with a `home` skin Settings opens on it unless another app asked for a section |
+
+The view model (`apps/settings/skinmodel.js`, `settingsViewModel`): `section` (the open section's id, or null on the home
+page), `title`, `query`, `groups: [{ id, label, sections: [{ id, label, color, glyph, selected }] }]` (the groups are
+`look`, `connect`, `input` and `system`, named by `settings.skin.group.*`; only the sections this computer shows and the
+search keeps), `user: { name, admin }`, `SectionIcon` (a component `({ color, glyph, size })`, the section's own badge)
+and `actions`: `open(id)` (only a section Settings shows here), `home()`, `search(text)` and `users()`. Each section's
+page is always Settings' own, drawn by Settings with its own title bar: a skin chooses where to go, never what a page
+does. `server/tests/settings_skin_scene.mjs` runs Settings with both regions stubbed (in `make test`).
+
+#### Terminal
+
+| Region | Where | The Terminal's own | The skin's `model` |
+|---|---|---|---|
+| `tabBar` | the top | the tabs and + | the view model below |
+| `statusBar` | the bottom, only while the profile shows one | the folder, the program, Claude Code's segments, the size, the clock | the view model |
+| `contextMenu` | over the window | the Terminal's menu | `{ x, y, items, close, bounds }`, as in Files |
+
+The view model (`apps/terminal/skinmodel.js`, `terminalViewModel`): `tabs: [{ key, title, color, active, busy, bell,
+index }]`, `status: { cwd, process, busy, shell, cols, rows }` (the session in front, read when the Terminal draws; null
+without one), `broadcast`, `commands: [{ id, label }]` and `actions`: `selectTab(key)`, `closeTab(key)` (the Terminal
+still asks before closing a busy tab), `tabMenu(key, event)` (the Terminal's own tab menu) and `command(id)`, which runs
+only one of `SKIN_COMMANDS` (`newTab`, `newWindow`, `copy`, `paste`, `find`, `splitRight`, `splitDown`, `selectAll`,
+`clearBuffer`, `preferences`, `closePane`) exactly as its menu item does. **The panes are never a skin's**, and no action
+writes to a session or reads its text. `server/tests/terminal_skin_scene.mjs` runs the Terminal with every region stubbed
+and checks that nothing a skin does reaches a session (in `make test`).
+
+#### Text Editor
+
+| Region | Where | The Text Editor's own | The skin's `model` |
+|---|---|---|---|
+| `toolbar` | above the tabs | none | the view model below |
+| `tabBar` | the top of the text | the open files' tabs | the view model |
+| `statusBar` | the bottom | line and column, cursors, selection, a message, language, indent, line ends | the view model |
+| `contextMenu` | over the text | the clipboard and Speech | `{ x, y, items, close, bounds }`, as in Files |
+
+The view model (`apps/editor/skinmodel.js`, `editorViewModel`): `tabs: [{ key, name, dirty, active, index }]`,
+`status: { line, col, cursors, selected, language, indent, eol, message: { text, ok } | null }`, `commands: [{ id,
+label }]` and `actions`: `selectTab(key)`, `closeTab(key)` (a tab with unsaved changes still asks), `menu(event)` (the
+editor's own menu at the event's place) and `command(id)`, which runs only one of `SKIN_COMMANDS` (`new`, `open`,
+`openFolder`, `save`, `saveAs`, `close`, `print`, `undo`, `redo`, `cut`, `copy`, `paste`, `selectAll`, `find`, `findNext`,
+`gotoLine`, `gotoFile`, `language`, `toggleProject`) as its menu item does. **The text is never a skin's:** the model
+carries no document text, and the project tree, the find bar and every dialog stay the editor's.
+`server/tests/editor_skin_scene.mjs` runs it with every region stubbed (in `make test`).
+
+#### Store
+
+| Region | Where | The Store's own | The skin's `model` |
+|---|---|---|---|
+| `sidebar` | the start side | the pages in three groups (the Store, the origins, the picks) and the package status | the view model below |
+| `toolbar` | the top of the page | Back, the title, refresh and the search | the view model |
+
+The view model (`apps/store/skinmodel.js`, `storeViewModel`): `pages: [{ id, label, count, group, soon, selected }]`
+(`group` is `store`, `origin` or `picks`; `soon` marks an origin that isn't there yet), `page`, `title`, `inApp` (an
+app's page is open), `query`, `searchHint`, `refresh: { title, busy } | null` and `actions`: `go(id)` (only a listed page
+that isn't `soon`), `back()`, `search(text)` and `refresh()`. Every page, card, install, update and removal stays the
+Store's, with its confirmations and the administrator prompt. `server/tests/store_skin_scene.mjs` (in `make test`).
 
 ## 3. Building it
 
@@ -533,7 +790,7 @@ is run only when the state is "development" (a development build with no manifes
 one), logged as `code: … loaded unchecked (outside …, development build)`; otherwise it is refused
 with "not part of LordOS's system code".
 
-**Third-party themes can't run on release builds today.** That is deliberate for now: a theme is not
+**A bundle built elsewhere can't run on release builds.** That is deliberate: a bundle in LordOS's folder is not
 sandboxed. It runs inside `lord-server`, in the same JavaScript context as every native app, with
 the whole `lord.*` API of the session (files, the terminal, the network, administrator requests),
 and it sees the desktop's keyboard and pointer input. It also carries its own copy of the SDK,
@@ -542,14 +799,16 @@ including the code that shows the permission prompts and records the answers (`l
 them would need, at least: a theme package format and a separate, user-confirmed trust decision
 (signed like `.lpk` packages, [SIGNING.md](SIGNING.md), not the LordOS release key), a place for
 user-installed themes that the code check knows about, and probably a narrower API for theme code
-than what built-in code gets. None of that exists yet.
+than what built-in code gets. Since 0.8.9.6.2 (in development) that exists for themes installed from a source `.zip`:
+see [Community themes](#6-community-themes-installed-from-a-file).
 
 ## 4. Installing and testing
 
 **Where themes live.** Installed: `/usr/lib/lordos/themes/<id>/` (`theme.json`, `theme.bundle.js`,
 `assets/`), next to `/usr/lib/lordos/code-manifest.json`; the development VMs also use
 `/usr/local/lib/lordos` ([VM-SETUP.md](VM-SETUP.md), step 22). The list of themes is the folder that
-holds the running theme's folder (`themes_root` in `js_sys.c`); there is no per-user themes folder.
+holds LordOS's themes (`themes_root` in `js_sys.c`), plus the community themes the person installed from a file in
+`~/.local/share/lordos/themes/` ([Community themes](#6-community-themes-installed-from-a-file)).
 
 **Trying one in a development session** (a development build of `lord-server`, see the table
 above):
@@ -567,8 +826,8 @@ above):
    There is no hot reload.
 
 A theme that throws while its bundle is evaluated makes the switch fall back to the theme you came
-from (`lord-server: the theme failed, going back to …`); the error is in the log. Keep Lord Flow or
-Lord Classic installed: they are the fallback (`start_theme` in `main.c`).
+from (`lord-server: the theme failed, going back to …`); the error is in the log. Keep Flow or
+Classic installed: they are the fallback (`start_theme` in `main.c`).
 
 **Debugging.**
 
@@ -587,7 +846,15 @@ Lord Classic installed: they are the fallback (`start_theme` in `main.c`).
 
 ## 5. Checklist before sharing a theme
 
-Check each item on a real session and take a screenshot ([VM-SETUP.md](VM-SETUP.md), `screendump`):
+Check each item on a real session and take a screenshot ([VM-SETUP.md](VM-SETUP.md), `screendump`). For a first
+look without a session, the headless theme tour keeps the same three screenshots a reviewer starts from (the desktop,
+two windows, a sidebar app) for any theme in `themes/<id>`; from `server/`, after `npm run build` and `make`:
+
+```sh
+tests/app_scene_headless.sh theme_tour_scene /tmp/shots <id> en dark
+tests/app_scene_headless.sh theme_tour_scene /tmp/shots <id> ar light     # right to left
+```
+
 
 - **Both kinds of window:** LordOS apps (the Terminal for a transparent one, Settings, Files) and
   Linux apps with and without their own frame (`args.csd`), including the window menu from a right
@@ -607,9 +874,111 @@ Check each item on a real session and take a screenshot ([VM-SETUP.md](VM-SETUP.
 - **The work area follows the bar and the Dock** (position, size, auto-hide) live.
 - **Performance:** dragging and resizing stay smooth with your blur; nothing re-renders per frame
   when idle (no `requestAnimationFrame` loop left running).
-- **Theme switch both ways** with windows open: they come back in your theme, and back in Lord Flow.
+- **Theme switch both ways** with windows open: they come back in your theme, and back in Flow.
 - **The login and lock screen** are the system's (`themes/greeter`): nothing in your theme should
   try to imitate them.
 - **Notifications, search, permission prompts and the power dialog** look right inside your
   `ThemeProvider` (they use your tokens).
 - And the [DESIGN.md](DESIGN.md#robustness-checklist) robustness checklist.
+
+To share a theme with LordOS, open an issue with the **"New desktop style"** form
+(`.github/ISSUE_TEMPLATE/new-desktop-style.yml`): screenshots in light, dark and Arabic, a link to the source-only
+`.zip` and its SHA-256, the provenance of every idea, piece of code or art, and the check report. The
+[lordos-theme-kit](https://github.com/lordbasex/lordos-theme-kit) plugin for Claude Code (`/lordos-theme publish`)
+fills in every section.
+
+## 6. Community themes installed from a file
+
+(0.8.9.6.2, in development; approved by the maintainer on 2026-11-26. The plan: [THEMES-PLAN.md](THEMES-PLAN.md) stage
+2; AGENTS.md "Community themes".) A theme someone else made runs on a normal LordOS without being "a program with full
+access". Five pieces make that so.
+
+**1. Install from a source `.zip`.** Settings → Appearance → **Install from a File…** takes the archive
+lordos-theme-kit's `/lordos-theme package` makes: one folder named after the theme's id (`[A-Za-z0-9_-]`, at most 26
+characters) holding `theme.json`, `index.jsx` and its other `.js`/`.jsx` files, `.json` data, `assets/` images (PNG,
+JPEG), `locales/<language>.json`, `LICENSE` and text files. The sandboxed helper **lord-themec**
+(`server/src/themec/`: no files, no network, no exec) reads it strictly — any `..`, absolute name, link, device, second
+folder, duplicate, encryption, Zip64, oversized entry or wrong CRC refuses the whole archive — then runs LordOS's theme
+compiler (`tools/themec/themec.js`) in a QuickJS of its own: the kit's static checks and the build. Settings lists what
+was refused, with the file and line. LordOS never runs a bundle from the archive: it **builds `theme.js` itself**.
+An id that one of LordOS's themes has is refused.
+
+**2. The static checks** (the kit's `check.mjs`, on the files in memory): the manifest (`name`, `description`,
+`"community": true`, `author`, `license`, `version`, `capabilities`); allowed file types and sizes; imports only of
+`react`, `@lordos/sdk`, `@lordos/apps` and its own files (a parent import such as `../tokens.js` from `components/` is
+fine while it stays inside the theme's folder: the build refuses one that leaves it); no `eval`, `Function`, dynamic `import()`, `require`,
+`globalThis`/`window`, names starting with `__`, `constructor`/`__proto__` tricks, `Reflect`, `Proxy`, `Symbol.for`,
+`fetch` and friends, remote URLs, obfuscation or minified lines; no `lord.*` beyond the theme's own five functions; no
+host elements (`<view>`); every visible text through `t()` (keys of its own namespace `theme-<id>` must be in
+`locales/en.json`). Run `/lordos-theme check` before packaging: it is the same list.
+
+**3. A restricted `lord.*`.** The theme's code runs in a **second JavaScript realm** of the session
+(`server/src/ui/js.c` `start_community`). Its global has only:
+
+| | |
+|---|---|
+| `lord` | `getLayout`, `setStyle` (its own nodes only), `measureText`, `now`, `log`, `version` |
+| timers | `setTimeout`, `setInterval`, `requestAnimationFrame`, `queueMicrotask`, `console`, `performance.now` |
+| imports | `react` (its own `createElement`, hooks, `memo`, context…), `@lordos/sdk` (an allowlist, `sdk/themeapi.js`), `@lordos/apps` |
+
+LordOS's code — React, the SDK, every app and the system layer, the signed **theme host**
+`assets/theme-host.bundle.js` — keeps the full API in the first realm, which is frozen before the theme's first line
+(no built-in can be changed and no code made from text). lord-server checks **every native call** made while the
+theme's code runs or runs for it (its timers, promises, callbacks, effects, stores and bound functions:
+`server/src/ui/js_theme.c`): a theme may manage windows, launch apps through the shell, read text, pictures and
+translations, lock the session, and **read** the models its `theme.json` declares:
+
+```json
+{ "capabilities": ["wifi", "bluetooth", "sound", "battery", "brightness", "media", "notifications"] }
+```
+
+`notifications` (approved by the maintainer on 2026-11-26) gives a notification centre the history as read-only plain
+data: titles, bodies, apps and times, never their actions, and no dismissing or clearing.
+Without a capability the SDK's hook gives a neutral value (no battery, no players). Never: the terminal, files,
+administrator actions, permission answers, packages, the keyring, the clipboard, network settings, switching themes or
+changing Wi-Fi, Bluetooth, the volume, the brightness or what plays. Refs and events give the theme a handle
+`{ id, type }`, never LordOS's node objects; LordOS's data (windows, settings, stores) arrives as frozen copies;
+whatever the theme hands back (props at any depth, arguments, what its callbacks return) is copied by an allowlist,
+always as the theme's own code (a getter, a Proxy or an iterator in it runs under the theme's policy), and a host
+node whose element LordOS's own React didn't make is refused (a forged React element never becomes a node); its key listeners hear keys only while the keyboard is the shell's (its
+launcher, its menus, no window focused) and never while a system prompt is up; its shortcut table takes the SDK's own
+entries (`{ id, keys: ['Alt+F4', …], run, when, repeat, label, group }`; `{ combo }` is read as one key), and each key
+needs ❖, ⌃ or ⌥ (or is Esc or F1–F24) and is never one every theme shares (search, lock, the clipboard, media keys…:
+such an entry is dropped, so a theme can't shadow them);
+`settings` is read whole but written only for its own options (`themeOptions[<id>]`) and `mode`, `accent`, `effects`,
+`dock…`, `menuBar…`, `taskbar…`. A refused call throws `theme.notAllowed` and is logged as
+`community theme: lord.<name> refused` in the compositor log.
+
+React's render after a state update the theme makes (a click that opens a menu, a timer) is LordOS's own code, as at
+the theme's start: it is queued with `lord.hostMicrotask`, a job that doesn't inherit the theme's taint
+(`JS_EnqueueTrustedJob`; only a function of LordOS's realm, never the theme's, a bound or a native one), and every
+function of the theme it reaches still runs through `lord.themeCall`. An app's `Icon` (in `useLauncherApps`,
+`useDockEntries`) and `windowIcon(win)` are drawn as the facade's own components. `findWallpaper` gives the person's own
+picture and the catalog's downloaded ones (checked by LordOS's code when the settings change, never from the theme's
+call), and a theme's `Image` may show exactly those files besides its `assets/` and `asset:` pictures. A status item
+drawn as a picture follows `<StatusItems color>` (light or dark by the colour).
+
+**4. The system layer.** Permission, keyring and administrator prompts, the file chooser and the other system surfaces
+are drawn by LordOS in the `system` layer; notification banners and the privacy pill in `notification`, above every
+layer a theme can draw in (`dock`, `menubar`, `overlay`, `popover`, `modal`, `tooltip`, `drag`). A community theme
+can't dismiss a banner or run its actions (a notification centre reads plain data with the `notifications`
+capability), and with one the privacy pill is always in each display's corner. The lock and login screens are the
+greeter's, another process.
+
+**5. Trust and recovery.** The first time, Settings asks: **"This theme isn't from LordOS"**, with the author, what it
+can't do and what it may read; only the person's answer there lets it run (lord-server keeps it in the theme's install
+record, which `lord.fs` can't write). A **watchdog** (`community_watch` in `server/src/main.c`) takes a community theme
+off when it throws at start, never calls `startShell`, draws nothing within 6 seconds, has its React tree die, stalls
+the desktop until the main-loop watchdog stops it, or was running when two sessions in a row ended abnormally (a
+lord-server that died; logging out, shutting down, restarting or switching user from LordOS is never counted, however
+short, while a logout the theme's own code asks for keeps the count until the theme has run a healthy minute, and a
+Restart… or Shut Down… countdown the theme starts never confirms by itself: only the person's click or key does): the previous style comes back and
+Settings shows "Couldn't start" with Report, **Try Again** and **Remove**. **Ctrl+Alt+Shift+Backspace** always
+restores Flow.
+
+**Where it lives:** `~/.local/share/lordos/themes/<id>/` (`theme.json`, the built `theme.js`, `assets/`, `locales/`,
+`install.json`), written only by lord-server (`server/src/ui/themestore.c`). Its texts are the catalog `theme-<id>`
+(`lord.locale.catalog` reads `locales/<language>.json` there).
+
+**Tests:** `build/realm-taint-test`, `build/themestore-test`, `tests/themec_test.mjs` and
+`tests/community_theme_headless.sh` (`make -C server test-full`), whose probe fixture tries every way past the policy.

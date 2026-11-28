@@ -92,7 +92,7 @@
   "menu.emptyTrash": "Dọn sạch Thùng rác",
   "menu.file": "Tệp",
   "menu.forward": "Tiến",
-  "menu.getInfo": "Xem thông tin",
+  "menu.getInfo": "Thuộc tính",
   "menu.go": "Đi",
   "menu.groupBy": "Nhóm theo",
   "menu.newFolder": "Thư mục mới",
@@ -334,5 +334,9 @@
   "readOnly.denied": "Thư mục này chỉ đọc: quyền của thư mục không cho phép bạn thay đổi. Để thay đổi, hãy dùng Terminal hoặc ứng dụng khác.",
   "fromMachineNoRun": "«{name}» đến từ máy {machine}. Tệp không mở chương trình hay trình cài đặt từ một máy: dùng Mở bằng nếu bạn tin tưởng nó.",
   "info.from": "Nguồn",
-  "info.fromMachine": "Máy {machine}"
+  "info.fromMachine": "Máy {machine}",
+  "skin.address": "Địa chỉ",
+  "skin.tasks": "Tác vụ tệp và thư mục",
+  "skin.otherPlaces": "Vị trí khác",
+  "skin.details": "Chi tiết"
 }

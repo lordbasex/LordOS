@@ -6,7 +6,7 @@ import {
   View, Text, useTheme, useSettings, useStore, useAppWindow, t as tr, formatTime, weekdayName, formatNumber,
   Segmented, Toggle, Button, Stepper, TextInput, ScrollView, clockAlarms, clockTimer, timerStart, timerPause, timerResume,
   timerReset, timerLeft, stopwatch, swStart, swStop, swLap, swReset, swElapsed, nextFire,
-  Toolbar, ToolbarButton, EmptyState, Hairline, spacing, typeScale,
+  Toolbar, ToolbarButton, EmptyState, Hairline, spacing, typeScale, SkinRegion, useSkinned, commandBar, pickCommand,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
@@ -380,8 +380,15 @@ export default function Clock() {
   const setTab = (x) => { lastTab = x; setTabState(x); };
   useEffect(() => { if (args?.tab && ['world', 'alarms', 'timer', 'stopwatch'].includes(args.tab)) setTab(args.tab); }, [args?.nonce]);
   const add = tab === 'world' ? [tr('clock.world.add'), () => setPicking(true)] : tab === 'alarms' ? [tr('clock.alarm.add'), () => setEditing('new')] : null;
+  // (0.8.9.6.2) app skins (docs/THEMES-GUIDE.md, "App skins → the shared shapes"): the tabs and Add as a command bar; the
+  // clocks, alarms, timer and stopwatch stay the Clock's
+  const skinned = useSkinned('clock');
+  const TABS = ['world', 'alarms', 'timer', 'stopwatch'];
+  const bar = skinned ? commandBar({ commands: [...TABS.map((id) => ({ id, label: tr(`clock.tab.${id}`), active: id === tab, group: 'tabs' })), ...(add ? [{ id: 'add', label: add[0], group: 'add' }] : [])] }) : null;
+  const vm = bar ? { app: 'clock', ...bar, actions: { command: (id) => { const c = pickCommand(bar, id); if (!c) return; if (c === 'add') add[1](); else setTab(c); } } } : null;
   return (
     <View ref={box} style={{ flex: 1 }}>
+      <SkinRegion app="clock" region="toolbar" model={vm}>
       <Toolbar>
         <View style={{ flex: 1 }} />
         <Segmented appearance="neutral" small={width < 520} value={tab} onChange={setTab} options={[['world', tr('clock.tab.world')], ['alarms', tr('clock.tab.alarms')],
@@ -390,6 +397,7 @@ export default function Clock() {
           {add ? <ToolbarButton icon="+" iconSize={20} title={add[0]} onClick={add[1]} /> : null}
         </View>
       </Toolbar>
+      </SkinRegion>
       {tab === 'world' ? <World picking={picking} setPicking={setPicking} />
         : tab === 'alarms' ? <Alarms editing={editing} setEditing={setEditing} />
         : tab === 'timer' ? <Timer /> : <Stopwatch />}

@@ -2,6 +2,8 @@
 #include "webmgr.h"
 #include "webinspect.h"
 #include "webscheme.h"
+#include "websearch.h"
+#include "webmem.h"
 #include "../sec/json.h"
 #include "../lordlog.h"
 
@@ -190,6 +192,9 @@ static pid_t spawn(char *const argv[], int chan, const char *logname, int s) {
 
 /* ---- the processes ---- */
 
+/* used: 0 free, KID_RUNNING, or KID_ENDING (killed, not reaped yet: a process stuck in the kernel; reap() waits for it,
+ * and it is no longer the app's process) */
+enum { KID_RUNNING = 1, KID_ENDING = 2 };
 typedef struct { int used, inspect; pid_t pid; char app[WEBREG_ID_MAX + 1], profile[WEBREG_ID_MAX + 1]; } Kid;
 static Kid kids[WEB_MAX_RUNNING];
 
@@ -208,34 +213,56 @@ void webmgr_reap(void) { reap(); }
 
 static Kid *kid_of(const char *app, const char *profile) {
     for (int i = 0; i < WEB_MAX_RUNNING; i++)
-        if (kids[i].used && !strcmp(kids[i].app, app) && !strcmp(kids[i].profile, profile)) return &kids[i];
+        if (kids[i].used == KID_RUNNING && !strcmp(kids[i].app, app) && !strcmp(kids[i].profile, profile)) return &kids[i];
     return NULL;
 }
 
-/* Ends a process and its WebKit processes (its own session): TERM, up to 2 s, then KILL. */
+static void pause_ms(long ms) {
+    struct timespec ts = { ms / 1000, (ms % 1000) * 1000000 };
+    nanosleep(&ts, NULL);
+}
+
+/* Ends a process and its WebKit processes: TERM to its own session's group (spawn's setsid: WebKit's processes are in
+ * it), up to 2 s, then KILL; then KILL to each process that was under it before and still is the same process (pid
+ * and start time), in case one left the group. Only a process of the kids table: one lord-server started. A process
+ * that won't go even then (stuck in the kernel) is left to reap() and no longer counts as the app's. */
 static void end_kid(Kid *k) {
+    pid_t under[WEBMEM_MAX_PROCS];
+    unsigned long long since[WEBMEM_MAX_PROCS];
+    int n = webmem_descendants("/proc", k->pid, under, WEBMEM_MAX_PROCS);
+    for (int i = 0; i < n; i++) since[i] = webmem_start_time("/proc", under[i]);
     kill(-k->pid, SIGTERM);
     double t0 = now_ms();
-    int st;
-    while (waitpid(k->pid, &st, WNOHANG) == 0) {
-        if (now_ms() - t0 > 2000) { kill(-k->pid, SIGKILL); waitpid(k->pid, &st, 0); break; }
-        struct timespec ts = { 0, 20 * 1000000 };
-        nanosleep(&ts, NULL);
+    int st, gone = 0;
+    while (!gone) {
+        pid_t r = waitpid(k->pid, &st, WNOHANG);
+        if (r == k->pid || (r < 0 && errno == ECHILD)) { gone = 1; break; }
+        if (now_ms() - t0 > 2000) break;
+        pause_ms(20);
     }
-    k->used = 0;
+    if (!gone) {
+        kill(-k->pid, SIGKILL);
+        for (double t1 = now_ms(); !gone && now_ms() - t1 < 1000; pause_ms(10)) {
+            pid_t r = waitpid(k->pid, &st, WNOHANG);
+            gone = r == k->pid || (r < 0 && errno == ECHILD);
+        }
+    }
+    for (int i = 0; i < n; i++)
+        if (since[i] && webmem_start_time("/proc", under[i]) == since[i]) kill(under[i], SIGKILL);
+    k->used = gone ? 0 : KID_ENDING;
 }
 
 static void end_app(const char *app, const char *profile) {
     reap();
     for (int i = 0; i < WEB_MAX_RUNNING; i++)
-        if (kids[i].used && !strcmp(kids[i].app, app) && (!profile || !strcmp(kids[i].profile, profile))) end_kid(&kids[i]);
+        if (kids[i].used == KID_RUNNING && !strcmp(kids[i].app, app) && (!profile || !strcmp(kids[i].profile, profile))) end_kid(&kids[i]);
 }
 
 int webmgr_running(WebRunning *out, int max) {
     reap();
     int n = 0;
     for (int i = 0; i < WEB_MAX_RUNNING && n < max; i++) {
-        if (!kids[i].used) continue;
+        if (kids[i].used != KID_RUNNING) continue;
         snprintf(out[n].app, sizeof out[n].app, "%s", kids[i].app);
         snprintf(out[n].profile, sizeof out[n].profile, "%s", kids[i].profile);
         out[n].pid = kids[i].pid;
@@ -264,7 +291,7 @@ int webmgr_owner(pid_t pid, char *app, char *profile) {
     reap();
     for (int depth = 0; pid > 1 && depth < 8; depth++) {
         for (int i = 0; i < WEB_MAX_RUNNING; i++)
-            if (kids[i].used && kids[i].pid == pid) {
+            if (kids[i].used == KID_RUNNING && kids[i].pid == pid) {
                 snprintf(app, WEBREG_ID_MAX + 1, "%s", kids[i].app);
                 snprintf(profile, WEBREG_ID_MAX + 1, "%s", kids[i].profile);
                 return 0;
@@ -384,6 +411,7 @@ static int catalog_entry(const char *id, WebApp *a, char *icon, size_t n) {
 
 typedef struct {
     int used, id, done;
+    int background;                 /* the Store's icon of a catalog app, not the person's own probe */
     double started, finished;
     pid_t pid;
     int fd;
@@ -393,6 +421,7 @@ typedef struct {
     size_t icon_len;
     int icon_kind;                  /* 1 PNG, 2 SVG */
     char icon_path[PATH_MAX];
+    char icon_error[48];            /* the last icon's code (web.probe.…) when none was usable, else "" */
 } Probe;
 
 static pthread_mutex_t pmu = PTHREAD_MUTEX_INITIALIZER;
@@ -468,6 +497,7 @@ static char *answer_json(const Probe *pr, const char *err) {
     put_str(out, cap, &o, "origin", pr->p.origin);
     put_str(out, cap, &o, "themeColor", pr->p.theme_color);
     put_str(out, cap, &o, "iconPath", pr->icon_path);
+    if (!pr->icon_path[0] && pr->icon_error[0]) put_str(out, cap, &o, "iconError", pr->icon_error);
     if (o + 2 < cap) { out[o++] = '}'; out[o] = 0; }
     return out;
 }
@@ -516,29 +546,44 @@ static void end_step(pid_t pid, int fd, int grace_ms) {
     }
 }
 
-/* The second step: lord-web --probe-icon with the icon the first one chose; its header line
- * {"ok":true,"type","size"} and then exactly size bytes. A bad or missing icon only means no icon. */
-static void probe_icon(Probe *pr, Rd *r, char *line) {
+/* The second step: lord-web --probe-icon with one of the icons the first one chose; its header line
+ * {"ok":true,"type","size"} and then exactly size bytes. 1 when it gave a PNG or an SVG (kept in pr), else 0 with the
+ * runtime's code (web.probe.…) in why, or "". */
+static int probe_icon_one(Probe *pr, const char *url, double deadline, Rd *r, char *line, char *why, size_t wn) {
     int fd = -1;
-    pid_t pid = start_step("--probe-icon", pr->p.icon_url, &fd);
-    if (pid < 0) return;
+    why[0] = 0;
+    pid_t pid = start_step("--probe-icon", url, &fd);
+    if (pid < 0) return 0;
     r->fd = fd;
     r->n = 0;
-    r->deadline = now_ms() + WEB_PROBE_MS;
+    r->deadline = deadline;
     size_t size = 0;
     int svg = 0, ok = 0;
-    char why[48];
     int l = rd_line(r, line, 4096);
-    int h = l >= 0 ? webreg_icon_header(line, (size_t)l, &size, &svg, why, sizeof why) : -1;
+    int h = l >= 0 ? webreg_icon_header(line, (size_t)l, &size, &svg, why, wn) : -1;
     if (h == 1 && (pr->icon = malloc(size))) {
         if (!rd_bytes(r, pr->icon, size) && webreg_icon_kind(pr->icon, size) == (svg ? 2 : 1)) {
             pr->icon_kind = svg ? 2 : 1;
             pr->icon_len = size;
             probe_icon_file(pr);
             ok = 1;
-        } else { free(pr->icon); pr->icon = NULL; }
-    } else if (h == 0) fprintf(stderr, "webapps: no icon from %s: %s\n", pr->p.icon_url, why[0] ? why : "refused");
+        } else { free(pr->icon); pr->icon = NULL; snprintf(why, wn, "web.probe.iconType"); }
+    } else if (h < 0 && !why[0]) snprintf(why, wn, "%s", now_ms() >= deadline ? "web.probe.timeout" : "web.probe.load");
     end_step(pid, fd, ok ? 1000 : 0);
+    return ok;
+}
+
+/* The icons the first step chose, best first, until one is a PNG or an SVG: a site may label a WebP "image/png", or
+ * serve its best icon from an address that fails. All of them share one step's time (WEB_PROBE_MS). The log gets one
+ * line per failure, with closed words only (the page's addresses never go there). */
+static void probe_icon(Probe *pr, Rd *r, char *line) {
+    double deadline = now_ms() + WEB_PROBE_MS;
+    char why[48] = "";
+    for (int i = 0; i < pr->p.icons && now_ms() < deadline; i++) {
+        if (probe_icon_one(pr, pr->p.icon_url[i], deadline, r, line, why, sizeof why)) { pr->icon_error[0] = 0; return; }
+        snprintf(pr->icon_error, sizeof pr->icon_error, "%s", webreg_probe_code_ok(why) ? why : "web.probe.load");
+        fprintf(stderr, "webapps: probe %d: icon %d of %d refused: %s\n", pr->id, i + 1, pr->p.icons, pr->icon_error);
+    }
 }
 
 static void *probe_thread(void *arg) {
@@ -560,7 +605,7 @@ static void *probe_thread(void *arg) {
     }
     end_step(pr.pid, pr.fd, err ? 0 : 1000);
     pr.fd = -1;
-    if (!err && r && line && pr.p.icon_url[0]) probe_icon(&pr, r, line);
+    if (!err && r && line && pr.p.icons) probe_icon(&pr, r, line);
     free(line);
     free(r);
     char *json = answer_json(&pr, err);
@@ -582,17 +627,35 @@ static void probe_free(Probe *p) {
     memset(p, 0, sizeof *p);
 }
 
-int webmgr_probe(const char *url, const char **err) {
+/* with pmu held: a free slot for a new probe, or NULL. Finished probes past their time are freed first. */
+static Probe *take_slot(int background) {
+    double now = now_ms();
+    int used = 0;
+    for (int i = 0; i < WEB_PROBE_SLOTS; i++) {
+        Probe *p = &probes[i];
+        if (!p->used) continue;
+        if (p->done && (now - p->finished > PROBE_KEEP_MS || (p->background && now - p->finished > WEB_PROBE_BG_KEEP_MS))) probe_free(p);
+        else used++;
+    }
+    if (background && used >= WEB_PROBE_SLOTS - WEB_PROBE_RESERVED) return NULL;
+    for (int i = 0; i < WEB_PROBE_SLOTS; i++) if (!probes[i].used) return &probes[i];
+    /* the person's own: a finished background probe gives way (its reader sees webapps.probeGone) */
+    for (int i = 0; i < WEB_PROBE_SLOTS && !background; i++)
+        if (probes[i].done && probes[i].background) { probe_free(&probes[i]); return &probes[i]; }
+    return NULL;
+}
+
+int webmgr_probe(const char *url, const char **err) { return webmgr_probe_ex(url, 0, err); }
+
+int webmgr_probe_ex(const char *url, int background, const char **err) {
     *err = NULL;
     if (!url || strlen(url) >= 2048 || strncmp(url, "https://", 8) || webreg_url_origin(url, NULL, 0)) { *err = "webapps.badAddress"; return 0; }
     if (!webmgr_available()) { *err = "webapps.noRuntime"; return 0; }
     pthread_mutex_lock(&pmu);
-    Probe *slot = NULL;
-    for (int i = 0; i < WEB_PROBE_SLOTS && !slot; i++) if (!probes[i].used) slot = &probes[i];
-    for (int i = 0; i < WEB_PROBE_SLOTS && !slot; i++)
-        if (probes[i].done && now_ms() - probes[i].finished > PROBE_KEEP_MS) { probe_free(&probes[i]); slot = &probes[i]; }
+    Probe *slot = take_slot(background);
     if (!slot) { pthread_mutex_unlock(&pmu); *err = "webapps.tooMany"; return 0; }
     slot->used = 1;
+    slot->background = !!background;
     slot->id = next_probe++;
     pthread_mutex_unlock(&pmu);
 
@@ -631,6 +694,24 @@ char *webmgr_probe_result(int id, int *gone) {
     else if (p->done && p->json) out = strdup(p->json);
     pthread_mutex_unlock(&pmu);
     return out;
+}
+
+void webmgr_probe_release(int id) {
+    pthread_mutex_lock(&pmu);
+    for (int i = 0; i < WEB_PROBE_SLOTS; i++) if (probes[i].used && probes[i].done && probes[i].id == id) probe_free(&probes[i]);
+    pthread_mutex_unlock(&pmu);
+}
+
+long webmgr_probe_age(int id) {
+    long age = -1;
+    pthread_mutex_lock(&pmu);
+    for (int i = 0; i < WEB_PROBE_SLOTS; i++)
+        if (probes[i].used && probes[i].id == id) {
+            double d = probes[i].done ? now_ms() - probes[i].finished : 0;
+            age = !probes[i].done ? 0 : d < 1 ? 1 : (long)d;
+        }
+    pthread_mutex_unlock(&pmu);
+    return age;
 }
 
 /* ---- installing ---- */
@@ -865,7 +946,7 @@ static const char *start(const char *app, const char *profile, int inspect, int 
     snprintf(logname, sizeof logname, "%s-%s", app, profile);
     pid_t pid = spawn(argv, -1, logname, s);
     if (pid < 0) return "webapps.startFailed";
-    k->used = 1;
+    k->used = KID_RUNNING;
     k->inspect = inspect;
     k->pid = pid;
     snprintf(k->app, sizeof k->app, "%s", app);
@@ -899,8 +980,31 @@ const char *webmgr_set_developer(int on) {
     if (!on) {
         /* off now: the windows that have developer tools lose them (and close) */
         reap();
-        for (int i = 0; i < WEB_MAX_RUNNING; i++) if (kids[i].used && kids[i].inspect) end_kid(&kids[i]);
+        for (int i = 0; i < WEB_MAX_RUNNING; i++) if (kids[i].used == KID_RUNNING && kids[i].inspect) end_kid(&kids[i]);
     }
+    return NULL;
+}
+
+/* ---- Search the web (websearch.h) ---- */
+
+int webmgr_search_engine(void) {
+    char path[PATH_MAX];
+    size_t len = 0;
+    int w = snprintf(path, sizeof path, "%s/" WEBSEARCH_FILE, webmgr_config_dir());
+    if (w < 0 || (size_t)w >= sizeof path) return WEBSEARCH_GOOGLE;
+    char *t = webreg_read_file(path, WEBSEARCH_FILE_MAX, &len);
+    int e = t ? websearch_parse(t, len) : WEBSEARCH_GOOGLE;
+    free(t);
+    return e;
+}
+
+const char *webmgr_set_search_engine(const char *name) {
+    char path[PATH_MAX], text[64];
+    int e = websearch_engine(name);
+    if (e < 0) return "sys.badArgument";
+    size_t n = websearch_write(e, text, sizeof text);
+    int w = snprintf(path, sizeof path, "%s/" WEBSEARCH_FILE, webmgr_config_dir());
+    if (!n || w < 0 || (size_t)w >= sizeof path || mkdirs(webmgr_config_dir()) || webreg_write_file(path, text, n)) return "webapps.writeFailed";
     return NULL;
 }
 
@@ -921,4 +1025,48 @@ const char *webmgr_inspect(const char *app, const char *profile, int *already) {
     if (k) end_kid(k);                              /* WPE 2.48 turns its inspector on only as the process starts */
     int raised = 0;
     return start(app, profile, 1, &raised);
+}
+
+/* ---- force quit and restart (docs/WEBAPPS.md, "When a web app stops answering") ---- */
+
+const char *webmgr_quit(const char *app, const char *profile, int *was) {
+    *was = 0;
+    if (!webreg_id_ok(app) || !webreg_id_ok(profile)) return "webapps.badId";
+    reap();
+    Kid *k = kid_of(app, profile);
+    if (!k) return NULL;
+    *was = 1;
+    end_kid(k);
+    return NULL;
+}
+
+const char *webmgr_restart(const char *app, const char *profile, int *was) {
+    *was = 0;
+    if (!webreg_id_ok(app) || !webreg_id_ok(profile)) return "webapps.badId";
+    WebApp *a;
+    const char *e = with_app(app, &a);              /* the app and profile are there before anything ends */
+    if (e) return e;
+    int known = webreg_profile_index(a, profile) >= 0;
+    free(a);
+    if (!known) return "webapps.noProfile";
+    if (!webmgr_available()) return "webapps.noRuntime";
+    reap();
+    Kid *k = kid_of(app, profile);
+    /* with developer tools on it starts with them again, only while developer mode still is */
+    int inspect = k && k->inspect && webmgr_developer();
+    if (k) { *was = 1; end_kid(k); }
+    int raised = 0;
+    return start(app, profile, inspect, &raised);
+}
+
+int webmgr_restart_all(void) {
+    WebRunning r[WEB_MAX_RUNNING];
+    int n = webmgr_running(r, WEB_MAX_RUNNING), done = 0;
+    for (int i = 0; i < n; i++) {
+        int was = 0;
+        const char *e = webmgr_restart(r[i].app, r[i].profile, &was);
+        if (e) fprintf(stderr, "webapps: %s/%s not restarted: %s\n", r[i].app, r[i].profile, e);
+        else done++;
+    }
+    return done;
 }

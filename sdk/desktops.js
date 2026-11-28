@@ -75,7 +75,7 @@ export const ctrlArrowsOn = () => settings.get().desktopArrows === true;
 const arrowDir = (e) => (e.code === 105 ? 'left' : 'right');
 const onStep = (e) => stepArrow(arrowDir(e));
 
-// Lord Flow. ⌃ arrows are word movement in apps, so they are the Desktops keys only when Settings → Desktop & Dock
+// Flow. ⌃ arrows are word movement in apps, so they are the Desktops keys only when Settings → Desktop & Dock
 // turns them on (off by default since 0.8.9.1, #201; off, the 'flow' key table keeps them from nobody); ❖⌃ arrows
 // always work.
 export const flowDesktopKeys = [
@@ -86,7 +86,7 @@ export const flowDesktopKeys = [
 ];
 export const flowGrabs = () => (ctrlArrowsOn() ? 'flow-desktops' : 'flow');
 
-// Lord Classic.
+// Classic.
 export const classicDesktopKeys = [
   { id: 'overview', keys: ['Meta+Tab'], run: () => toggleOverview(), label: 'shell.shortcuts.overview', group: 'desktops' },
   { id: 'newDesktop', keys: ['Meta+Ctrl+D'], run: addDesktopAndShow, label: 'shell.shortcuts.newDesktop', group: 'desktops' },

@@ -20,7 +20,7 @@ import { requestPermission, markDeviceUse } from './privacy.js';
 import { t } from './i18n.js';
 import { useTheme } from './theme.js';
 import * as fs from './fs.js';
-import { wm } from './windows.js';
+import { wm, pointerWorkArea } from './windows.js';
 import { canMarkup } from './imageeditmodel.js';
 import { waitFor } from './doc.js';
 import { createThumbCache } from './thumbcache.js';
@@ -190,10 +190,12 @@ export const media = {
 // Photos and Files' Quick Preview. Only raster pictures lord-media decodes (imageeditmodel.js MARKUP_RE).
 export function openMarkup(path) {
   if (!path || !canMarkup(path)) return null;
-  const sw = (typeof lord !== 'undefined' && lord.screen) || { width: 1280, height: 800 };
-  const w = Math.min(1100, sw.width - 80), h = Math.min(740, sw.height - 120);
+  // inside the work area of the display under the pointer (where Photos or Quick Preview was clicked), not centred
+  // on the whole logical space, which put it across two displays (issue #252)
+  const a = pointerWorkArea();
+  const w = Math.max(320, Math.min(1100, a.w - 80)), h = Math.max(240, Math.min(740, a.h - 40));
   return wm.open('screenshots', { instance: `edit${Date.now().toString(36)}`, args: { path },
-    frame: { x: Math.round((sw.width - w) / 2), y: 50, w, h } });
+    frame: { x: a.x + Math.round((a.w - w) / 2), y: a.y + Math.max(0, Math.min(24, Math.round((a.h - h) / 2))), w, h } });
 }
 
 // Camera/microphone indicators while the source lives.

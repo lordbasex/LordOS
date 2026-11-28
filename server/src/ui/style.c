@@ -31,7 +31,7 @@ static const char *const E_DIRECTION[] = {"inherit", "ltr", "rtl", NULL};
 static const char *const E_FIT[]      = {"fill", "cover", "contain", NULL};
 static const char *const E_WSPACE[]   = {"normal", "nowrap", NULL};
 static const char *const E_WRAP[]     = {"nowrap", "wrap", NULL};
-static const char *const E_FAMILY[]   = {"sans-serif", "monospace", "brand", NULL};
+static const char *const E_FAMILY[]   = {"sans-serif", "monospace", "brand", "theme", NULL};
 static const char *const E_CURSOR[]   = {CURSOR_CSS_NAMES, NULL};
 static const char *const E_TOVERFLOW[] = {"clip", "ellipsis", NULL};
 
@@ -132,6 +132,8 @@ static const StyleProp props[] = {
     PX("rotate", ST_FLOAT, rotate),
     PX("transformOriginX", ST_DIM, origin_x),
     PX("transformOriginY", ST_DIM, origin_y),
+    /* a misspelled word's wavy underline (paint.c paint_wavy) */
+    PX("wavyColor", ST_COLOR, wavy),
 };
 
 static const StyleProp *find(const char *key) {

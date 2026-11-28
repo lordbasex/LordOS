@@ -247,9 +247,18 @@ passed through the pipeline first (`stcam.c` → `stfx.c`).
    "Measurements"). It isn't used on the GPU path, which builds its window list there.
 
 On the GPU path (`GPU.md`) the node is painted into the UI texture, and only the region that
-changed is uploaded. **Pending:** true zero-copy, exporting the VA-API surface as a dmabuf (NV12)
-and importing it through EGL as an external texture. It wasn't written because there's nowhere to
-test it: neither the VM nor the host has a GPU with VA-API.
+changed is uploaded.
+
+**NV12 and zero-copy (in development, [MOVING-WALLPAPERS.md](MOVING-WALLPAPERS.md)):** while the GPU composes, a
+moving wallpaper's player (`play()` with `ambient`) asks lord-media for NV12 instead of BGRA (`MM_FORMAT`, `MF_NV12`: the decoder's 4:2:0 planes in the
+same sealed memfd ring, 1.5 bytes a pixel, no RGB conversion in lord-media, never larger than the video), and then for the VA-API surface
+itself as dmabufs (`MM_DMAFRAME`, checked by `mp_dma_check` and the
+driver's modifier list). lord-server converts either on the GPU with the video's matrix into one texture
+(`gpu_yuv_convert`) that every view draws below the UI, so a new frame is a present, not a repaint (`mambient.c`). The
+ring's layout comes from `mp_ring_layout` on both sides (strides and offsets are never sent). The CPU's pixels of such a
+frame are made only where needed: a capture, a lost GPU (`cpu_read`), and the strips under a blurred node over a moving
+wallpaper (`nv_blur_strips`), converted (`nv12.c`) or read back row by row. Without GPU composition BGRA is asked, as
+before, and so does the Player for now (a window's rounded corners clip its video only on the CPU path).
 
 ### Audio: PipeWire belongs to lord-server, not the helper
 
@@ -386,7 +395,7 @@ unmodified, approved on 2026-11-10); `lord-server` never parses an SVG.
   `src` is an `.svg` file, or `svg:<px>:<rrggbb|->:<absolute path>` (`sdk/iconsrc.js`: the size it's
   shown at times 2, 16–256 px, and for a symbolic icon the color), goes to `server/src/media/svgicon.c`.
 - **What lord-server does.** It checks the path after `realpath` (`iconfind_svg_allowed`: a `.svg`
-  under `/usr/share`, `/usr/local/share`, `/opt`, the Flatpak exports or the user's icon folders),
+  under `/usr/share`, `/usr/local/share`, `/opt`, the Flatpak exports, the user's icon folders or a web app's icon folders, `~/.cache/lordos/web/icons` and `~/.config/lordos/web/icons`),
   opens it with `O_NOFOLLOW`, checks it's a regular file of at most 1 MB and sends the fd in a
   `MW_SVG` job to the foreground worker (`v[1]` = side, `v[2]` = `0xRRGGBB` or -1). No path or
   parameter text goes to the helper. In app mode (`--app`) nothing is asked for.
@@ -496,7 +505,7 @@ Big Buck Bunny 1080p H.264 at 30 frames/s with MP3 audio. VM with 4 vCPU (Xeon S
 | In the session, windowed, after | 10.9–13.0 % | 38–49 % | 1962 of 1968 shown, **0 dropped** (60 s) |
 | Full screen (1280×720), before | 92.1 % | 50 % | |
 | Full screen, after | 14.1–14.7 % | 52–54 % | 14 dropped out of 1971 (0.7 %), when switching to full screen |
-| With VA-API | **not measured** | **not measured** | The VM has no driver (`vainfo` fails); the code falls back to software. It needs measuring on the AMD PC (see below) |
+| With VA-API | **not measured here** | **not measured here** | The VM has no driver (`vainfo` fails). On the AMD PC (RX 580, `build/motion-bench`, no display): see [MOVING-WALLPAPERS.md](MOVING-WALLPAPERS.md), "Measurements" |
 
 CPU as % of one core, from `/proc/<pid>/stat` over 20–60 s; with the video, the VM's total CPU
 stays at ~20 %. A/V sync measured inside the player (`|frame pts − audio clock|` when presenting
@@ -558,8 +567,9 @@ something changes), 0 dropped frames.
 
 ## Pending
 
-- **VA-API measured on real hardware**, and dmabuf → EGL **zero-copy** on the GPU path. Test them
-  on the AMD PC.
+- **VA-API in a full session on the AMD PC**: the zero-copy path, NV12 and the loop cache were measured there with
+  `build/motion-bench` (no display, [MOVING-WALLPAPERS.md](MOVING-WALLPAPERS.md)); the three-monitor session itself
+  still needs measuring. NV12 and zero-copy are used by moving wallpapers only, not yet by the Player (its window's rounded corners clip its video on the CPU path; drawn by the GPU below the UI they would need a rounded clip there).
 - **LordBench's video workloads with hardware decoding (maintainer's decision):** `MK_VBENCH` gets no fds and no ioctl
   classes; a hardware workload needs the render node and `SANDBOX_IOCTL_DRM` for that job, which widens its sandbox.
 - **Image subtitles** (PGS, DVD): only text ones today.

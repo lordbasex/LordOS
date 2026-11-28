@@ -4,7 +4,7 @@
 // server is installed, the first time, with the package engine's own pkg-install action.
 import {
   View, Text, Button, Toggle, Segmented, TextInput, useTheme, useLocale, useStore, admin, remote, remoteViewers, shareHolder, sshLogin, remoteCidr,
-  remoteMinutesLeft, remoteVideo, remoteIceServer, remoteFingerprint, statusText, useSystemInfo, spacing, typeScale, FilePicker, fs, Layer, useAppWindow, wm,
+  remoteMinutesLeft, remoteVideo, remoteIceServer, remoteFingerprint, statusText, useSystemInfo, spacing, typeScale, FilePicker, fs, WindowSheet,
 } from '@lordos/sdk';
 import { useEffect, useState } from 'react';
 import { Stack, Section, SettingRow, Note, Message, StatusDot, tint } from './ui.jsx';
@@ -152,18 +152,18 @@ function ConnectionSection({ st, isAdmin, busy, run }) {
       <Section title={tr('settings.sharing.turn')} footer={tr('settings.sharing.turnFooter')}>
         <View style={{ paddingVertical: spacing.s, gap: 6 }}>
           <Text style={label}>{tr('settings.sharing.turnServer')}</Text>
-          <TextInput value={turn} placeholder={tr('settings.sharing.turnServerPlaceholder')} style={{ direction: 'ltr' }} onChange={(v) => { setTurn(v.slice(0, 95)); setBad(''); }} />
+          <TextInput spellCheck={false} value={turn} placeholder={tr('settings.sharing.turnServerPlaceholder')} style={{ direction: 'ltr' }} onChange={(v) => { setTurn(v.slice(0, 95)); setBad(''); }} />
           <Text style={label}>{tr('settings.sharing.turnTransport')}</Text>
           <View style={{ alignSelf: 'flex-start' }}>
             <Segmented small value={transport} onChange={(v) => { setTransport(v); setBad(''); }}
               options={[['udp', tr('settings.sharing.turnUdp')], ['tcp', tr('settings.sharing.turnTcp')], ['tls', tr('settings.sharing.turnTls')]]} />
           </View>
           {transport === 'tls' && <Text style={label}>{tr('settings.sharing.turnFp')}</Text>}
-          {transport === 'tls' && <TextInput value={fp} placeholder={tr('settings.sharing.turnFpPlaceholder')} style={{ direction: 'ltr', fontFamily: 'monospace' }}
+          {transport === 'tls' && <TextInput spellCheck={false} value={fp} placeholder={tr('settings.sharing.turnFpPlaceholder')} style={{ direction: 'ltr', fontFamily: 'monospace' }}
             onChange={(v) => { setFp(v.slice(0, 95)); setBad(''); }} />}
           {transport === 'tls' && <Text style={label}>{tr('settings.sharing.turnFpHint')}</Text>}
           <Text style={label}>{tr('settings.sharing.turnUser')}</Text>
-          <TextInput value={user} style={{ direction: 'ltr' }} onChange={(v) => { setUser(v.slice(0, 128)); setBad(''); }} />
+          <TextInput spellCheck={false} value={user} style={{ direction: 'ltr' }} onChange={(v) => { setUser(v.slice(0, 128)); setBad(''); }} />
           <Text style={label}>{tr('settings.sharing.turnPass')}</Text>
           <TextInput secure value={pass} placeholder={st.turnKey ? tr('settings.sharing.turnPassSaved') : ''} style={{ direction: 'ltr' }}
             onChange={(v) => { setPass(v.slice(0, 128)); setBad(''); }} onSubmit={saveTurn} />
@@ -263,7 +263,6 @@ function RootSshSection({ ips, hostname }) {
   const [keyText, setKeyText] = useState('');
   const [rootPw, setRootPw] = useState(['', '']);
   const [picking, setPicking] = useState(false);
-  const win = useAppWindow();
   const load = () => {
     const s = { mode: 'off', password: false, keys: [] };
     admin.run('ssh-root-status', '', (line) => {
@@ -323,7 +322,7 @@ function RootSshSection({ ips, hostname }) {
             </View>
           )) : <Text style={{ fontSize: typeScale.caption, color: t.textDim, textAlign: 'start' }}>{tr('settings.sharing.root.noKeys')}</Text>}
           <View style={{ flexDirection: 'row', gap: spacing.s, alignItems: 'center' }}>
-            <View style={{ flex: 1 }}><TextInput value={keyText} onChange={setKeyText} placeholder={tr('settings.sharing.root.keyPlaceholder')} /></View>
+            <View style={{ flex: 1 }}><TextInput spellCheck={false} value={keyText} onChange={setKeyText} placeholder={tr('settings.sharing.root.keyPlaceholder')} /></View>
             <Button small label={tr('settings.sharing.root.importFile')} disabled={busy} onClick={() => setPicking(true)} />
             <Button small label={tr('settings.sharing.root.addKey')} disabled={busy || !keyText.trim()} onClick={addKey} />
           </View>
@@ -353,17 +352,16 @@ function RootSshSection({ ips, hostname }) {
       {on ? <Note tone="warn">{tr('settings.sharing.root.activeWarning')}</Note> : null}
       <Message msg={msg} />
       {picking ? (() => {
-        // over this Settings window, in the modal layer (the page itself scrolls); starts in ~/.ssh
-        const g = wm.frame(wm.get(win.id) || {});
+        // a sheet over this Settings window's content (the page itself scrolls); starts in ~/.ssh
         let start = fs.home();
         try { if (fs.stat(`${start}/.ssh`)?.dir) start = `${start}/.ssh`; } catch (e) { /* no ~/.ssh */ }
         return (
-          <Layer name="modal">
-            <View style={{ position: 'absolute', left: g.x || 0, top: g.y || 0, width: g.w || 640, height: g.h || 480 }}>
+          <WindowSheet>
+            <View style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0 }}>
               <FilePicker title={tr('settings.sharing.root.importFile')} filter={/\.pub$/} start={start} onClose={() => setPicking(false)}
                 onPick={(paths) => { setPicking(false); const p = [].concat(paths)[0]; try { setKeyText(String(fs.read(p)).split('\n')[0].trim()); } catch (e) { setMsg({ ok: false, text: e.message }); } }} />
             </View>
-          </Layer>
+          </WindowSheet>
         );
       })() : null}
     </>

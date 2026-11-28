@@ -32,6 +32,7 @@
 #define WEBREG_ID_MAX         40
 #define WEBREG_NAME_MAX       64             /* bytes of UTF-8 */
 #define WEBREG_URL_MAX        2048
+#define WEBREG_PROBE_ICONS    3               /* the icons --probe-icon tries, best first */
 #define WEBREG_PROFILES_MAX   16
 #define WEBREG_FILE_MAX       (64 * 1024)
 #define WEBREG_ICON_PATH_MAX  (WEBREG_ID_MAX + 15)      /* "icons/<id>.png" */
@@ -148,13 +149,20 @@ typedef struct {
     char name[WEBREG_NAME_MAX + 1];
     char start_url[WEBREG_URL_MAX + 1], scope[WEBREG_URL_MAX + 1], origin[WEBREG_URL_MAX + 1];
     char theme_color[8];
-    char icon_url[WEBREG_URL_MAX + 1];  /* the icon chosen from "icons" for --probe-icon, or "" */
+    /* the icons --probe-icon tries, best first (the first that is really a PNG or an SVG is kept); icon_url[0] ""
+     * when none */
+    char icon_url[WEBREG_PROBE_ICONS][WEBREG_URL_MAX + 1];
+    int  icons;
     char error[48];                     /* {"ok":false,"error":"web.probe.…"}: the runtime's code, or "" */
 } WebProbe;
-/* The --probe line: { ok, name, startUrl, scope, origin, themeColor, icons: [{ src, sizes, type }], manifest }. The
- * page wrote most of it, so it is made safe here: a name with control characters is cleaned and cut, an unusable one
- * becomes the host; a scope that does not fit startUrl becomes startUrl's folder; the origin is startUrl's; the icon
- * is the best PNG (the largest up to 512 px, else the smallest above) or else an SVG, https: only.
+/* The --probe line: { ok, name, startUrl, scope, origin, themeColor, icons: [{ src, sizes, type, purpose }],
+ * manifest }. The page wrote most of it, so it is made safe here: a name with control characters is cleaned and cut,
+ * an unusable one becomes the host; a scope that does not fit startUrl becomes startUrl's folder; the origin is
+ * startUrl's. The icons, https: only, ranked: PNGs (the largest up to 512 px, else the smallest above), then SVGs,
+ * then the same two for icons that are only "maskable"; a "monochrome"-only icon is never taken. An icon is a PNG or
+ * an SVG by its type ("image/png", "image/svg+xml" or "image/svg") or, without one, by its extension; an address that
+ * ends in another image's extension (.webp, .ico, .jpg, …) is skipped whatever its type says (a site may label a WebP
+ * "image/png"). At most WEBREG_PROBE_ICONS, for --probe-icon to try in that order.
  * 0 when it is a usable answer (ok true and a valid startUrl); -1 otherwise, with p->error set to the runtime's code
  * when it answered {"ok":false,"error":"web.probe.<code>"} with one of the codes it documents. */
 int  webreg_probe_parse(const char *line, size_t len, WebProbe *p);

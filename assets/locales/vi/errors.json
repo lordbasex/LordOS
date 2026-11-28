@@ -234,6 +234,7 @@
   "fs.moveRemoveFailed": "Đã sao chép, nhưng không thể xóa bản gốc: {errno}",
   "fs.noTrash": "Vị trí đó không có Thùng rác",
   "fs.notFile": "Đây không phải là tệp",
+  "fs.notFolder": "Đây không phải là thư mục",
   "fs.notInTrash": "Mục này không ở trong Thùng rác",
   "fs.notRegular": "Đây không phải là tệp thông thường (có phải là liên kết không?)",
   "fs.openFailed": "Không thể mở tệp: {errno}",
@@ -243,11 +244,13 @@
   "fs.systemFolder": "Tệp không hiển thị các thư mục nội bộ của hệ thống (/proc, /sys, /dev và /run)",
   "fs.tooLarge": "Tệp quá lớn (tối đa {max})",
   "fs.tooManyCopies": "Có quá nhiều lượt sao chép đang thực hiện; hãy thử lại khi một lượt hoàn tất",
+  "fs.tooManyWatches": "Đang theo dõi quá nhiều thư mục (tối đa {max})",
   "fs.trashBadOrigin": "Vị trí gốc không hợp lệ",
   "fs.trashEntryFailed": "Không thể tạo mục trong Thùng rác",
   "fs.trashOriginGone": "Thư mục gốc không còn tồn tại",
   "fs.trashOtherDisk": "Mục này nằm trên ổ đĩa khác với Thùng rác của nó",
   "fs.trashRestoreExists": "Vị trí gốc đã có một tệp trùng tên",
+  "fs.watchRemote": "Không thể theo dõi thay đổi trong thư mục đám mây và mạng; thay vào đó thư mục sẽ được liệt kê lại",
   "fw.bpfConfig": "không thể cấu hình BPF: {errno}",
   "fw.bpfMaps": "không thể tạo các BPF map: {errno}",
   "fw.bpfMissing": "thiếu chương trình {program}",
@@ -962,5 +965,9 @@
   "sentinela.notBlocked": "Chương trình đó không có trong danh sách chặn.",
   "sentinela.noAppNetwork": "Tiến trình này không có ứng dụng riêng nào có thể bị chặn mạng.",
   "sys.failed": "Đã xảy ra sự cố.",
-  "sys.unsupported": "Phiên bản LordOS này không làm được việc đó."
+  "sys.unsupported": "Phiên bản LordOS này không làm được việc đó.",
+  "theme.notAllowed": "{call} không dùng được cho chủ đề cộng đồng",
+  "theme.noHost": "Thiếu phần LordOS của kiểu màn hình nền",
+  "hands.refused": "Chỉ bạn mới làm được việc này: không bao giờ là thao tác của tác tử AI",
+  "install.diskTooManyParts": "Ổ đĩa này có quá nhiều phân vùng để trình cài đặt liệt kê"
 }

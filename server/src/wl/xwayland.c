@@ -22,6 +22,7 @@
  * HiDPI (xwscale.h): when it starts, X gets its pixel size for that run, the largest display's scale
  * unless Settings → Displays says X11 apps are scaled by LordOS (xwl_set_self_scaling). */
 #include "xwayland.h"
+#include "../nofile.h"
 #include "xwm.h"
 #include "xauth.h"
 #include "../fsops.h"
@@ -308,6 +309,7 @@ static void spawn(void) {
         dup2(logfd >= 0 ? logfd : null, 2);
         if (dup2(a, 3) != 3 || dup2(b, 4) != 4 || dup2(c, 5) != 5) _exit(126);
         syscall(SYS_close_range, 6, ~0u, 0);
+        nofile_restore();                                   /* the usual 1024, now that there is room under it (#251) */
         /* its own scope: never lord-server's (the firewall and the Monitor know it apart) */
         CgroupLimits lim = { 0, 0, 0 };
         if (cgroup_enter("lordos-xwayland.scope", &lim) && managed) {

@@ -167,6 +167,7 @@
     "other": "{count} ang ia-update"
   },
   "remove": "Alisin",
+  "removeAsk": "Alisin ang {name}?",
   "rescue.ask": "Walang administrator na account sa computer na ito. Kung alam mo ang root password, puwede mong gawing administrator ang account na ito. Magkakabisa lang ito pagkatapos i-restart ang computer.",
   "rescue.button": "Gawin Akong Administrator",
   "rescue.noSudo": "Walang administrator na account sa computer na ito, at hindi naka-install ang sudo package. Bilang root, patakbuhin ang apt install sudo, pagkatapos ay subukan ulit dito.",
@@ -233,7 +234,7 @@
   },
   "suggest.nvidiaDriver.detail": "Sa ngayon, gumagamit ito ng nouveau, ang libreng driver na kasama ng LordOS. Kadalasang mas mahusay ang 3D performance at power management ng driver ng vendor ({packages}).",
   "suggest.nvidiaDriver.note.nouveau": "Hangga't hindi mo ito ini-install, ang libreng nouveau driver ang ginagamit; kapag inalis ang package, babalik ito roon.",
-  "suggest.nvidiaDriver.note.older": "Hindi sinusuportahan ng bersyong ito ng driver ang mga card na mas luma sa mga 2014; panatilihin ang libreng driver sa mga iyon. Hindi pa nasusubok ang LordOS desktop sa driver na ito.",
+  "suggest.nvidiaDriver.note.older": "Hindi suportado ng bersyong ito ng driver ang mga card na mas luma sa mga 2014; panatilihin sa mga iyon ang libreng driver. Eksperimental ang desktop ng LordOS sa driver na ito: may isang ulat ng komunidad na binubuo ito sa card (isang GTX 1070 na may driver 580); sa mas naunang ulat, ang processor ang bumuo.",
   "suggest.nvidiaDriver.note.secureBoot": "Binubuo ang driver para sa iyong kernel sa computer na ito (DKMS) at muli pagkatapos ng bawat update ng kernel. Kapag naka-on ang Secure Boot, kailangan mong i-enroll ang signing key nito sa susunod na restart, kung hindi ay hindi maglo-load ang driver.",
   "suggest.nvidiaDriver.title": "Proprietary na graphics driver",
   "suggest.nvidiaDriver.unavailable": "Kailangan ng driver ng vendor ang contrib at non-free na component ng Debian, at hindi parehong naka-enable ang mga ito sa mga package source ng computer na ito. Patuloy na gagana ang libreng driver, ang nouveau.",

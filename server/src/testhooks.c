@@ -104,6 +104,14 @@ static void command(int fd, char *line) {
         reply(fd, host.frame(arg, a) ? "err frame" : "ok", -1);
         return;
     }
+    if (!strcmp(line, "where") && host.where) {
+        int x = 0, y = 0;
+        char r[48];
+        host.where(&x, &y);
+        snprintf(r, sizeof r, "ok %d %d", x, y);
+        reply(fd, r, -1);
+        return;
+    }
     if (!strcmp(line, "painted") && host.painted) {
         char r[40];
         snprintf(r, sizeof r, "ok %lld", host.painted());

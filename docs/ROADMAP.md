@@ -19,7 +19,7 @@ screenshots (QEMU `screendump`) and documented.
 - [x] Text with `stb_truetype` and the Inter font (OFL); PNG/JPEG images with `stb_image`.
 - [x] React 18 renderer (`runtime/`, `react-reconciler` 0.29) that creates and updates native nodes.
 - [x] Mouse events with bubbling (enter/leave/click), keyboard, timers, `requestAnimationFrame`.
-- [x] "Lord Flow" theme: menu bar with blur, dock with magnification and tooltip, draggable
+- [x] "Flow" theme: menu bar with blur, dock with magnification and tooltip, draggable
       windows with traffic lights, Files/Settings/About apps, light/dark mode and live accents.
 - [x] Cached shadows, reduced-resolution blur, damage tracking.
 
@@ -49,12 +49,12 @@ input (keyboard → characters per layout), copying only the damaged region to t
       (`ThemeProvider`/`useTheme`), `TextInput`, `ScrollView`, controls, system hooks.
 - [x] Apps as packages (`apps/<id>/manifest.json`): Files (real FS), Settings, About
       (real data), Calculator, Terminal (M4 notice).
-- [x] "Lord Flow" theme: app launcher with search, Control Center (live CPU/RAM),
+- [x] "Flow" theme: app launcher with search, Control Center (live CPU/RAM),
       drop-down menus, context menu, 4 wallpapers of our own.
-- [x] "Lord Classic" theme as a template (taskbar + start menu, a single file).
+- [x] "Classic" theme as a template (taskbar + start menu, a single file).
 - [x] Live theme switching from Settings, persistent, with protection against broken themes.
 
-Measured on the VM: server RAM 24–26 MB with Lord Flow, 11 MB with Lord Classic; theme
+Measured on the VM: server RAM 24–26 MB with Flow, 11 MB with Classic; theme
 switch ~30 ms + first frame ~60 ms.
 
 Left over from M3 and moved to later: volume and brightness (no audio or backlight on the VM),
@@ -539,8 +539,8 @@ no migration (`UPDATES.md`). What it delivered, each item described in its own d
 - [x] Files: This Computer and every disk (item below; `FILES.md`, `SYSTEM.md`).
 - [x] Root over SSH as an advanced option (`REMOTE.md`, "Root over SSH").
 - [x] Settings → Displays: numbers, Identify and snapping; one place to choose the desktop style;
-  the themes renamed Lord Flow and Lord Classic; the app menu and Force Quit, a fuller Window menu,
-  menus inside the window in Lord Classic, Dock Open at Login and Assign To (`SETTINGS.md`,
+  the themes renamed Flow and Classic; the app menu and Force Quit, a fuller Window menu,
+  menus inside the window in Classic, Dock Open at Login and Assign To (`SETTINGS.md`,
   `WINDOWS.md`); a guide to building an appearance (`THEMES-GUIDE.md`); a version per native app
   (`NATIVE-APPS.md`).
 - [x] The login screen runs only while it is shown, follows a monitor plugged in after boot, and lock
@@ -821,14 +821,14 @@ An update through the Store and `apt` (`CHANGELOG.md`, "0.8.8.9-beta"); no new I
 
 ## Release 0.8.9 (released 2026-11-18; the open items below carry over)
 
-- [ ] **Lord Workspaces** (approved by the maintainer on 2026-11-15; shipped in 0.8.9,
+- [ ] **Workspaces** (approved by the maintainer on 2026-11-15; shipped in 0.8.9,
   `WORKSPACES.md`): a third theme with activities, a Context Spine, tiling per display and three effects styles
   (Opaque, Translucent, Crystal). Built and checked in headless sessions and scene tests; still to check on a real
   session with real monitors, Linux apps with their own bar, right to left and the GPU path, then the screenshots for
   the site. Compositor and SDK work it leaves for later:
   - live miniatures of hidden activities (keeping and scaling a hidden desktop's last buffers);
   - real frosted glass over Linux apps on the GPU path (today the blur only tints there);
-  - a key table of its own over Linux apps (Alt+Space and others; `keygrab.c` is a fixed, reviewed list), reusing Lord
+  - a key table of its own over Linux apps (Alt+Space and others; `keygrab.c` is a fixed, reviewed list), reusing
     Flow's until then;
   - a different activity per monitor (per-display desktops in the SDK and the compositor's parking) and the Overview
     per display;
@@ -846,7 +846,7 @@ An update through the Store and `apt` (`CHANGELOG.md`, "0.8.8.9-beta"); no new I
   - [x] Display scale below 100 % ([#158](https://github.com/lordbasex/LordOS/issues/158)), shipped in 0.8.9:
     75 % and 80 % only, never 50 % (docs/DISPLAYS.md, "Below 100 %"); Wayland and X11 clients stay at 100 % and are drawn
     smaller. Still to check with a screenshot on the VM and on a real 1280 × 800 laptop.
-  - Lord Flow personalisation ([#151](https://github.com/lordbasex/LordOS/issues/151)): the menu bar at the bottom,
+  - Flow personalisation ([#151](https://github.com/lordbasex/LordOS/issues/151)): the menu bar at the bottom,
     window-button size, hiding the tiling submenu. *Window-button size and the tiling menu's items shipped in 0.8.9.5*
     (Settings → Appearance → Window options, every theme); the menu bar at the bottom is still open.
   - Copy and paste with a VMware host ([#76](https://github.com/lordbasex/LordOS/issues/76)): start Debian's
@@ -865,8 +865,8 @@ An update through the Store and `apt` (`CHANGELOG.md`, "0.8.8.9-beta"); no new I
     places of 1,000 people or more (172,038 against 34,247; 7 MB on disk against 1.4 MB). The search reads the file on
     the interface thread, about 80 ms per key in the worst case against 16 ms today, so first make it one pass or index
     the names, or move it off the interface thread.
-  - From the #190 and #201 fixes: Lord Classic's taskbar has a 4 px band at the screen edge that does nothing; Lord
-    Flow's top-left corner under the logo too; with ⌃ arrows off by default, Lord Flow's Overview has no default key
+  - From the #190 and #201 fixes: Classic's taskbar has a 4 px band at the screen edge that does nothing;
+    Flow's top-left corner under the logo too; with ⌃ arrows off by default, Flow's Overview has no default key
     (a ❖ shortcut).
 
 - [ ] **Later: languages of countries that already meet the visits rule (November 2026)** (`LANGUAGES.md`,
@@ -897,7 +897,7 @@ An update through the Store and `apt` (`CHANGELOG.md`, "0.8.8.9-beta"); no new I
   already installed get them from the Store or `apt`; decide whether the `lordos` package should also recommend them.
   Since 0.8.8.6: `screen`, `mc`, `tcpdump`, `net-tools` and `vim`, with `curl`, `wget`, `rsync`, `htop`,
   `fdisk`, `rfkill` and `jq`, are in one list both images read (`tools/iso/packages-tools.sh`) and are Recommends of
-  `lordos`; `dnsutils` is not in it yet.
+  `lordos`. Since 0.8.9.6.2 the list also has `bind9-dnsutils` (`dig`, `nslookup`, `host`).
 - [x] The boot menu's font draws parentheses as braces ("{live}" for "(live)") in every entry: seen on the 0.8.8 ISO. GRUB draws
   the 16 px Inter bitmap without smoothing, and its 3-pixel "(" reads as "{". The entries use " · " instead (0.8.8.8).
 - [ ] **LordOS Imager 0.8.8 with French** (French reached the Imager's code after Imager 0.8.6): the Mac build signed
@@ -914,7 +914,7 @@ An update through the Store and `apt` (`CHANGELOG.md`, "0.8.8.9-beta"); no new I
 
 ## Release 0.8.9.1 (released 2026-11-19)
 
-- [x] **Lord Workspaces: a window brought back from Minimized fills its slot.** Found in the scene test while taking the
+- [x] **Workspaces: a window brought back from Minimized fills its slot.** Found in the scene test while taking the
   screenshots for the 0.8.9 article (2026-11-18): the window came back at its old width (923 px in a 1231 px slot).
   The tiler was right; the scene ran more than 60 tiler passes in a second, so the tiler's limit (`MAX_PASSES` in
   `themes/workspaces/tiler.js`) put the next pass 1 s later and the scene checked before it. `workspaces_scene.mjs` now
@@ -929,18 +929,41 @@ An update through the Store and `apt` (`CHANGELOG.md`, "0.8.8.9-beta"); no new I
   time filters work (#194); verified Cloud providers read verified again (#195); the Logs sidebar scrolls and folds
   (#199); the Control Center's Wi-Fi tile (#192); Mail's account names (#191). Still to do: screenshots on the VM and a
   check on real hardware (Wi-Fi switch and network name, a paused Google Drive account, the calendar on a 4K Pi).
-- [ ] **Raspberry Pi: Lord Flow's headless session uses more processor than 0.8.8.9's** (6.1 % against 3.4 % at rest, an
-  hour each, fresh session per run; 6.2 % with 0.8.9.1). Lord Workspaces on the same `lord-server` uses 0.06 %, so it is
-  something Lord Flow's theme keeps doing with nothing on screen. Find it.
+- [ ] **Raspberry Pi: Flow's headless session uses more processor than 0.8.8.9's** (6.1 % against 3.4 % at rest, an
+  hour each, fresh session per run; 6.2 % with 0.8.9.1). Workspaces on the same `lord-server` uses 0.06 %, so it is
+  something Flow's theme keeps doing with nothing on screen. Find it.
 - [x] **The 0.8.9 performance report** (`docs/PERFORMANCE-0.8.9.md`, 2026-11-19): PC and Raspberry Pi, method, the
   slideshow's cost (19.0 % of one core on three 1080p displays, 2.0 % with it off), the floor (177 MB, 0.2 %) and what
   widgets and a Terminal add, the memory work's runs, the Pi's 0.8.8.9 and 0.8.9 sessions; the CSVs in `docs/perf/`.
   The memory chart on the site and in the paper (`[[chart:…]]`, `web/lib/chartsvg.mjs`).
-- [x] **Raspberry Pi with 0.8.9.1** in the same report (2026-11-19): Lord Flow 113 MB and 6.2 % of one core, as 0.8.9;
-  Lord Workspaces, measured on the Pi for the first time, 99 MB and 0.06 %.
+- [x] **Raspberry Pi with 0.8.9.1** in the same report (2026-11-19): Flow 113 MB and 6.2 % of one core, as 0.8.9;
+  Workspaces, measured on the Pi for the first time, 99 MB and 0.06 %.
+
+## Release 0.8.9.6.3 (the next pre-release; chosen by the maintainer on 2026-11-27)
+
+- [ ] **Files: Replace / Keep Both / Skip on a name conflict** ([#263](https://github.com/lordbasex/LordOS/issues/263)),
+  with **Keep Both** as the default, for copies, moves and drops; an "apply to all" for the rest of the batch. It never
+  offers Replace where `lord.fs` may not write: the protected folders (`fsops_protected`) and read-only places keep
+  refusing, checked again in C, not only by the dialog.
+- [ ] **iCloud: choose which calendars and contacts to sync** ([#241](https://github.com/lordbasex/LordOS/issues/241));
+  the plan is the item "iCloud: choose what to sync" under *Next release after 0.8.9.6.1* below.
+- [ ] **Cloud: a shortcut to the existing "Encrypted folder"** (rclone crypt;
+  [#265](https://github.com/lordbasex/LordOS/issues/265)) from an account's menu, and a careful export of its keys (a
+  file the person saves, with a clear warning that whoever has it can read the folder). No union view of several
+  remotes.
+- [ ] **Text Editor: soft word wrap** ([#264](https://github.com/lordbasex/LordOS/issues/264), part 2; part 1, the
+  horizontal scroll bar, is in 0.8.9.6.2): long lines wrap at the window's edge without changing the file, as a View
+  option remembered per file kind, with the caret, selection and line numbers following the wrapped rows.
 
 ## Next release after 0.8.9.6.1
 
+- [ ] **Toolkit audit** (`docs/TOOLKIT-AUDIT.md`; branches `feat/toolkit-audit`, `feat/ta-score`, `feat/ta-report`).
+  Done in code: `lordos-testbench --toolkits` scores GTK 3, GTK 4, Qt 5, Qt 6 (both backends each) and a plain X11
+  client from small Python harnesses in `/usr/lib/lordos/toolkit-audit/` (no new dependency); its result in the
+  hardware report ("Include framework compatibility", the `toolkit:*-fail` labels, lordos.org/hardware), in
+  `lordos-issue` (`--toolkits --last`) and in `tools/wl-conformance.mjs`. Left: Qt 5 and Qt 6 end to end, the X11
+  rows inside a real LordOS session (dev VM screenshot), creating the 9 `toolkit:*` labels on GitHub, and turning on
+  the snapshot's `toolkits` field once no supported release reads it with the old 5-field check.
 - [ ] **Desktop icons in every theme** (approved by the maintainer on 2026-11-25; design `docs/drafts/DESKTOP-ICONS.md`,
   being built on branch `feat/desktop-icons`). The Desktop folder's files, optional places and app launchers on the
   desktop of Flow, Classic, Workspaces and Celeste, with Files' selection, rename, menus and Trash, drag and drop with
@@ -1023,7 +1046,7 @@ LordOS card is unchanged.
   keycodes); `lordos-sysreport`'s display engine facts through the DRM uapi.
 - [x] **Remote desktop (5673), improvement 1:** VA-API on the compositor's render node, one frame in flight, following
   the bit rate, BT.709 tags (`REMOTE.md`). Improvements 2 to 5 are in the next release's list.
-- [x] **Fixes:** Monitor's seal tooltip under a group row's summary; Files' rename field moving the grid; Lord
+- [x] **Fixes:** Monitor's seal tooltip under a group row's summary; Files' rename field moving the grid;
   Workspaces' top band in right-to-left languages and narrow screens; a Thunderbird message dropped on a Files folder
   (#188); Check This Account on pCloud (#243); `firmware-mediatek` (#227) and `firmware-intel-graphics` as Recommends;
   the CPU microcode as a Recommends, so `lordos` installs on a Debian without `non-free-firmware`.
@@ -1037,7 +1060,7 @@ An update of the package through the Store and `apt` (`CHANGELOG.md`, "0.8.9.6-b
   "AI on this computer"; `/proc` walked every 5 s (about 0.45 ms a second on the RX 580 PC). **NVIDIA through
   `lord-nvgpu`** (approved 2026-11-24): the sandboxed helper that alone loads NVML, numbers only. Left: run it on NVIDIA
   hardware and check its sandbox there with `strace` (in development).
-- [x] **Lord Workspaces' bar** (`WORKSPACES.md`): open and minimized windows of the activity on each display, launches
+- [x] **Workspaces' bar** (`WORKSPACES.md`): open and minimized windows of the activity on each display, launches
   that land on the display, activity and slot they came from (Chrome's profile picker included), late-parent dialogs
   over their parent, browser profiles for Chrome, Chromium, Brave and Edge with `lord.apps.launchProfile` (approved
   2026-11-24), ❖` through an app's windows, and the FileChooser portal at version 3 so Chromium-family browsers use
@@ -1116,10 +1139,10 @@ An update of the package through the Store and `apt` (`CHANGELOG.md`, "0.8.9.5-b
   permission allowed from the start (#219).
 - [x] **From GitHub requests and reports**: window options in Appearance (#151, #219), backup destination and
   exclusions in the file dialog (#200), clipboard snippets (first step of #205), Print Screen's action (#202), the
-  clipboard panel's scrolling and arrows (#203, #204), the wallpaper from anywhere (#219), Lord Classic's apps by
+  clipboard panel's scrolling and arrows (#203, #204), the wallpaper from anywhere (#219), Classic's apps by
   category (#210's idea), Cloud fixes (#206–#208, #216, #217), the screen back after sleep (#214), Files' drag in big
   folders (#218), Browsers' Done note (#222), hardware reports (#212, #221, #224).
-- [x] **Lord Celeste**, a community theme (`themes/celeste`); `lordos-fetch` behind `fastfetch` and `neofetch`.
+- [x] **Celeste**, a community theme (`themes/celeste`); `lordos-fetch` behind `fastfetch` and `neofetch`.
 
 ## Release 0.8.9.4 (released 2026-11-20)
 
@@ -1492,7 +1515,7 @@ An update of the package through the Store and `apt` (`CHANGELOG.md`, "0.8.9.5-b
   - [x] tests with real X11 apps (XTerm, xeyes, a Swing app, Neverball), CPU and GPU paths.
   - [ ] later: a separate or "untrusted" X display for restricted apps; X11 ↔ Wayland drag and drop;
     sharp X11 apps on HiDPI displays.
-- [x] **Turn the "Lord Classic" theme into a second full appearance** (0.8.3; Settings → Appearance → Desktop style, see `DESIGN.md`, "Lord Classic"), for people coming from the
+- [x] **Turn the "Classic" theme into a second full appearance** (0.8.3; Settings → Appearance → Desktop style, see `DESIGN.md`, "Classic"), for people coming from the
   most common desktop layout: a centered taskbar with a start menu, pinned and running apps, a
   system tray with quick settings and a notification panel, snap layouts for windows, rounded
   corners and translucent materials. Until 0.8.3 `themes/classic` was only a template (taskbar and

@@ -1,5 +1,5 @@
 #!/bin/sh
-# launchplace_headless.sh — Lord Workspaces: a window launched from a display's bar lands on that display, in that
+# launchplace_headless.sh — Workspaces: a window launched from a display's bar lands on that display, in that
 # activity and its layout slot, even when the app shows a picker first and the person goes to another activity meanwhile
 # (Google Chrome with profiles; themes/workspaces/model/launches.js, docs/WORKSPACES.md "Where launched windows go"), a
 # dialog told its parent late goes over it (sdk/dialogmodel.js lateParentFrame), and the bar shows every window of the
@@ -12,6 +12,7 @@
 cd "$(dirname "$0")/.." || exit 1
 [ -x build/lord-server-test ] && [ -x build/launchplace-client ] || { echo "skipped: needs build/lord-server-test and build/launchplace-client"; exit 77; }
 command -v node >/dev/null 2>&1 && command -v python3 >/dev/null 2>&1 || { echo "skipped: needs node and python3"; exit 77; }
+python3 -c 'import PIL' 2>/dev/null || { echo "skipped: needs python3-pil (the screenshots it takes)"; exit 77; }
 LANG_UI=${LAUNCHPLACE_LANG:-en}
 # the folder for the run and its pictures: a fresh private one (mktemp -d), or the one given if it is a real folder of
 # this user (not a link someone else could have planted)

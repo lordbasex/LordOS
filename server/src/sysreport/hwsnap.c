@@ -88,6 +88,30 @@ static int check_device(const JVal *d, char *err, size_t errlen) {
     return 0;
 }
 
+/* the optional "toolkits" field (format 1 kept; tools/hwreport/catalog.mjs toolkitSummary): per toolkit combination
+ * and LordOS version, the reports that ran it, how many failed and their mean score. Checked as strictly as the
+ * devices, so a field that is there is never trusted unchecked; JS shows nothing of it that isn't a known id. */
+static int is_combo(const char *s) {
+    static const char *const ok[] = { "gtk3-wayland", "gtk3-x11", "gtk4-wayland", "gtk4-x11", "qt5-wayland", "qt5-xcb",
+                                      "qt6-wayland", "qt6-xcb", "x11-xwayland" };
+    for (size_t i = 0; s && i < sizeof ok / sizeof ok[0]; i++) if (!strcmp(s, ok[i])) return 1;
+    return 0;
+}
+
+static int check_toolkits(const JVal *t, char *err, size_t errlen) {
+    if (!t || t->type != J_ARR || t->len > HWSNAP_TOOLKITS_MAX) { seterr(err, errlen, "snapshot: bad toolkit list%s", NULL); return -1; }
+    for (const JVal *e = t->kid; e; e = e->next) {
+        const JVal *sc = json_get(e, "score");
+        if (e->type != J_OBJ || e->len != 5 || !is_combo(json_str(e, "id")) || !is_version(json_str(e, "lordos"))
+            || !is_count(json_get(e, "reports")) || !is_count(json_get(e, "fail")) || !sc || sc->type != J_NUM
+            || sc->num < 0 || sc->num > 100 || json_num(e, "reports", 0) < 1 || json_num(e, "fail", 0) > json_num(e, "reports", 0)) {
+            seterr(err, errlen, "snapshot: bad toolkit entry%s", NULL);
+            return -1;
+        }
+    }
+    return 0;
+}
+
 HwSnapState hwsnap_check(const char *json, size_t len, const char *sig, size_t siglen, const uint8_t pub[32],
                          char *err, size_t errlen) {
     if (!json || !len || len > HWSNAP_MAX) { seterr(err, errlen, "snapshot size%s", NULL); return HWSNAP_INVALID; }
@@ -102,12 +126,15 @@ HwSnapState hwsnap_check(const char *json, size_t len, const char *sig, size_t s
     HwSnapState st = HWSNAP_INVALID;
     const JVal *r = doc.root, *devs = json_get(r, "devices");
     const char *fmt = json_str(r, "format");
-    if (!r || r->type != J_OBJ || r->len != 5) { seterr(err, errlen, "snapshot: not an object of 5 fields%s", NULL); goto out; }
+    /* 5 fields, or 6 with the optional "toolkits" (any other extra field is still refused) */
+    const JVal *tk = json_get(r, "toolkits");
+    if (!r || r->type != J_OBJ || r->len != (tk ? 6u : 5u)) { seterr(err, errlen, "snapshot: not an object of 5 fields (6 with toolkits)%s", NULL); goto out; }
     if (!fmt || strcmp(fmt, HWSNAP_FORMAT) || json_num(r, "version", 0) != 1) { seterr(err, errlen, "snapshot: not " HWSNAP_FORMAT " version 1%s", NULL); goto out; }
     if (!is_date(json_str(r, "generated")) || !is_count(json_get(r, "reports"))) { seterr(err, errlen, "snapshot: bad date or report count%s", NULL); goto out; }
     if (!devs || devs->type != J_ARR || devs->len > HWSNAP_DEVICES_MAX) { seterr(err, errlen, "snapshot: bad device list%s", NULL); goto out; }
     for (const JVal *d = devs->kid; d; d = d->next)
         if (check_device(d, err, errlen)) goto out;
+    if (tk && check_toolkits(tk, err, errlen)) goto out;
     st = HWSNAP_OK;
 out:
     json_free(&doc);

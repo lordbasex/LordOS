@@ -379,7 +379,7 @@ In the SDK: `session.lock()`, `session.switchUser()` and `session.managed()`. Th
 ### Restart and Shut Down from a session
 
 Since 0.8.1 the crown menu ends with **Restart…** and **Shut Down…**, after Lock Screen, Switch
-User… and Log Out; the Lord Classic theme has them behind a **Power** button at the bottom of its start
+User… and Log Out; the Classic theme has them behind a **Power** button at the bottom of its start
 menu. Before, they were only on the login screen. Sleep is not in the menu; the computer sleeps from the lid, the power
 button (a tap on tablets, since 0.8.8.9) and the idle timers in Settings → Energy. A laptop that went to sleep with
 the lid open has its lid's ACPI wake source off until it wakes, so the firmware can't wake it a second later
@@ -392,7 +392,7 @@ is unchecked in every hardware report; the only report after waking is #14's Wi-
 |---|---|
 | ![crown menu](session-power-menu-light.png) | ![crown menu, dark](session-power-menu-dark.png) |
 | ![restart confirmation](session-power-restart-light.png) | ![restart confirmation, dark](session-power-restart-dark.png) |
-| ![Lord Classic start menu, Power](session-power-classic-light.png) | ![Lord Classic, dark](session-power-classic-dark.png) |
+| ![Classic start menu, Power](session-power-classic-light.png) | ![Classic, dark](session-power-classic-dark.png) |
 
 - **The confirmation** (`sdk/power.jsx`, `<PowerDialog>`, in the `modal` layer; a theme renders it
   inside its `ThemeProvider`) says what will happen and counts down 60 seconds; at zero it does it,
@@ -416,7 +416,7 @@ is unchecked in every hardware report; the only report after waking is #14's Wi-
   session seen only through the remote desktop isn't offered them; before 0.8.5 it showed the
   sheet and nothing happened at the end of the countdown.
 - **Tested on VM 122:** the menu items, the sheet in light and dark, the countdown, Cancel and
-  Escape (no restart after the minute), the Lord Classic Power button, a real Shut Down (`qm start` back
+  Escape (no restart after the minute), the Classic Power button, a real Shut Down (`qm start` back
   to the login screen) and a real Restart (back to the login screen). The refusal with other users
   logged in was checked in the code path only: it needs a second account's password on the VM.
 
@@ -435,7 +435,7 @@ Settings → Session → **Reopen windows when you log in**: Always (the default
 
 **Apps that ask first.** Terminal, Passwords, Remote Desktop, Machines, Databases, Camera and Recorder hold a live
 session or private data (`ASK_FIRST` in `sdk/sessionmodel.js`). With Always, everything else reopens and the question
-lists only those; with Ask first, it lists every window. Each row names the app and its desktop (its activity in Lord
+lists only those; with Ask first, it lists every window. Each row names the app and its desktop (its activity in
 Workspaces) and has a box to leave it closed (`restoreSplit`, tested in `server/tests/session_model_test.mjs`). Until
 the question is answered the saved list stays as it was, so a logout meanwhile loses nothing.
 
@@ -672,10 +672,10 @@ session. Everything that changes something goes through closed `admin.c` actions
   cycle with several real monitors was exercised on one PC with a Radeon RX 580 (amdgpu) and three monitors:
   it brought 0.8.8.6's login screen on the chosen main display and 0.8.8.7's hand-off with a black frame and
   CLOSEFB, so DisplayPort monitors keep their signal across lock, logout and login. Sessions on real hardware are
-  known from 27 machines ([HARDWARE-REPORT.md](HARDWARE-REPORT.md)): Intel graphics from Ironlake to Whiskey Lake,
-  a Raptor Lake Iris Xe, Cherry Trail, Braswell and Gemini Lake, five AMD generations (TeraScale 2 to RDNA 4), laptop panels, four laptops
+  known from 31 machines ([HARDWARE-REPORT.md](HARDWARE-REPORT.md)): Intel graphics from Ironlake to Whiskey Lake,
+  Skylake, Tiger Lake (one of them a hybrid laptop with an NVIDIA card), a Raptor Lake Iris Xe, Cherry Trail, Braswell and Gemini Lake, five AMD generations (TeraScale 2 to RDNA 4), laptop panels, four laptops
   with an external monitor, two monitors at 120 Hz (RX 7800 XT), an NVIDIA RTX 3060 on the proprietary driver, drawn
-  with the CPU, and an RTX 5070 Ti on NVIDIA's open kernel modules. Untested: nouveau and NVK, AMD integrated graphics,
+  with the CPU, a GTX 1070 on the proprietary driver, composed on the GPU, and an RTX 5070 Ti on NVIDIA's open kernel modules. Untested: nouveau and NVK, AMD integrated graphics,
   Intel between Whiskey Lake and Raptor Lake and newer, DisplayPort MST hubs.
 - **Text consoles:** Ctrl+Alt+F2 doesn't switch consoles while LordOS is running, as before.
 - **Choosing the avatar image:** today it's a hand-typed path; the file picker is missing.

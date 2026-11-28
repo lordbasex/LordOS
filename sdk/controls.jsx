@@ -5,13 +5,15 @@
 // and Table are in sdk/lists.jsx). The spacing and type scale they follow is in docs/DESIGN.md.
 import { View, Text, addListener, displayAt } from '@lordos/runtime';
 import { useEffect, useRef, useState } from 'react';
-import { useTheme, popupBg } from './theme.js';
+import { useTheme, popupBg, stateBorder, bevelStyle } from './theme.js';
+import { PackIcon } from './appskins.jsx';
 import { TextInput, ScrollView, useAppWindow, hasTextFocus, clearTextFocus } from './components.jsx';
 import { wm } from './windows.js';
 import { useStore } from './store.js';
 import { dialogStack, dialogKey, defaultButton, keyOwner } from './dialogkeys.js';
 import { direction, t as tr } from './i18n.js';
 import { Lumo } from './mascot.js';
+import { optionIndex } from './handsmodel.js';
 import { Overlay, shellLayers } from './layers.js';
 import { menuStep, within } from './focusmodel.js';
 import { focusRingColor, useFocusScope, keyFocused, onFocusMove } from './focus.js';
@@ -87,7 +89,9 @@ function TooltipBubble({ text, end, top, bottom }) {
 // title: tooltip text (required for icon-only buttons). active: a toggled-on state.
 // A Tab stop unless disabled (sdk/focus.js): Space and Enter press it. onKeyDown (optional) sees its keys first.
 // accessibilityLabel: what a screen reader says for an icon-only button (the Store's update icon); its tooltip otherwise.
-export function ToolbarButton({ icon, label, title, onClick, active, disabled, small, iconSize, color, style, onKeyDown, focusable = true, accessibilityLabel }) {
+// iconName: the icon's name in a style pack (appskinmodel.js TOOLBAR_ICONS: 'back', 'forward', 'up', …); the pack's
+// icon is drawn instead of `icon` when the theme brings one.
+export function ToolbarButton({ icon, iconName, label, title, onClick, active, disabled, small, iconSize, color, style, onKeyDown, focusable = true, accessibilityLabel }) {
   const t = useTheme();
   const { id: winId } = useAppWindow();
   const ref = useRef(null);
@@ -97,14 +101,21 @@ export function ToolbarButton({ icon, label, title, onClick, active, disabled, s
   const fg = disabled ? t.textDim : active ? t.accent : color || t.text;
   return (
     <View ref={ref} onClick={() => { tipLeave(); if (!disabled) onClick?.(); }} focusable={focusable && !disabled} onKeyDown={onKeyDown}
+      accessibilityRole="button" accessibilityState={{ disabled: !!disabled, selected: !!active }}
       accessibilityLabel={accessibilityLabel || (label ? undefined : title)}
       onFocus={tipEnter} onBlur={tipLeave} onMouseEnter={() => { setHover(true); tipEnter(); }} onMouseLeave={() => { setHover(false); tipLeave(); }}
       style={[{ height: h, minWidth: h, paddingHorizontal: label ? 8 : 0, borderRadius: t.controlRadiusSmall, flexDirection: 'row', gap: 6,
         alignItems: 'center', justifyContent: 'center', opacity: disabled ? 0.45 : 1, zIndex: tip ? 1000 : 0,
-        backgroundColor: active ? (t.mode === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)') : hover && !disabled ? t.hover : 'transparent' }, style]}>
-      {icon == null ? null : typeof icon === 'string' || typeof icon === 'number'
-        ? <Text style={{ fontSize: iconSize || (small ? 13 : 15), color: fg, textAlign: 'center' }}>{icon}</Text>
-        : icon /* an element: a drawn glyph */}
+        backgroundColor: active ? (t.mode === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)') : hover && !disabled ? t.hover : 'transparent',
+        // richer tokens (sdk/theme.js): a border per state, a sunken bevel while active
+        ...(t.stateBorders ? { border: '1px solid transparent', ...stateBorder(t, disabled ? 'disabled' : active ? 'pressed' : hover ? 'hover' : 'toolbar') } : null),
+        ...(active ? bevelStyle(t, true) : null) }, style]}>
+      {(() => {
+        const own = icon == null ? null : typeof icon === 'string' || typeof icon === 'number'
+          ? <Text style={{ fontSize: iconSize || (small ? 13 : 15), color: fg, textAlign: 'center' }}>{icon}</Text>
+          : icon; /* an element: a drawn glyph */
+        return iconName ? <PackIcon group="toolbar" name={iconName} size={iconSize ? Math.max(14, iconSize + 4) : small ? 16 : 20} color={fg} fallback={own} /> : own;
+      })()}
       {label ? <Text style={{ fontSize: small ? 12 : 13, fontWeight: 500, color: fg, whiteSpace: 'nowrap' }}>{label}</Text> : null}
       {/* in the tooltip layer (sdk/layers.js): zIndex only orders siblings, so a bubble drawn in place went
           under whatever the window draws after the toolbar (the picture in Photos, issue #72) */}
@@ -153,7 +164,8 @@ export function ToolbarGroup({ children, style }) {
 export function Toolbar({ children, style, separator = true }) {
   const t = useTheme();
   return (
-    <View style={[{ height: controlSize.toolbar, flexDirection: 'row', alignItems: 'center', gap: spacing.s, paddingHorizontal: spacing.m, zIndex: 10 }, style]}>
+    <View style={[{ height: controlSize.toolbar, flexDirection: 'row', alignItems: 'center', gap: spacing.s, paddingHorizontal: spacing.m, zIndex: 10,
+      ...(t.toolbarBg ? { background: t.toolbarBg } : null) }, style]}>
       {separator ? <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 1, backgroundColor: t.separator }} /> : null}
       {children}
     </View>
@@ -257,7 +269,8 @@ function MenuRow({ it, onDone, lit: keyed, onHover }) {
   const lit = (hover || keyed) && !it.disabled;
   const on = lit && t.menuHighlight !== 'subtle';     // 'subtle' (a theme token): a light fill, the text keeps its color
   return (
-    <View onClick={() => { if (it.disabled) return; onDone(); it.onClick?.(); }} onMouseEnter={() => { setHover(true); onHover?.(); }} onMouseLeave={() => setHover(false)}
+    <View onClick={() => { if (it.disabled) return; onDone(); it.onClick?.(); }} accessibilityRole="menuitem"
+      accessibilityState={{ disabled: !!it.disabled, checked: !!it.checked }} onMouseEnter={() => { setHover(true); onHover?.(); }} onMouseLeave={() => setHover(false)}
       style={{ height: it.detail ? 40 : 24, paddingHorizontal: 8, borderRadius: t.menuItemRadius, flexDirection: 'row', alignItems: 'center', gap: 6,
         backgroundColor: on ? t.accent : lit ? t.hover : 'transparent', opacity: it.disabled ? 0.4 : 1 }}>
       <Text style={{ width: 12, fontSize: 11, color: on ? '#fff' : t.text }}>{it.checked ? '✓' : ''}</Text>
@@ -279,7 +292,7 @@ export function SearchField({ value, onChange, placeholder, onSubmit, onCancel, 
   const lead = rtl ? 'right' : 'left', trail = rtl ? 'left' : 'right';
   return (
     <View style={[{ width, flexDirection: 'row', alignItems: 'center' }, style]}>
-      <TextInput value={value} onChange={onChange} placeholder={placeholder} onSubmit={onSubmit} onKeyDown={onKeyDown} autoFocus={autoFocus}
+      <TextInput spellCheck={false} value={value} onChange={onChange} placeholder={placeholder} onSubmit={onSubmit} onKeyDown={onKeyDown} autoFocus={autoFocus}
         onCancel={() => { if (value) onChange(''); onCancel?.(); }}
         style={{ flex: 1, [rtl ? 'paddingRight' : 'paddingLeft']: 26, [rtl ? 'paddingLeft' : 'paddingRight']: value ? 26 : 10 }} />
       <Text style={{ position: 'absolute', [lead]: 9, top: 5, fontSize: 13, color: t.textDim, pointerEvents: 'none' }}>⌕</Text>
@@ -303,8 +316,11 @@ export function EmptyState({ icon, mascot, title, hint, action, style }) {
     <View style={[{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.s, padding: spacing.xxl }, style]}>
       {mascot ? <Lumo pose={mascot} size={112} style={{ marginBottom: spacing.xs }} />
         : typeof icon === 'string' ? <Text style={{ fontSize: 40, color: t.textDim, marginBottom: spacing.xs }}>{icon}</Text> : icon}
-      {title ? <Text style={{ fontSize: typeScale.headline, fontWeight: 600, color: t.text, textAlign: 'center' }}>{title}</Text> : null}
-      {hint ? <Text style={{ fontSize: typeScale.callout, color: t.textDim, textAlign: 'center', maxWidth: 360, lineHeight: 1.4 }}>{hint}</Text> : null}
+      {/* the title and the hint take the width they have (100 %, the hint at most 360) and center their lines: shrunk to
+          their own measured width, a title in a narrow sidebar broke into one line more than it was measured for, and
+          the last one was cut (Help, "No se encontraron" without "artículos.", QA ws168) */}
+      {title ? <Text style={{ width: '100%', fontSize: typeScale.headline, fontWeight: 600, color: t.text, textAlign: 'center' }}>{title}</Text> : null}
+      {hint ? <Text style={{ width: '100%', fontSize: typeScale.callout, color: t.textDim, textAlign: 'center', maxWidth: 360, lineHeight: 1.4 }}>{hint}</Text> : null}
       {action ? <View style={{ marginTop: spacing.s }}>{action}</View> : null}
     </View>
   );
@@ -354,7 +370,10 @@ export function FormRow({ label, children, labelWidth, minHeight = 36 }) {
 // the action needs a click, or Tab to it and then Space. cautious: the default is Cancel too, with a button
 // that isn't red (an action that only needs a second look, such as pasting files another app copied).
 // children: an option shown under the detail (Settings → Web apps' "Delete its data" toggle).
-export function ConfirmDialog({ title, detail, okLabel, cancelLabel, onOk, onCancel, destructive, cautious, area, children }) {
+// handsDeny: the answer is the person's own, never an AI agent's (docs/HANDS.md): a click on it, and any key while it has
+// the keyboard, are refused to an agent. Every destructive confirmation is (an irreversible action is the person's);
+// others pass handsDeny for a trust, an install or a removal, a permission, a sign-out.
+export function ConfirmDialog({ title, detail, okLabel, cancelLabel, onOk, onCancel, destructive, cautious, area, children, handsDeny }) {
   const t = useTheme();
   const { id: win, focused } = useAppWindow();
   const token = useRef({}).current;
@@ -364,14 +383,21 @@ export function ConfirmDialog({ title, detail, okLabel, cancelLabel, onOk, onCan
   const owner = useStore(dialogStack, (list) => keyOwner(list) === token);
   const latest = useRef(null);
   latest.current = { onOk, onCancel, destructive: safe, focus };
+  const root = useRef(null);
   useEffect(() => {
     dialogStack.open(token, win, focused);
+    dialogStack.setNode(token, root.current);
     if (dialogStack.owner() === token) clearTextFocus();   // a field under it must not go on typing
     return () => dialogStack.close(token);
   }, []);
   useEffect(() => { dialogStack.setFocused(token, focused); }, [focused]);
+  const personal = handsDeny ?? !!destructive;
+  const personalRef = useRef(personal);
+  personalRef.current = personal;
   useEffect(() => addListener('keydown', (e) => {
     if (dialogStack.owner() !== token || hasTextFocus()) return;
+    // the person's own answer: never an AI agent's key (Hands, docs/HANDS.md; lord-server refuses it before too)
+    if (personalRef.current && typeof lord !== 'undefined' && typeof lord.hands?.injecting === 'function' && lord.hands.injecting()) return;
     const p = latest.current;
     const r = dialogKey(e, p);
     if (r) dialogStack.take(e);
@@ -381,7 +407,7 @@ export function ConfirmDialog({ title, detail, okLabel, cancelLabel, onOk, onCan
   }), []);
   const a = area || { x: 0, y: 0, w: undefined, h: undefined };
   return (
-    <View onClick={onCancel} style={{ position: 'absolute', left: a.x, top: a.y, ...(a.w ? { width: a.w, height: a.h } : { right: 0, bottom: 0 }),
+    <View ref={root} handsDeny={handsDeny ?? !!destructive} onClick={onCancel} style={{ position: 'absolute', left: a.x, top: a.y, ...(a.w ? { width: a.w, height: a.h } : { right: 0, bottom: 0 }),
       backgroundColor: 'rgba(0,0,0,0.3)', alignItems: 'center', justifyContent: 'center' }}>
       <View onClick={(e) => e.stopPropagation()} style={{ width: 360, padding: spacing.xl, gap: spacing.s, borderRadius: t.groupRadius + 2, backgroundColor: t.windowBg,
         border: `1px solid ${t.separator}`, boxShadow: '0 14px 36px rgba(0,0,0,0.45)' }}>
@@ -389,7 +415,7 @@ export function ConfirmDialog({ title, detail, okLabel, cancelLabel, onOk, onCan
         {detail ? <Text style={{ fontSize: typeScale.body, color: t.textDim, lineHeight: 1.4, textAlign: 'start' }}>{detail}</Text> : null}
         {children || null}
         <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.s, marginTop: spacing.m }}>
-          <DialogButton t={t} label={cancelLabel} onClick={onCancel} isDefault={dflt === 'cancel'} ring={owner && focus === 'cancel'} />
+          <DialogButton t={t} label={cancelLabel || tr('shell.dialog.cancel')} onClick={onCancel} isDefault={dflt === 'cancel'} ring={owner && focus === 'cancel'} />
           <DialogButton t={t} label={okLabel} onClick={onOk} primary destructive={destructive} isDefault={dflt === 'ok'} ring={owner && focus === 'ok'} />
         </View>
       </View>
@@ -614,7 +640,7 @@ export function Dropdown({ value, options, onChange, width = 180, placeholder, s
     const on = lit === i;
     const fill = on && t.menuHighlight !== 'subtle';
     return (
-      <View key={String(v)} onClick={() => choose(i)} onMouseEnter={() => setLit(i)}
+      <View key={String(v)} onClick={() => choose(i)} onMouseEnter={() => setLit(i)} accessibilityRole="option" accessibilityState={{ selected: v === value }}
         style={{ height: DROP_ROW, paddingHorizontal: 8, borderRadius: t.menuItemRadius, flexDirection: 'row', alignItems: 'center', gap: 6,
           backgroundColor: fill ? t.accent : on ? t.hover : 'transparent' }}>
         <Text style={{ width: 12, fontSize: 11, color: fill ? '#fff' : t.text }}>{v === value ? '✓' : ''}</Text>
@@ -625,6 +651,14 @@ export function Dropdown({ value, options, onChange, width = 180, placeholder, s
   return (
     <View ref={btn} style={{ width }}>
       <View onClick={disabled ? undefined : () => setOpen((o) => !o)} focusable={focusable && !disabled} onKeyDown={keys}
+        // Hands: a pop-up; set_value picks an option by its value or its label
+        accessibilityRole="combobox" accessibilityValue={String(cur ?? '')} accessibilityState={{ disabled: !!disabled, expanded: open }}
+        handsSetValue={(want) => {
+          const i = optionIndex(latest.current.options, want);
+          if (i < 0) return false;
+          choose(i);
+          return true;
+        }}
         style={{ height: h, paddingHorizontal: 9, borderRadius: small ? t.controlRadiusSmall : t.controlRadius, flexDirection: 'row', alignItems: 'center', gap: 6,
           backgroundColor: t.control, opacity: disabled ? 0.45 : 1, ...(t.buttonBorder ? { border: `1px solid ${t.separator}` } : null) }}>
         <Text style={{ flex: 1, fontSize: small ? 12 : 13, color: current >= 0 ? t.text : t.textDim, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'start' }}>{cur}</Text>
@@ -651,6 +685,8 @@ export function Checkbox({ checked, onChange, label, disabled, mixed, focusable 
   const on = !!checked || !!mixed;
   return (
     <View onClick={disabled ? undefined : () => onChange?.(!checked)} focusable={focusable && !disabled}
+      accessibilityRole="checkbox" accessibilityState={{ checked: mixed ? 'mixed' : !!checked, disabled: !!disabled }}
+      handsSetValue={disabled ? undefined : (v) => { const want = /^(1|true|on|yes|checked)$/i.test(String(v)); if (want !== !!checked) onChange?.(want); return true; }}
       style={{ flexDirection: 'row', alignItems: 'center', gap: 6, opacity: disabled ? 0.45 : 1, borderRadius: 4 }}>
       <View style={{ width: 14, height: 14, borderRadius: 4, alignItems: 'center', justifyContent: 'center', backgroundColor: on ? t.accent : t.control,
         border: `1px solid ${on ? t.accent : t.separator}` }}>
@@ -685,7 +721,8 @@ export function RadioGroup({ value, options, onChange, row = false, disabled, fo
       {options.map(([v, label], i) => {
         const on = v === value, off = skip(i);
         return (
-          <View key={String(v)} onClick={off ? undefined : () => onChange(v)} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, opacity: off ? 0.45 : 1 }}>
+          <View key={String(v)} onClick={off ? undefined : () => onChange(v)} accessibilityRole="radio" accessibilityState={{ checked: on, disabled: !!off }}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 6, opacity: off ? 0.45 : 1 }}>
             <View style={{ width: 14, height: 14, borderRadius: 7, alignItems: 'center', justifyContent: 'center', backgroundColor: on ? t.accent : t.control,
               border: `1px solid ${on ? t.accent : t.separator}` }}>
               {on ? <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#fff' }} /> : null}
@@ -718,7 +755,7 @@ export function Tabs({ value, tabs, onChange, focusable = true, style }) {
       {tabs.map(([v, label], i) => {
         const on = v === value, off = skip(i);
         return (
-          <View key={String(v)} onClick={off ? undefined : () => onChange(v)}
+          <View key={String(v)} onClick={off ? undefined : () => onChange(v)} accessibilityRole="tab" accessibilityState={{ selected: on, disabled: !!off }}
             style={{ height: 30, paddingHorizontal: spacing.m, justifyContent: 'center', opacity: off ? 0.45 : 1 }}>
             <Text style={{ fontSize: typeScale.body, fontWeight: on ? 600 : 500, color: on ? t.text : t.textDim, whiteSpace: 'nowrap' }}>{label}</Text>
             {on ? <View style={{ position: 'absolute', left: spacing.s, right: spacing.s, bottom: 0, height: 2, borderRadius: 1, backgroundColor: t.accent }} /> : null}

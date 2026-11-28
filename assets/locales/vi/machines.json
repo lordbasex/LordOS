@@ -712,6 +712,7 @@
   "agent.toolsAutoFailed": "Cập nhật tự động không thành công ({have} → {want}).",
   "agent.toolsUpdateBtn": "Cập nhật",
   "agent.st.needsTools": "Cần công cụ",
+  "agent.st.oldLordos": "Cập nhật LordOS bên trong",
   "agent.st.needsXclip": "Cần xclip",
   "agent.toolsInstalled": "Công cụ LordOS đã được cài và đang chạy trong máy; chúng khởi động lại mỗi lần đăng nhập.",
   "agent.timesync": "Chỉnh đồng hồ",
@@ -880,6 +881,8 @@
   "un.how.preseed": "Các câu trả lời được đưa vào tệp khởi động riêng của trình cài đặt, mật khẩu của bạn chỉ dưới dạng mã băm, và chúng bị xóa khi hệ thống đã cài xong.",
   "un.how.autoinstall": "Các câu trả lời được đặt trên một đĩa nhỏ mà trình cài đặt đọc, mật khẩu của bạn chỉ dưới dạng mã băm, và đĩa bị gỡ khi hệ thống đã cài xong.",
   "un.how.kickstart": "Các câu trả lời được đặt trên một đĩa nhỏ mà trình cài đặt đọc, mật khẩu của bạn chỉ dưới dạng mã băm, và đĩa bị gỡ khi hệ thống đã cài xong.",
+  "un.how.kali": "Các câu trả lời được đưa vào tệp khởi động riêng của trình cài đặt, mật khẩu của bạn chỉ dưới dạng mã băm, và chúng bị xóa khi hệ thống đã cài xong.",
+  "un.how.lordos": "Các câu trả lời được đặt trên một đĩa nhỏ mà trình cài đặt đọc, mật khẩu của bạn chỉ dưới dạng mã băm, và đĩa bị gỡ khi hệ thống đã cài xong.",
   "un.image": "Cài từ {file}, cũng được đối chiếu với danh sách có chữ ký của nhà phát hành",
   "un.review": "Không cần hỏi: tài khoản {user} trên {host}",
   "un.reviewOff": "Bạn trả lời các câu hỏi của trình cài đặt",
@@ -1100,6 +1103,7 @@
   "apps.menu": "Ứng dụng",
   "apps.needsAgent": "Chế độ ứng dụng cần tác tử của máy đã kết nối",
   "win.appsNeedsTools": "Chế độ ứng dụng cần LordOS hoặc Windows trong máy, kèm công cụ LordOS",
+  "win.appsOldLordos": "Chế độ ứng dụng cần LordOS {version} trở lên bên trong máy. Hãy cập nhật LordOS trong máy; chỉ công cụ LordOS thì không đủ.",
   "apps.noApps": "Máy chưa liệt kê các ứng dụng của nó",
   "apps.gone": "Cửa sổ này đã đóng trong máy",
   "apps.dropTitle": "Thả để đưa các tệp này cho cửa sổ này trong máy",
@@ -2027,5 +2031,7 @@
   "req.row.answers": "Câu trả lời cài đặt",
   "req.use.answers": "Do chính Machines tạo: không cần cài gì",
   "req.st.download": "Khi tạo",
-  "req.st.builtin": "Có sẵn"
+  "req.st.builtin": "Có sẵn",
+  "cfg.closeOnStop": "Đóng cửa sổ khi máy dừng",
+  "cfg.closeOnStopNote": "Sau khi tắt hoặc Tắt nguồn. Nếu máy dừng vì sự cố, cửa sổ vẫn mở để cho thấy chuyện gì đã xảy ra."
 }

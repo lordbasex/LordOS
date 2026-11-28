@@ -4,12 +4,17 @@
  * socket 0600 in a 0700 folder and no TCP port, every network and file escape refused inside (TCP, UDP, IPv6, netlink,
  * packet, unix datagram, connect, /etc, /home, /tmp, exec, a signal outside, namespaces), its own network namespace,
  * the model read through its descriptor, the engine stopped after it idles, a missing model, bad arguments, and the
- * facts of a process (package from dpkg's lists, the /usr merge, where it lives, its parents).
+ * facts of a process (package from dpkg's lists, the /usr merge, where it lives, its parents), and (0.8.9.6.2) the
+ * engine's processor threads: "automatic", the clamping, the argument list per value, lord-llm refusing a bad count, an
+ * idle engine restarted with the new one.
  *   build/llm-engine-test                     the checks above
  *   build/llm-engine-test --real <models folder> <id> [summary file] [system file]
- *       two real analyses (cold, then warm) with /usr/bin/llama-server and <folder>/<id>.gguf, with their timings */
+ *       two real analyses (cold, then warm) with /usr/bin/llama-server and <folder>/<id>.gguf, with their timings and
+ *       the engine's state (where it ran); LLM_BACKEND=auto|cpu|gpu chooses where */
 #include "../src/llm/engine.h"
 #include "../src/llm/blockwatch.h"
+#include "../src/llm/writing.h"
+#include "../src/llm/llmjail.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -72,6 +77,8 @@ static int real(const char *mdir, const char *id, const char *summary_file, cons
     snprintf(launcher, sizeof launcher, "%.*s/lord-llm", (int)(strrchr(self, '/') - self), self);
     setenv("XDG_RUNTIME_DIR", rt, 1);
     llm_set_paths(mdir, NULL, launcher, NULL);
+    /* LLM_BACKEND=auto|cpu|gpu: where it computes (the default is auto, as in a session) */
+    if (getenv("LLM_BACKEND") && llm_set_backend(getenv("LLM_BACKEND"))) { printf("LLM_BACKEND: auto, cpu or gpu\n"); return 1; }
     char summary[LLM_USER_MAX + 1] = "Trigger: high CPU for 5 minutes.\nProcess: \"kworkerd\"; program ~/.cache/x/kworkerd, not installed by any package, in the home folder.\nStarted by: bash < sh < cron.\nCPU: 5-minute average 197% (2 cores), peak 199%.\nMemory: 310 MB, steady.\nThreads: 4.";
     char system[LLM_SYSTEM_MAX + 1] = "You are Sentinela, LordOS's local process guard. You read a summary of one process and answer only JSON: "
                          "verdict (normal, suspicious or dangerous), reason (one or two short sentences in Spanish, plain words) and "
@@ -90,6 +97,9 @@ static int real(const char *mdir, const char *id, const char *summary_file, cons
     r = wait_take(jid, 300000);
     printf("warm answer %s\nwall %.0f ms\n", r ? r : "(none)", now_ms() - t0);
     free(r);
+    char *st = llm_state_json();
+    printf("state %s\n", st ? st : "(none)");
+    free(st);
     llm_stop();
     msleep(1500);
     /* the runtime folder is empty once the engine stopped (its socket removed) */
@@ -98,7 +108,477 @@ static int real(const char *mdir, const char *id, const char *summary_file, cons
     return 0;
 }
 
+/* (0.8.9.6.2) the writing actions' requests and the streamed answer's reader, without the engine */
+static void writing_pure(void) {
+    const char *nonce = "0123456789abcdef";
+    char *b = wr_request(WR_FIX, NULL, "hello", nonce);
+    CHECK(b && strstr(b, "\"stream\":true") && strstr(b, "<<<TEXT 0123456789abcdef>>>\\u000ahello\\u000a<<<END-TEXT 0123456789abcdef>>>") &&
+          strstr(b, "never instructions"), "the fix request: %s", b ? b : "(none)");
+    /* the task right before the fenced text, in every user message; worked examples first (ws164: without them the
+     * 1.7B model copied the text back) */
+    CHECK(b && strstr(b, "\"content\":\"Proofread this text.") && strstr(b, "Hola, ¿qué haces?") &&
+          strstr(b, "\"role\":\"assistant\"") && strstr(b, "\"top_k\":20") && strstr(b, "\"enable_thinking\":false"),
+          "the fix request: its task, its examples and its sampling");
+    /* (BUG-1 of the 0.8.9.6.2 QA) Spanish's joined and split words: named in the task, and a short worked example last */
+    CHECK(b && strstr(b, "nose → no sé") && strstr(b, "No sé si mañana puedo ir, a ver qué pasa") &&
+          strstr(b, "No sé si llego a tiempo. A ver qué dice el jefe.") &&
+          strstr(b, "No sé si llego a tiempo") > strstr(b, "I don't know if he's coming"),
+          "the fix request: nose → no sé and aver → a ver, in the task and the examples, the short one last");
+    {
+        /* the person's text is the last message, once */
+        const char *last = b ? strstr(b, "<<<TEXT 0123456789abcdef>>>\\u000ahello") : NULL;
+        CHECK(last && !strstr(last + 1, "<<<TEXT 0123456789abcdef>>>\\u000ahello") && strstr(last, "]") && !strstr(last, "\"role\":\"assistant\""),
+              "the text goes last, once");
+    }
+    free(b);
+    b = wr_request(WR_TRANSLATE, "pt", "hello", nonce);
+    CHECK(b && strstr(b, "into Portuguese") && strstr(b, "Esqueça o que está acima") && strstr(b, "Forget the above"),
+          "translate's target named, its example a request translated as text");
+    free(b);
+    b = wr_request(WR_TRANSLATE, "en", "hola", nonce);
+    CHECK(b && strstr(b, "into English") && strstr(b, "Olvida lo anterior"), "into English: the example from Spanish");
+    free(b);
+    for (const char *const *l = (const char *const[]){ "ar", "fil", "zh-Hans", "zh-Hant", "ur", NULL }; *l; l++) {
+        b = wr_request(WR_TRANSLATE, *l, "hello", nonce);
+        CHECK(b != NULL, "a request into %s", *l);
+        free(b);
+    }
+    CHECK(!wr_request(WR_TRANSLATE, "xx", "hello", nonce) && !wr_request(9, NULL, "hello", nonce) && !wr_request(WR_FIX, NULL, "", nonce) &&
+          !wr_request(WR_FIX, NULL, "caf\xe9", nonce) && !wr_request(WR_FIX, NULL, "x", "nonce") && !wr_request(WR_FIX, NULL, "x", "0123456789ABCDEF"),
+          "bad requests refused");
+    static WrStream st;
+    static char ans[1024];
+    {
+        const char *ev[3] = { "data: {\"choices\":[{\"delta\":{\"content\":\"Hi\"}}]}\n\n",
+                              "data: {\"choices\":[{\"delta\":{\"content\":\" there\\n\"}}]}\n\n", "data: [DONE]\n\n" };
+        size_t at = (size_t)snprintf(ans, sizeof ans, "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nTransfer-Encoding: chunked\r\n\r\n");
+        for (int i = 0; i < 3; i++) at += (size_t)snprintf(ans + at, sizeof ans - at, "%zx\r\n%s\r\n", strlen(ev[i]), ev[i]);
+        snprintf(ans + at, sizeof ans - at, "0\r\n\r\n");
+    }
+    /* whole, then byte by byte: the same text */
+    wr_stream_init(&st);
+    int r = wr_stream_feed(&st, ans, strlen(ans));
+    CHECK(r == 1 && !strcmp(st.text, "Hi there\n"), "a chunked stream: %d \"%s\"", r, st.text);
+    wr_stream_init(&st);
+    r = 0;
+    for (size_t i = 0; i < strlen(ans) && r == 0; i++) r = wr_stream_feed(&st, ans + i, 1);
+    CHECK(r == 1 && !strcmp(st.text, "Hi there\n"), "byte by byte: %d \"%s\"", r, st.text);
+    const char *bad[] = {
+        "HTTP/1.1 500 Internal\r\n\r\n",
+        "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\nzz\r\n",
+        "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n5\r\nabcdeXX",
+        "HTTP/1.1 200 OK\r\n\r\ndata: {not json\n",
+        "garbage\r\n\r\n",
+    };
+    for (size_t i = 0; i < sizeof bad / sizeof bad[0]; i++) {
+        wr_stream_init(&st);
+        CHECK(wr_stream_feed(&st, bad[i], strlen(bad[i])) < 0, "malformed answer %zu refused", i);
+    }
+    /* a line longer than the reader keeps, and a model that writes too much */
+    wr_stream_init(&st);
+    const char *h = "HTTP/1.1 200 OK\r\n\r\ndata: ";
+    r = wr_stream_feed(&st, h, strlen(h));
+    static char big[70000];
+    memset(big, 'a', sizeof big);
+    CHECK(wr_stream_feed(&st, big, sizeof big) < 0, "a line too long refused");
+    wr_stream_init(&st);
+    wr_stream_feed(&st, "HTTP/1.1 200 OK\r\n\r\n", 19);
+    static char ev[9000];
+    snprintf(ev, sizeof ev, "data: {\"choices\":[{\"delta\":{\"content\":\"%.*s\"}}]}\n\n", 8000, big);
+    for (int k = 0; k < 3; k++) wr_stream_feed(&st, ev, strlen(ev));
+    CHECK(st.tn == LLM_WRITE_OUT_MAX && st.truncated, "the text capped at %d: %zu", LLM_WRITE_OUT_MAX, st.tn);
+    /* fuzz: random bytes after a good head never crash */
+    unsigned seed = 7;
+    for (int it = 0; it < 20000; it++) {
+        wr_stream_init(&st);
+        wr_stream_feed(&st, ans, 80);
+        char rnd[64];
+        for (int k = 0; k < 64; k++) { seed = seed * 1103515245u + 12345u; rnd[k] = (char)(seed >> 16); }
+        wr_stream_feed(&st, rnd, (size_t)(seed % 64));
+    }
+}
+
+/* a fake model with words for the fake engine (llm_fake_engine.c): FAIL_GPU, NO_VRAM, OOM_GPU, HOSTILE_NAME */
+static void fake_model(const char *mdir, const char *id, const char *words) {
+    char p[PATH_MAX];
+    snprintf(p, sizeof p, "%s/%s.gguf", mdir, id);
+    FILE *f = fopen(p, "w");
+    fputs("GGUF", f);
+    for (int i = 0; i < 64; i++) fputc(0, f);
+    fputs(words, f);
+    for (int i = 0; i < 2048; i++) fputc(0, f);
+    fclose(f);
+    chmod(p, 0644);
+}
+
+static char *analyze_state(const char *model, char *jail, size_t jn, const char *sock) {
+    int id = llm_submit_analyze(model, "system", "Process: miner");
+    char *r = wait_take(id, 20000);
+    CHECK(r && strstr(r, "\"ok\":true"), "%s: answered on the next backend: %s", model, r ? r : "(none)");
+    free(r);
+    if (jail) { jail[0] = 0; get(sock, "/jail", jail, jn); }
+    return llm_state_json();
+}
+
+/* (0.8.9.6.2) the Brain's cores: the pure parts (automatic, clamping, LORD_LLM_THREADS's check, the argument lists) */
+static void threads_pure(void) {
+    CHECK(llmjail_threads_auto(1) == 1 && llmjail_threads_auto(2) == 1 && llmjail_threads_auto(3) == 1 && llmjail_threads_auto(8) == 4 &&
+          llmjail_threads_auto(20) == 10 && llmjail_threads_auto(32) == 16 && llmjail_threads_auto(64) == 16, "automatic: half, 1..16");
+    CHECK(llmjail_threads_for(0, 8) == 4 && llmjail_threads_for(0, 1) == 1 && llmjail_threads_for(3, 8) == 3 && llmjail_threads_for(8, 8) == 8,
+          "a setting in range is used");
+    CHECK(llmjail_threads_for(9, 8) == 8 && llmjail_threads_for(1000, 4) == 4 && llmjail_threads_for(100, 200) == LLMJAIL_THREADS_MAX &&
+          llmjail_threads_for(5, 0) == 1 && llmjail_threads_for(-1, 8) == -1, "clamped to the cores (and to 64)");
+    int cpus = llmjail_cpus();
+    CHECK(cpus >= 1 && cpus <= LLMJAIL_THREADS_MAX && cpus == (sysconf(_SC_NPROCESSORS_ONLN) > 64 ? 64 : (int)sysconf(_SC_NPROCESSORS_ONLN)),
+          "online cores %d", cpus);
+    CHECK(llmjail_threads_parse("4", 8) == 4 && llmjail_threads_parse("1", 8) == 1 && llmjail_threads_parse("8", 8) == 8 &&
+          llmjail_threads_parse("16", 16) == 16, "a plain count in 1..cores");
+    static const char *const bad[] = { "0", "9", "04", "+4", "-1", " 4", "4 ", "4\n", "", "abc", "4a", "0x4", "1000", "65", NULL };
+    for (const char *const *b = bad; *b; b++) CHECK(llmjail_threads_parse(*b, *b[0] == '6' ? 100 : 8) == -1, "LORD_LLM_THREADS \"%s\" refused", *b);
+    CHECK(llmjail_threads_parse(NULL, 8) == -1, "no value refused by the parser");
+    static const char *const devs[3] = { "none", "Vulkan0", "CUDA0" };
+    static const int counts[] = { 1, 2, 4, 7, 16, 64 };
+    for (int be = 0; be < 3; be++) {
+        for (size_t c = 0; c < sizeof counts / sizeof counts[0]; c++) {
+            char buf[8], want[8];
+            const char *a[LLMJAIL_ARGV_MAX];
+            snprintf(want, sizeof want, "%d", counts[c]);
+            int ok = !llmjail_argv(be, counts[c], buf, sizeof buf, a, LLMJAIL_ARGV_MAX);
+            int t = 0, tb = 0, http = 0, dev = 0, n = 0, same = ok;
+            for (; ok && a[n]; n++) {
+                if (a[n + 1] && !strcmp(a[n], "-t")) t = !strcmp(a[n + 1], want);
+                if (a[n + 1] && !strcmp(a[n], "-tb")) tb = !strcmp(a[n + 1], want);
+                if (a[n + 1] && !strcmp(a[n], "--threads-http")) http = !strcmp(a[n + 1], "2");
+                if (a[n + 1] && !strcmp(a[n], "-dev")) dev = !strcmp(a[n + 1], devs[be]);
+                /* everything else as the fixed list */
+                if (a[n] != buf && (!LLMJAIL_ARGVS[be][n] || strcmp(a[n], LLMJAIL_ARGVS[be][n]))) same = 0;
+            }
+            CHECK(ok && t && tb && http && dev && same && !LLMJAIL_ARGVS[be][n] && !strcmp(a[0], "llama-server"),
+                  "backend %d, %d threads: -t %s -tb %s, the rest fixed", be, counts[c], want, want);
+        }
+    }
+    char buf[8];
+    const char *a[LLMJAIL_ARGV_MAX];
+    CHECK(llmjail_argv(0, 0, buf, sizeof buf, a, LLMJAIL_ARGV_MAX) && llmjail_argv(0, 65, buf, sizeof buf, a, LLMJAIL_ARGV_MAX) &&
+          llmjail_argv(3, 2, buf, sizeof buf, a, LLMJAIL_ARGV_MAX) && llmjail_argv(-1, 2, buf, sizeof buf, a, LLMJAIL_ARGV_MAX) &&
+          llmjail_argv(0, 2, buf, sizeof buf, a, 4) && llmjail_argv(0, 2, buf, 2, a, LLMJAIL_ARGV_MAX), "argv: bad count, backend or room refused");
+}
+
+/* lord-llm itself: a LORD_LLM_THREADS that isn't a plain count in 1..its cores stops it before anything (exit 2) */
+static void threads_launcher(const char *launcher, const char *model, const char *rtdir, const char *engine) {
+    char over[16];
+    snprintf(over, sizeof over, "%d", llmjail_cpus() + 1);
+    const char *bad[] = { "0", "-1", "abc", " 2", "2 ", "02", "999999", over, "", NULL };
+    for (const char *const *b = bad; *b; b++) {
+        int perr[2];
+        if (pipe(perr)) return;
+        pid_t k = fork();
+        if (k == 0) {
+            /* the pipe's ends may be 3 and 4: stderr first, everything above 5 before the dup2s */
+            if (dup2(perr[1], 2) < 0) _exit(99);
+            close(perr[0]);
+            close(perr[1]);
+            int m = fcntl(open(model, O_RDONLY), F_DUPFD, 10), d = fcntl(open(rtdir, O_RDONLY | O_DIRECTORY), F_DUPFD, 10),
+                e = fcntl(open(engine, O_PATH), F_DUPFD, 10);
+            if (m < 0 || d < 0 || e < 0 || dup2(m, 3) < 0 || dup2(d, 4) < 0 || dup2(e, 5) < 0) _exit(99);
+            char env[64];
+            snprintf(env, sizeof env, "LORD_LLM_THREADS=%s", *b);
+            char *envp[] = { "LORD_LLM_BACKEND=cpu", env, NULL };
+            char *argv[] = { "lord-llm", NULL };
+            execve(launcher, argv, envp);
+            _exit(98);
+        }
+        close(perr[1]);
+        char out[256] = "";
+        ssize_t n = read(perr[0], out, sizeof out - 1);
+        out[n > 0 ? n : 0] = 0;
+        close(perr[0]);
+        int st = 0;
+        waitpid(k, &st, 0);
+        CHECK(WIFEXITED(st) && WEXITSTATUS(st) == 2 && strstr(out, "bad thread count"), "lord-llm refuses LORD_LLM_THREADS=\"%s\" (%d: %s)", *b,
+              WIFEXITED(st) ? WEXITSTATUS(st) : -1, out);
+    }
+}
+
+/* (0.8.9.6.2, BUG-6 of the QA) the engine dies with lord-server: lord-llm sets PR_SET_PDEATHSIG and checks that its
+ * parent is the one LORD_LLM_PARENT names. A "lord-server" (a child of this test) starts lord-llm, which runs the fake
+ * engine in its sandbox, and exits: the engine must be gone within seconds, not left running as an orphan. And a
+ * parent that isn't the one named starts nothing. In a runtime folder of its own (the main engine's socket stays). */
+static pid_t start_launcher(const char *launcher, const char *model, const char *rtdir, const char *engine, int wrong_parent, int perr) {
+    pid_t k = fork();
+    if (k != 0) return k;
+    if (perr >= 0 && dup2(perr, 2) < 0) _exit(99);
+    int m = fcntl(open(model, O_RDONLY), F_DUPFD, 10), d = fcntl(open(rtdir, O_RDONLY | O_DIRECTORY), F_DUPFD, 10),
+        e = fcntl(open(engine, O_PATH), F_DUPFD, 10);
+    if (m < 0 || d < 0 || e < 0 || dup2(m, 3) < 0 || dup2(d, 4) < 0 || dup2(e, 5) < 0) _exit(99);
+    char penv[40];
+    snprintf(penv, sizeof penv, "LORD_LLM_PARENT=%d", wrong_parent ? 1 : (int)getppid());
+    char *envp[] = { "LORD_LLM_BACKEND=cpu", "LORD_LLM_THREADS=1", penv, NULL };
+    char *argv[] = { "lord-llm", NULL };
+    execve(launcher, argv, envp);
+    _exit(98);
+}
+static int gone(pid_t p) {
+    char f[64], st[256] = "";
+    snprintf(f, sizeof f, "/proc/%d/stat", (int)p);
+    FILE *fp = fopen(f, "r");
+    if (!fp) return 1;
+    size_t n = fread(st, 1, sizeof st - 1, fp);
+    fclose(fp);
+    st[n] = 0;
+    const char *r = strrchr(st, ')');
+    return r && (r[2] == 'Z' || r[2] == 'X');
+}
+static void parent_death(const char *launcher, const char *model, const char *engine) {
+    char rtdir[] = "/tmp/llm-pdeath-XXXXXX";
+    if (!mkdtemp(rtdir)) return;
+    /* a parent other than the one named: refused before anything runs */
+    int perr[2];
+    if (pipe(perr)) return;
+    pid_t k = start_launcher(launcher, model, rtdir, engine, 1, perr[1]);
+    close(perr[1]);
+    char out[256] = "";
+    /* at most 5 s: a lord-llm that started anyway keeps the pipe open (it is killed then, and the check fails) */
+    int st = 0, ended = 0;
+    for (int i = 0; i < 100 && !(ended = waitpid(k, &st, WNOHANG) == k); i++) msleep(50);
+    if (!ended) { kill(k, SIGKILL); waitpid(k, &st, 0); st = -1; }
+    fcntl(perr[0], F_SETFL, O_NONBLOCK);
+    ssize_t n = read(perr[0], out, sizeof out - 1);
+    out[n > 0 ? n : 0] = 0;
+    close(perr[0]);
+    CHECK(ended && WIFEXITED(st) && WEXITSTATUS(st) == 2 && strstr(out, "lord-server is gone"), "lord-llm refuses a parent LORD_LLM_PARENT doesn't name (%s)", out);
+    /* the real case: lord-server (here a child of the test) goes, its engine goes with it */
+    int pp[2];
+    if (pipe(pp)) return;
+    pid_t server = fork();
+    if (server == 0) {
+        close(pp[0]);
+        int dn = open("/dev/null", O_WRONLY);
+        pid_t eng = start_launcher(launcher, model, rtdir, engine, 0, dn);
+        if (write(pp[1], &eng, sizeof eng) != (ssize_t)sizeof eng) _exit(97);
+        /* until the engine runs (its socket is there), then this "lord-server" ends without stopping it */
+        for (int i = 0; i < 100; i++) {
+            char sp[PATH_MAX];
+            snprintf(sp, sizeof sp, "%s/engine.sock", rtdir);
+            struct stat ss;
+            if (!stat(sp, &ss)) break;
+            usleep(50000);
+        }
+        _exit(0);
+    }
+    close(pp[1]);
+    pid_t eng = 0;
+    if (read(pp[0], &eng, sizeof eng) != (ssize_t)sizeof eng) eng = 0;
+    close(pp[0]);
+    waitpid(server, NULL, 0);
+    int dead = 0;
+    for (int i = 0; i < 60 && eng > 0 && !(dead = gone(eng)); i++) usleep(50000);
+    char sp[PATH_MAX];
+    snprintf(sp, sizeof sp, "%s/engine.sock", rtdir);
+    struct stat ss;
+    int ran = !stat(sp, &ss);
+    CHECK(eng > 0 && ran && dead, "the engine dies with lord-server (PR_SET_PDEATHSIG through the exec): ran %d, gone %d", ran, dead);
+    if (eng > 0 && !dead) kill(eng, SIGKILL);
+    unlink(sp);
+    rmdir(rtdir);
+}
+
+static int state_int(const char *st, const char *key) {
+    char k[40];
+    snprintf(k, sizeof k, "\"%s\":", key);
+    const char *p = st ? strstr(st, k) : NULL;
+    return p ? atoi(p + strlen(k)) : -1;
+}
+
+/* the engine started with the person's count (-t, -tb), the automatic one, a clamped one; an idle engine restarted
+ * with a new count without a job; the same effective count restarts nothing */
+static void threads_engine(const char *sock) {
+    char jail[8192], want[64];
+    int cpus = llmjail_cpus(), aut = llmjail_threads_auto(cpus);
+    CHECK(llm_set_threads(-1) < 0 && errno == EINVAL, "a negative count refused");
+    char *st = analyze_state("qwen-test", jail, sizeof jail, sock);
+    snprintf(want, sizeof want, "\"t\":\"%d\",\"tb\":\"%d\"", aut, aut);
+    CHECK(strstr(jail, want), "automatic: %s (%s)", want, jail);
+    CHECK(state_int(st, "cpus") == cpus && state_int(st, "threadsAuto") == aut && state_int(st, "threads") == aut && state_int(st, "runThreads") == aut,
+          "state: cores, automatic, next and running counts %s", st ? st : "");
+    free(st);
+    CHECK(!llm_set_threads(1), "one thread");
+    st = analyze_state("qwen-test", jail, sizeof jail, sock);
+    CHECK(strstr(jail, "\"t\":\"1\",\"tb\":\"1\"") && state_int(st, "runThreads") == 1, "one thread: %s", jail);
+    free(st);
+    CHECK(!llm_set_threads(cpus + 50), "more than the cores");
+    st = analyze_state("qwen-test", jail, sizeof jail, sock);
+    snprintf(want, sizeof want, "\"t\":\"%d\",\"tb\":\"%d\"", cpus, cpus);
+    CHECK(strstr(jail, want) && state_int(st, "threads") == cpus && state_int(st, "runThreads") == cpus, "clamped to %d cores: %s", cpus, jail);
+    /* idle and ready: a new count restarts it now, with no job */
+    int pid0 = state_int(st, "pid");
+    free(st);
+    if (cpus >= 2) {
+        int next = cpus == 2 ? 1 : 2;
+        CHECK(!llm_set_threads(next), "%d threads", next);
+        int pid1 = -1, run = -1;
+        for (int i = 0; i < 400; i++) {
+            st = llm_state_json();
+            pid1 = state_int(st, "pid");
+            run = state_int(st, "runThreads");
+            int ready = st && strstr(st, "\"state\":\"ready\"");
+            free(st);
+            if (ready && pid1 > 0 && pid1 != pid0 && run == next) break;
+            msleep(25);
+        }
+        CHECK(pid1 > 0 && pid1 != pid0 && run == next, "an idle engine restarted with %d threads (pid %d → %d, running %d)", next, pid0, pid1, run);
+        jail[0] = 0;
+        get(sock, "/jail", jail, sizeof jail);
+        snprintf(want, sizeof want, "\"t\":\"%d\",\"tb\":\"%d\"", next, next);
+        CHECK(strstr(jail, want), "the restarted engine's arguments: %s", jail);
+        /* the same effective count (above the cores again equals the cores only when next == cores): no restart */
+        CHECK(!llm_set_threads(next), "the same count");
+        msleep(400);
+        st = llm_state_json();
+        CHECK(state_int(st, "pid") == pid1, "the same count restarts nothing %s", st ? st : "");
+        free(st);
+    } else printf("skipped: needs 2 cores to restart the engine with another count\n");
+    llm_set_threads(0);
+    llm_stop();
+    msleep(300);
+}
+
+/* (0.8.9.6.2) where the engine computes: a GPU when its module and device are there (a fake device folder whose nodes
+ * are links to /dev/null, a character device), its devices reachable in the sandbox only then and never card0, the
+ * device's name and layers read from the log (a hostile name cleaned), the processor when chosen, and the fallbacks:
+ * a GPU that fails to start, has no room, or runs out of memory in the middle of an answer */
+static void gpu_cases(const char *dir, const char *mdir, const char *gdir, const char *fdev, const char *sock) {
+    (void)dir;
+    char p[PATH_MAX], jail[8192];
+    mkdir(fdev, 0755);
+    snprintf(p, sizeof p, "%s/dri", fdev);
+    mkdir(p, 0755);
+    snprintf(p, sizeof p, "%s/dri/renderD128", fdev);
+    if (symlink("/dev/null", p)) { /* checked by the state below */ }
+    snprintf(p, sizeof p, "%s/libggml-vulkan.so", gdir);
+    write_file(p, "ELF");
+    chmod(p, 0644);
+    fake_model(mdir, "gpu-ok", "");
+    fake_model(mdir, "gpu-fail", "FAIL_GPU");
+    fake_model(mdir, "gpu-novram", "NO_VRAM");
+    fake_model(mdir, "gpu-oom", "OOM_GPU");
+    fake_model(mdir, "gpu-hostile", "HOSTILE_NAME");
+    int real_render = 0;
+    for (int i = 128; i < 192; i++) { char q[40]; snprintf(q, sizeof q, "/dev/dri/renderD%d", i); if (!access(q, F_OK)) real_render = 1; }
+
+    CHECK(llm_set_backend("bogus") < 0 && llm_set_backend("") < 0 && llm_set_backend(NULL) < 0, "a mode of the closed list only");
+#if defined(__aarch64__)
+    llm_set_backend("gpu");                        /* "auto" keeps the processor on arm64 */
+#else
+    llm_set_backend("auto");
+#endif
+    char *st = analyze_state("gpu-ok", jail, sizeof jail, sock);
+    CHECK(st && strstr(st, "\"gpus\":{\"vulkan\":true,\"cuda\":false}") && strstr(st, "\"backend\":\"vulkan\"") &&
+          strstr(st, "\"device\":\"Fake GPU 9000\"") && strstr(st, "\"layers\":5,\"layersTotal\":5") && strstr(st, "\"fallback\":null"),
+          "vulkan: %s", st ? st : "");
+    free(st);
+    CHECK(strstr(jail, "\"dev\":\"Vulkan0\""), "vulkan's arguments: %s", jail);
+    CHECK(strstr(jail, "\"card_node\":\"denied\"") && strstr(jail, "\"nvidia_node\":\"denied\""), "vulkan: never the display's node or NVIDIA's");
+    if (real_render) CHECK(strstr(jail, "\"render_node\":\"ALLOWED\"") && strstr(jail, "\"render_ioctl\":\"ALLOWED\""), "vulkan: the render node and its ioctls");
+    else printf("skipped: needs a render node (/dev/dri/renderD*) to open it in the sandbox\n");
+    /* the sandbox's other refusals hold with a GPU too */
+    static const char *const denied[] = { "tcp4", "connect_unix", "read_etc", "read_home", "write_tmp", "exec_sh", "signal_parent", "unshare", NULL };
+    for (const char *const *d = denied; *d; d++) {
+        char want[64];
+        snprintf(want, sizeof want, "\"%s\":\"denied\"", *d);
+        CHECK(strstr(jail, want), "vulkan: %s must be denied", *d);
+    }
+
+    /* the processor when chosen: an idle engine on the card restarts now, with no job, so Settings → AI says where it
+     * runs from what the engine reports (BUG-5 of the 0.8.9.6.2 QA: "on the graphics card" under Processor) */
+    st = llm_state_json();
+    int vpid = state_int(st, "pid");
+    free(st);
+    CHECK(!llm_set_backend("cpu"), "cpu");
+    {
+        int on_cpu = 0, npid = -1;
+        for (int i = 0; i < 400 && !on_cpu; i++) {
+            st = llm_state_json();
+            npid = state_int(st, "pid");
+            on_cpu = st && strstr(st, "\"backend\":\"cpu\"") && strstr(st, "\"state\":\"ready\"") && npid > 0 && npid != vpid;
+            free(st);
+            if (!on_cpu) msleep(25);
+        }
+        CHECK(on_cpu, "an idle engine on the card restarted on the processor with no job (pid %d → %d)", vpid, npid);
+    }
+    st = analyze_state("gpu-ok", jail, sizeof jail, sock);
+    CHECK(st && strstr(st, "\"mode\":\"cpu\"") && strstr(st, "\"backend\":\"cpu\"") && strstr(st, "\"device\":null"), "cpu: %s", st ? st : "");
+    free(st);
+    CHECK(strstr(jail, "\"dev\":\"none\"") && strstr(jail, "\"render_node\":\"denied\"") && strstr(jail, "\"render_ioctl\":\"denied\""),
+          "cpu: no render node: %s", jail);
+
+    /* a GPU that can't start the engine: the processor, and why */
+    llm_set_backend("gpu");
+    st = analyze_state("gpu-fail", NULL, 0, sock);
+    CHECK(st && strstr(st, "\"backend\":\"cpu\"") && strstr(st, "\"fallback\":\"start\""), "a failed start: %s", st ? st : "");
+    free(st);
+    /* given up on until the choice changes: the next model too runs on the processor */
+    st = analyze_state("gpu-ok", NULL, 0, sock);
+    CHECK(st && strstr(st, "\"backend\":\"cpu\""), "given up on: %s", st ? st : "");
+    free(st);
+    llm_set_backend("cpu");
+    llm_set_backend("gpu");
+    st = analyze_state("gpu-novram", NULL, 0, sock);
+    CHECK(st && strstr(st, "\"backend\":\"cpu\"") && strstr(st, "\"fallback\":\"memory\""), "no layer fits: %s", st ? st : "");
+    free(st);
+    llm_set_backend("cpu");
+    llm_set_backend("gpu");
+    st = analyze_state("gpu-oom", NULL, 0, sock);
+    CHECK(st && strstr(st, "\"backend\":\"cpu\"") && strstr(st, "\"fallback\":\"memory\""), "out of memory mid-answer: %s", st ? st : "");
+    free(st);
+    /* a streamed answer too */
+    llm_set_backend("cpu");
+    llm_set_backend("gpu");
+    int id = llm_submit_write("gpu-oom", "fix", NULL, "The text with mistake.");
+    char *r = wait_take(id, 20000);
+    CHECK(r && strstr(r, "\"ok\":true") && strstr(r, "mistakes."), "a streamed answer after the GPU ran out of memory: %s", r ? r : "(none)");
+    free(r);
+    /* a hostile name in the log: printable, no quote, backslash or escape, and the state still parses as one string */
+    llm_set_backend("cpu");
+    llm_set_backend("gpu");
+    st = analyze_state("gpu-hostile", NULL, 0, sock);
+    CHECK(st && strstr(st, "\"device\":\"EvilGPUx [31mred\"") && !strchr(st, 0x1b) && !strchr(st, 0x07), "a hostile device name: %s", st ? st : "");
+    free(st);
+
+    /* CUDA first when its module and NVIDIA's control node are there */
+    snprintf(p, sizeof p, "%s/libggml-cuda.so", gdir);
+    write_file(p, "ELF");
+    chmod(p, 0644);
+    snprintf(p, sizeof p, "%s/nvidiactl", fdev);
+    if (symlink("/dev/null", p)) { /* checked below */ }
+    llm_set_backend("cpu");
+    llm_set_backend("gpu");
+    st = analyze_state("gpu-ok", jail, sizeof jail, sock);
+    CHECK(st && strstr(st, "\"cuda\":true") && strstr(st, "\"backend\":\"cuda\"") && strstr(st, "\"device\":\"Fake CUDA 7000\""), "cuda: %s", st ? st : "");
+    free(st);
+    CHECK(strstr(jail, "\"dev\":\"CUDA0\"") && strstr(jail, "\"render_node\":\"denied\"") && strstr(jail, "\"card_node\":\"denied\""),
+          "cuda: its own nodes only: %s", jail);
+    /* CUDA failing: Vulkan next */
+    llm_set_backend("cpu");
+    llm_set_backend("gpu");
+    snprintf(p, sizeof p, "%s/libggml-cuda.so", gdir);
+    chmod(p, 0666);                                 /* writable by others: not loaded, not offered */
+    st = analyze_state("gpu-ok", NULL, 0, sock);
+    CHECK(st && strstr(st, "\"cuda\":false") && strstr(st, "\"backend\":\"vulkan\""), "a module writable by others is not used: %s", st ? st : "");
+    free(st);
+    unlink(p);
+
+    /* back to the processor for the rest */
+    snprintf(p, sizeof p, "%s/libggml-vulkan.so", gdir);
+    unlink(p);
+    llm_set_backend("auto");
+    llm_stop();
+    msleep(300);
+}
+
 int main(int argc, char **argv) {
+    writing_pure();
+    threads_pure();
     if (argc >= 4 && !strcmp(argv[1], "--real")) return real(argv[2], argv[3], argc > 4 ? argv[4] : NULL, argc > 5 ? argv[5] : NULL);
     char dir[] = "/tmp/llm-test-XXXXXX";
     if (!mkdtemp(dir)) { perror("mkdtemp"); return 1; }
@@ -127,6 +607,12 @@ int main(int argc, char **argv) {
     setenv("XDG_RUNTIME_DIR", rt, 1);
     llm_set_paths(mdir, fake, launcher, info);
     llm_set_idle_ms(1500);
+    /* (0.8.9.6.2) no GPU module in an empty folder: the processor, whatever this computer has */
+    char gdir[300], fdev[300];
+    snprintf(gdir, sizeof gdir, "%s/ggml", dir);
+    snprintf(fdev, sizeof fdev, "%s/dev", dir);
+    mkdir(gdir, 0755);
+    llm_set_gpu_paths(gdir, fdev);
 
     /* ids and the list */
     CHECK(llm_model_id_ok("qwen3-1.7b"), "plain id");
@@ -185,6 +671,15 @@ int main(int argc, char **argv) {
     r = wait_take(id, 20000);
     CHECK(r && strstr(r, "rm -rf"), "injected text returned verbatim as content %s", r ? r : "");
     free(r);
+
+    gpu_cases(dir, mdir, gdir, fdev, sock);
+    threads_engine(sock);
+    {
+        char mp[PATH_MAX + 32];
+        snprintf(mp, sizeof mp, "%s/qwen-test.gguf", mdir);
+        threads_launcher(launcher, mp, llmdir, fake);
+        parent_death(launcher, mp, fake);
+    }
 
     /* (0.8.9.6) "Investigate with Lumo": a script's text fenced as data with a nonce, code given inline, a binary's
      * metadata, a script reached through a link (not read: the interpreter's metadata instead), a reused PID */
@@ -248,6 +743,32 @@ int main(int argc, char **argv) {
         r = wait_take(id, 20000);
         CHECK(r && strstr(r, "traducido"), "translation %s", r ? r : "(none)");
         free(r);
+
+        /* (0.8.9.6.2) "✨ AI" on selected text: streamed, seen while it comes (peek), then whole (take); fenced */
+        id = llm_submit_write("qwen-test", "fix", NULL, "Teh text with mistaks.");
+        CHECK(id > 0, "a writing job");
+        int saw_part = 0;
+        for (int t = 0; t < 20000 && !(r = llm_take(id)); t += 5) {
+            char *pk = llm_peek(id);
+            if (pk && strstr(pk, "\"writing\"") && strstr(pk, "The text") && !strstr(pk, "mistakes.\"")) saw_part = 1;
+            free(pk);
+            msleep(5);
+        }
+        CHECK(saw_part, "the answer was seen as it streamed");
+        CHECK(r && strstr(r, "\"content\":\"The text with mistakes.\"") && strstr(r, "\"ok\":true"), "the streamed answer: %s", r ? r : "(none)");
+        free(r);
+        id = llm_submit_write("qwen-test", "translate", "es", "Hello world");
+        r = wait_take(id, 20000);
+        CHECK(r && strstr(r, "\"content\":\"Hola mundo\""), "a translation into Spanish: %s", r ? r : "(none)");
+        free(r);
+        id = llm_submit_write("qwen-test", "fix", NULL, "STUB_SLOW a long one");
+        msleep(150);
+        llm_cancel(id);
+        r = wait_take(id, 20000);
+        CHECK(r && strstr(r, "llm.cancelled"), "cancelled while streaming: %s", r ? r : "(none)");
+        free(r);
+        CHECK(llm_submit_write("qwen-test", "rm", NULL, "x") < 0 && llm_submit_write("qwen-test", "translate", "xx", "x") < 0 &&
+              llm_submit_write("qwen-test", "fix", NULL, "") < 0 && llm_submit_write("../m", "fix", NULL, "x") < 0, "writing's arguments checked");
     }
 
     /* (0.8.9.6) the blocklist: a program blocked by its hash is ended whenever it starts, under any name; a blocked

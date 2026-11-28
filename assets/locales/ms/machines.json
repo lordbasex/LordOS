@@ -712,6 +712,7 @@
   "agent.toolsAutoFailed": "Kemas kini automatik tidak berjaya ({have} → {want}).",
   "agent.toolsUpdateBtn": "Kemas kini",
   "agent.st.needsTools": "Perlukan alatan",
+  "agent.st.oldLordos": "Kemas kini LordOS di dalamnya",
   "agent.st.needsXclip": "Perlukan xclip",
   "agent.toolsInstalled": "Alatan LordOS dipasang dan berjalan dalam mesin; ia bermula semula setiap kali log masuk.",
   "agent.timesync": "Tetapkan Jam",
@@ -880,6 +881,8 @@
   "un.how.preseed": "Jawapan dimasukkan ke dalam fail permulaan pemasang sendiri, kata laluan anda hanya sebagai cincangan, dan ia dialih keluar setelah sistem dipasang.",
   "un.how.autoinstall": "Jawapan diletakkan pada cakera kecil yang dibaca oleh pemasang, kata laluan anda hanya sebagai cincangan, dan cakera itu dialih keluar setelah sistem dipasang.",
   "un.how.kickstart": "Jawapan diletakkan pada cakera kecil yang dibaca oleh pemasang, kata laluan anda hanya sebagai cincangan, dan cakera itu dialih keluar setelah sistem dipasang.",
+  "un.how.kali": "Jawapan dimasukkan ke dalam fail permulaan pemasang sendiri, kata laluan anda hanya sebagai cincangan, dan ia dialih keluar setelah sistem dipasang.",
+  "un.how.lordos": "Jawapan diletakkan pada cakera kecil yang dibaca oleh pemasang, kata laluan anda hanya sebagai cincangan, dan cakera itu dialih keluar setelah sistem dipasang.",
   "un.image": "Dipasang daripada {file}, turut disemak dengan senarai bertandatangan pembuatnya",
   "un.review": "Tanpa soalan: akaun {user} pada {host}",
   "un.reviewOff": "Anda menjawab soalan pemasang",
@@ -1100,6 +1103,7 @@
   "apps.menu": "Aplikasi",
   "apps.needsAgent": "Mod aplikasi memerlukan ejen mesin yang bersambung",
   "win.appsNeedsTools": "Mod aplikasi memerlukan LordOS atau Windows dalam mesin, dengan alatan LordOS",
+  "win.appsOldLordos": "Mod aplikasi memerlukan LordOS {version} atau lebih baharu di dalam mesin. Kemas kini LordOS dalam mesin; alatan LordOS sahaja tidak mencukupi.",
   "apps.noApps": "Mesin belum menyenaraikan aplikasinya",
   "apps.gone": "Tetingkap ini ditutup dalam mesin",
   "apps.dropTitle": "Lepaskan untuk memberi fail ini kepada tetingkap ini dalam mesin",
@@ -2027,5 +2031,7 @@
   "req.row.answers": "Jawapan pemasangan",
   "req.use.answers": "Dibuat oleh Machines sendiri: tiada apa untuk dipasang",
   "req.st.download": "Semasa mencipta",
-  "req.st.builtin": "Terbina dalam"
+  "req.st.builtin": "Terbina dalam",
+  "cfg.closeOnStop": "Tutup tetingkap apabila mesin berhenti",
+  "cfg.closeOnStopNote": "Selepas dimatikan atau Matikan. Jika ia berhenti kerana masalah, tetingkap kekal terbuka untuk menunjukkan apa yang berlaku."
 }

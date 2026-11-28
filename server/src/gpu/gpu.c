@@ -16,7 +16,9 @@
 #include "gpu.h"
 #include "gscissor.h"
 #include "../outputs.h"
+#include "../media/nv12.h"
 
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -34,11 +36,28 @@ GpuTex *gpu_tex_pixels(GpuTex *t, const uint32_t *px, int w, int h, int opaque) 
 GpuTex *gpu_tex_pixels_rect(GpuTex *t, const uint32_t *px, int w, int h, int opaque, Rect r) { (void)t; (void)px; (void)w; (void)h; (void)opaque; (void)r; return NULL; }
 GpuTex *gpu_tex_dmabuf(const GpuDmabuf *d) { (void)d; return NULL; }
 void gpu_tex_free(GpuTex *t) { (void)t; }
+int  gpu_tex_width(const GpuTex *t) { (void)t; return 0; }
 int  gpu_tex_current(const GpuTex *t) { (void)t; return 0; }
 unsigned gpu_generation(void) { return 0; }
 void gpu_set_hooks(void (*lost)(void), void (*changed)(void)) { (void)lost; (void)changed; }
 int  gpu_tex_read(const GpuTex *t, uint32_t *px, int w, int h) { (void)t; (void)px; (void)w; (void)h; return -1; }
 int  gpu_tex_read_rows(const GpuTex *t, uint8_t *px, int y, int h, int flip) { (void)t; (void)px; (void)y; (void)h; (void)flip; return -1; }
+GpuYuv *gpu_yuv_upload(GpuYuv *t, const uint8_t *y, int ys, const uint8_t *uv, int uvs, int w, int h) { (void)t; (void)y; (void)ys; (void)uv; (void)uvs; (void)w; (void)h; return NULL; }
+int  gpu_yuv_convert(const GpuYuv *src, GpuTex **dst, int matrix, int full) { (void)src; (void)dst; (void)matrix; (void)full; return -1; }
+int  gpu_yuv_convert_to(const GpuYuv *src, GpuTex **dst, int w, int h, int matrix, int full) { (void)src; (void)dst; (void)w; (void)h; (void)matrix; (void)full; return -1; }
+int  gpu_yuv_current(const GpuYuv *t) { (void)t; return 0; }
+long gpu_yuv_bytes(const GpuYuv *t) { (void)t; return 0; }
+void gpu_yuv_free(GpuYuv *t) { (void)t; }
+GpuYuv *gpu_yuv_import(const GpuDmabuf *y, const GpuDmabuf *uv) { (void)y; (void)uv; return NULL; }
+int  gpu_dmabuf_plane_ok(uint32_t fourcc, uint64_t modifier) { (void)fourcc; (void)modifier; return 0; }
+GpuPack *gpu_yuv_pack(const GpuYuv *src) { (void)src; return NULL; }
+int  gpu_pack_convert(const GpuPack *k, GpuTex **dst, int matrix, int full) { (void)k; (void)dst; (void)matrix; (void)full; return -1; }
+int  gpu_pack_current(const GpuPack *k) { (void)k; return 0; }
+long gpu_pack_bytes(const GpuPack *k) { (void)k; return 0; }
+void gpu_pack_free(GpuPack *k) { (void)k; }
+int  gpu_pack_ready(void) { return 0; }
+int  gpu_init_offscreen(int render_fd) { (void)render_fd; return -1; }
+void gpu_offscreen_finish(void) {}
 int  gpu_add_output(Kms *k) { (void)k; return -1; }
 int  gpu_frame(int out, const Canvas *s, Rect d, void (*f)(int)) { (void)out; (void)s; (void)d; (void)f; return -1; }
 int  gpu_gdrag_ready(int out) { (void)out; return 0; }
@@ -68,6 +87,16 @@ int  gpu_scanout(const GpuDmabuf *d, void (*done)(void *), void *data) { (void)d
 int  gpu_scanout_tear(const GpuDmabuf *d, void (*done)(void *), void *data, int tear) { (void)d; (void)done; (void)data; (void)tear; return -1; }
 int  gpu_flip_torn(void) { return 0; }
 int  gpu_can_scanout(const GpuDmabuf *d, int w, int h) { (void)d; (void)w; (void)h; return 0; }
+int  gpu_draw_frosted(GpuTex *t, float dx, float dy, float dw, float dh, float sx, float sy, float sw, float sh,
+                      float bx, float by, float bw, float bh, float rad, int blur, Rect clip) {
+    (void)t; (void)dx; (void)dy; (void)dw; (void)dh; (void)sx; (void)sy; (void)sw; (void)sh; (void)bx; (void)by; (void)bw; (void)bh;
+    (void)rad; (void)blur; (void)clip; return -1;
+}
+int  gpu_frost_image(GpuTex *t, float dx, float dy, float dw, float dh, float sx, float sy, float sw, float sh,
+                     float bx, float by, float bw, float bh, float rad, int blur, uint32_t *px, int W, int H) {
+    (void)t; (void)dx; (void)dy; (void)dw; (void)dh; (void)sx; (void)sy; (void)sw; (void)sh; (void)bx; (void)by; (void)bw; (void)bh;
+    (void)rad; (void)blur; (void)px; (void)W; (void)H; return -1;
+}
 void gpu_read_next(uint32_t *px, int w, int h) { (void)px; (void)w; (void)h; }
 int  gpu_read_done(void) { return 0; }
 
@@ -582,6 +611,44 @@ fail:
     return -1;
 }
 
+/* Tests and benchmarks only (build/motion-bench, docs/MOVING-WALLPAPERS.md "Measurements"): a context on a render node
+ * with no display and no surface (EGL_KHR_surfaceless_context), so the NV12 programs, the zero-copy import and the loop
+ * cache's packing run on the real GPU without touching a screen. Never called by lord-server. */
+int gpu_init_offscreen(int render_fd) {
+    G.gbm = gbm_create_device(render_fd);
+    if (!G.gbm) return -1;
+    PFNEGLGETPLATFORMDISPLAYEXTPROC get_display = (PFNEGLGETPLATFORMDISPLAYEXTPROC)eglGetProcAddress("eglGetPlatformDisplayEXT");
+    G.dpy = get_display ? get_display(EGL_PLATFORM_GBM_KHR, G.gbm, NULL) : eglGetDisplay((EGLNativeDisplayType)G.gbm);
+    EGLint maj, min;
+    if (G.dpy == EGL_NO_DISPLAY || !eglInitialize(G.dpy, &maj, &min)) return -1;
+    const char *exts = eglQueryString(G.dpy, EGL_EXTENSIONS);
+    if (!has_ext(exts, "EGL_KHR_surfaceless_context")) return -1;
+    eglBindAPI(EGL_OPENGL_ES_API);
+    static const EGLint ctx_attr[] = { EGL_CONTEXT_CLIENT_VERSION, 2, EGL_NONE };
+    G.ctx = eglCreateContext(G.dpy, EGL_NO_CONFIG_KHR, EGL_NO_CONTEXT, ctx_attr);
+    if (G.ctx == EGL_NO_CONTEXT || !eglMakeCurrent(G.dpy, EGL_NO_SURFACE, EGL_NO_SURFACE, G.ctx)) return -1;
+    const char *rend = (const char *)glGetString(GL_RENDERER), *gl_exts = (const char *)glGetString(GL_EXTENSIONS);
+    snprintf(G.renderer, sizeof G.renderer, "%s", rend ? rend : "?");
+    G.bgra = has_ext(gl_exts, "GL_EXT_texture_format_BGRA8888");
+    G.have_external = has_ext(gl_exts, "GL_OES_EGL_image_external");
+    G.unpack_sub = has_ext(gl_exts, "GL_EXT_unpack_subimage");
+    if (make_prog(0, fs_2d) || (G.have_external && make_prog(1, fs_ext))) return -1;
+    if (has_ext(exts, "EGL_EXT_image_dma_buf_import")) {
+        G.create_image = (PFNEGLCREATEIMAGEKHRPROC)eglGetProcAddress("eglCreateImageKHR");
+        G.destroy_image = (PFNEGLDESTROYIMAGEKHRPROC)eglGetProcAddress("eglDestroyImageKHR");
+        G.image_target = (PFNGLEGLIMAGETARGETTEXTURE2DOESPROC)eglGetProcAddress("glEGLImageTargetTexture2DOES");
+    }
+    if (has_ext(exts, "EGL_EXT_image_dma_buf_import_modifiers")) {
+        G.query_formats = (PFNEGLQUERYDMABUFFORMATSEXTPROC)eglGetProcAddress("eglQueryDmaBufFormatsEXT");
+        G.query_modifiers = (PFNEGLQUERYDMABUFMODIFIERSEXTPROC)eglGetProcAddress("eglQueryDmaBufModifiersEXT");
+    }
+    G.gen = ++last_gen;
+    G.on = 1;
+    return 0;
+}
+/* the offscreen context's work done (a benchmark's frame): glFinish */
+void gpu_offscreen_finish(void) { if (G.on) glFinish(); }
+
 void gpu_shutdown(void) {
     int was_on = G.on;
     if (sc_frames) fprintf(stderr, "gpu: buffer-age scissor: %ld frames, %ld of them partial, composed %.1f Mpx of %.1f\n", sc_frames, sc_cut, sc_px / 1e6, sc_all_px / 1e6);
@@ -764,6 +831,8 @@ static EGLImageKHR import_image(const GpuDmabuf *d, int with_mod) {
     return G.create_image(G.dpy, EGL_NO_CONTEXT, EGL_LINUX_DMA_BUF_EXT, NULL, attr);
 }
 
+int gpu_tex_width(const GpuTex *t) { return t ? t->w : 0; }
+
 void gpu_tex_free(GpuTex *t) {
     if (!t) return;
     if (G.on && t->gen == G.gen) {          /* a stale one's GL name may now be someone else's */
@@ -881,6 +950,361 @@ int gpu_tex_read_rows(const GpuTex *t, uint8_t *px, int y, int h, int flip) {
     return ok ? 0 : -1;
 }
 
+/* ---- NV12 frames (gpu.h gpu_yuv_*, gpu_pack_*) ----
+ * Sources: two planes as textures, either uploaded from lord-media's memfd (LUMINANCE and LUMINANCE_ALPHA, sampler2D)
+ * or imported from its dmabuf (R8 and GR88 EGLImages, external textures: zero-copy). Programs, made at first use:
+ *   conv[e]   the planes → an RGBA texture with the video's matrix (e: external)
+ *   pky[e]    the Y plane packed four samples a texel into an RGBA8 texture (w/4 × h): the loop cache's own copy
+ *   pkuv[e]   the U, V plane packed two pairs a texel (w/4 × h/2): 1.5 bytes a pixel in all, as NV12
+ *   unpk      a packed frame → RGBA (the loop cache's playback)
+ * GLES2 can't render into one- or two-byte textures, hence the packing; texel positions need highp (else no cache). */
+
+struct GpuYuv {
+    GLuint ty, tuv;
+    GpuTex *ey, *euv;                   /* imported planes (external): owned, freed with it */
+    int w, h, ext;
+    unsigned gen;
+};
+
+struct GpuPack {
+    GLuint ty, tuv;
+    int w, h, tw;                       /* tw: the packed width, ceil(w / 4) */
+    unsigned gen;
+};
+
+#define YUV_HEAD(ext) (ext ? "#extension GL_OES_EGL_image_external : require\n#define SAMP samplerExternalOES\n#define UVS(t) (t).rg\n" \
+                           : "#define SAMP sampler2D\n#define UVS(t) (t).ra\n")
+static const char *fs_conv =
+    "precision mediump float; varying vec2 v_uv; uniform SAMP u_y; uniform SAMP u_uv; uniform mat4 u_m;\n"
+    "void main() { vec4 q = vec4(texture2D(u_y, v_uv).r, UVS(texture2D(u_uv, v_uv)), 1.0);\n"
+    "  gl_FragColor = vec4(clamp((u_m * q).rgb, 0.0, 1.0), 1.0); }\n";
+static const char *vs_hp =
+    "attribute vec2 a_pos; attribute vec2 a_uv; varying highp vec2 v_uv;\n"
+    "void main() { v_uv = a_uv; gl_Position = vec4(a_pos, 0.0, 1.0); }\n";
+/* u_size: the source plane's size in texels; v_uv * u_out: the packed texel being written (its centre) */
+static const char *fs_pky =
+    "#ifndef GL_FRAGMENT_PRECISION_HIGH\n#error no highp\n#endif\nprecision highp float; varying highp vec2 v_uv;\n"
+    "uniform SAMP u_t; uniform vec2 u_size; uniform vec2 u_out;\n"
+    "float at(float x, float y) { return texture2D(u_t, vec2((min(x, u_size.x - 1.0) + 0.5) / u_size.x, (y + 0.5) / u_size.y)).r; }\n"
+    "void main() { vec2 p = floor(v_uv * u_out); float x = p.x * 4.0;\n"
+    "  gl_FragColor = vec4(at(x, p.y), at(x + 1.0, p.y), at(x + 2.0, p.y), at(x + 3.0, p.y)); }\n";
+static const char *fs_pkuv =
+    "#ifndef GL_FRAGMENT_PRECISION_HIGH\n#error no highp\n#endif\nprecision highp float; varying highp vec2 v_uv;\n"
+    "uniform SAMP u_t; uniform vec2 u_size; uniform vec2 u_out;\n"
+    "vec2 at(float x, float y) { return UVS(texture2D(u_t, vec2((min(x, u_size.x - 1.0) + 0.5) / u_size.x, (y + 0.5) / u_size.y))); }\n"
+    "void main() { vec2 p = floor(v_uv * u_out); float x = p.x * 2.0;\n"
+    "  gl_FragColor = vec4(at(x, p.y), at(x + 1.0, p.y)); }\n";
+/* u_px: the frame's size; packed textures u_y (tw × h) and u_uv (tw × h/2), chroma nearest */
+static const char *fs_unpk =
+    "#ifndef GL_FRAGMENT_PRECISION_HIGH\n#error no highp\n#endif\nprecision highp float; varying highp vec2 v_uv;\n"
+    "uniform sampler2D u_y; uniform sampler2D u_uv; uniform vec2 u_px; uniform float u_tw; uniform mat4 u_m;\n"
+    "void main() { vec2 p = floor(v_uv * u_px);\n"
+    "  float ix = floor(p.x / 4.0), k = p.x - ix * 4.0;\n"
+    "  vec4 y4 = texture2D(u_y, vec2((ix + 0.5) / u_tw, (p.y + 0.5) / u_px.y));\n"
+    "  float y = k < 0.5 ? y4.r : k < 1.5 ? y4.g : k < 2.5 ? y4.b : y4.a;\n"
+    "  float cx = floor(p.x / 2.0), jx = floor(cx / 2.0), j = cx - jx * 2.0;\n"
+    "  vec4 c4 = texture2D(u_uv, vec2((jx + 0.5) / u_tw, (floor(p.y / 2.0) + 0.5) / floor(u_px.y / 2.0)));\n"
+    "  vec2 c = j < 0.5 ? c4.rg : c4.ba;\n"
+    "  gl_FragColor = vec4(clamp((u_m * vec4(y, c, 1.0)).rgb, 0.0, 1.0), 1.0); }\n";
+
+enum { YP_CONV = 0, YP_PKY = 2, YP_PKUV = 4, YP_UNPK = 6, YP_N = 7 };
+static struct { GLuint p[YP_N]; int tried[YP_N]; unsigned gen; } YP;
+
+static GLuint yuv_program(int which, int ext) {
+    int i = which == YP_UNPK ? YP_UNPK : which + (ext ? 1 : 0);
+    if (YP.gen != G.gen) { memset(&YP, 0, sizeof YP); YP.gen = G.gen; }
+    if (YP.p[i] || YP.tried[i]) return YP.p[i];
+    YP.tried[i] = 1;
+    if (ext && !G.have_external) return 0;
+    const char *body = which == YP_CONV ? fs_conv : which == YP_PKY ? fs_pky : which == YP_PKUV ? fs_pkuv : fs_unpk;
+    const char *head = which == YP_UNPK ? "" : YUV_HEAD(ext);
+    /* #extension first, then the body (the #error lines stay preprocessor lines) */
+    size_t nh = strlen(head), nb = strlen(body);
+    char *src = malloc(nh + nb + 1);
+    if (!src) return 0;
+    memcpy(src, head, nh);
+    memcpy(src + nh, body, nb + 1);
+    GLuint v = compile(GL_VERTEX_SHADER, which == YP_CONV ? vs_src : vs_hp), f = compile(GL_FRAGMENT_SHADER, src);
+    free(src);
+    if (!v || !f) { if (v) glDeleteShader(v); if (f) glDeleteShader(f); return 0; }
+    GLuint p = glCreateProgram();
+    glAttachShader(p, v);
+    glAttachShader(p, f);
+    glBindAttribLocation(p, 0, "a_pos");
+    glBindAttribLocation(p, 1, "a_uv");
+    glLinkProgram(p);
+    glDeleteShader(v);
+    glDeleteShader(f);
+    GLint ok = 0;
+    glGetProgramiv(p, GL_LINK_STATUS, &ok);
+    if (!ok) { glDeleteProgram(p); return 0; }
+    YP.p[i] = p;
+    return p;
+}
+
+/* the context current on some output's surface (gpu_tex_read_rows does the same): frames come between paints */
+static int ctx_current(void) {
+    if (!G.on) return 0;
+    if (eglGetCurrentContext() == G.ctx) return 1;
+    for (int i = 0; i < OUT_MAX; i++) if (G.out[i].used && eglMakeCurrent(G.dpy, G.out[i].surf, G.out[i].surf, G.ctx)) return 1;
+    return 0;
+}
+
+int gpu_yuv_current(const GpuYuv *t) { return t && G.on && t->gen == G.gen; }
+long gpu_yuv_bytes(const GpuYuv *t) { return t ? (long)t->w * t->h + (long)t->w * (t->h / 2) : 0; }
+
+void gpu_yuv_free(GpuYuv *t) {
+    if (!t) return;
+    if (t->ext) { gpu_tex_free(t->ey); gpu_tex_free(t->euv); }
+    else if (G.on && t->gen == G.gen && ctx_current()) { glDeleteTextures(1, &t->ty); glDeleteTextures(1, &t->tuv); }
+    free(t);
+}
+
+/* rows of a plane (bpr bytes of pixels a row, stride bytes apart) into the bound texture */
+static void plane_up(GLenum fmt, int tw, int th, int bpr, const uint8_t *px, int stride, int fresh) {
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+    if (stride == bpr || G.unpack_sub) {
+        if (stride != bpr) glPixelStorei(GL_UNPACK_ROW_LENGTH_EXT, stride / (bpr / tw));
+        if (fresh) glTexImage2D(GL_TEXTURE_2D, 0, fmt, tw, th, 0, fmt, GL_UNSIGNED_BYTE, px);
+        else glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, tw, th, fmt, GL_UNSIGNED_BYTE, px);
+        if (stride != bpr) glPixelStorei(GL_UNPACK_ROW_LENGTH_EXT, 0);
+    } else {
+        if (fresh) glTexImage2D(GL_TEXTURE_2D, 0, fmt, tw, th, 0, fmt, GL_UNSIGNED_BYTE, NULL);
+        for (int y = 0; y < th; y++) glTexSubImage2D(GL_TEXTURE_2D, 0, 0, y, tw, 1, fmt, GL_UNSIGNED_BYTE, px + (size_t)y * stride);
+    }
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+}
+
+GpuYuv *gpu_yuv_upload(GpuYuv *t, const uint8_t *y, int ystride, const uint8_t *uv, int uvstride, int w, int h) {
+    if (!G.on || !y || !uv || w < 2 || h < 2 || (w & 1) || (h & 1) || w > 8192 || h > 8192 || ystride < w || uvstride < w) return t;
+    if (!ctx_current()) return t;
+    if (t && (t->gen != G.gen || t->ext)) { gpu_yuv_free(t); t = NULL; }
+    int fresh = !t || t->w != w || t->h != h;
+    if (!t) {
+        t = calloc(1, sizeof *t);
+        if (!t) return NULL;
+        glGenTextures(1, &t->ty);
+        glGenTextures(1, &t->tuv);
+        t->gen = G.gen;
+        for (int i = 0; i < 2; i++) { glBindTexture(GL_TEXTURE_2D, i ? t->tuv : t->ty); tex_params(GL_TEXTURE_2D); }
+    }
+    while (glGetError() != GL_NO_ERROR) {}
+    glBindTexture(GL_TEXTURE_2D, t->ty);
+    plane_up(GL_LUMINANCE, w, h, w, y, ystride, fresh);
+    glBindTexture(GL_TEXTURE_2D, t->tuv);
+    plane_up(GL_LUMINANCE_ALPHA, w / 2, h / 2, w, uv, uvstride, fresh);
+    t->w = w;
+    t->h = h;
+    if (glGetError() != GL_NO_ERROR) { gpu_yuv_free(t); return NULL; }
+    return t;
+}
+
+GpuYuv *gpu_yuv_import(const GpuDmabuf *y, const GpuDmabuf *uv) {
+    if (!G.on || !y || !uv || !G.have_external || !ctx_current()) return NULL;
+    if (y->width < 2 || y->height < 2 || (y->width & 1) || (y->height & 1) || uv->width != y->width / 2 || uv->height != y->height / 2) return NULL;
+    GpuTex *a = gpu_tex_dmabuf(y);
+    GpuTex *b = a ? gpu_tex_dmabuf(uv) : NULL;
+    GpuYuv *t = b ? calloc(1, sizeof *t) : NULL;
+    if (!t) { gpu_tex_free(a); gpu_tex_free(b); return NULL; }
+    t->ey = a;
+    t->euv = b;
+    t->ty = a->id;
+    t->tuv = b->id;
+    t->ext = 1;
+    t->w = y->width;
+    t->h = y->height;
+    t->gen = G.gen;
+    return t;
+}
+
+static int yuv_modifier_known(uint32_t fourcc, uint64_t mod) {
+    if (!G.create_image) return 0;
+    if (!G.query_modifiers) return mod == DRM_FORMAT_MOD_INVALID || mod == DRM_FORMAT_MOD_LINEAR;
+    EGLuint64KHR mods[128];
+    EGLBoolean ext[128];
+    EGLint nm = 0;
+    if (!G.query_modifiers(G.dpy, (EGLint)fourcc, 128, mods, ext, &nm)) return 0;
+    if (mod == DRM_FORMAT_MOD_INVALID) return 1;            /* implicit: the driver's own layout */
+    for (int i = 0; i < nm; i++) if (mods[i] == mod) return 1;
+    return 0;
+}
+
+int gpu_dmabuf_plane_ok(uint32_t fourcc, uint64_t modifier) {
+    if (!G.on || !G.create_image || !G.have_external) return 0;
+    if (fourcc != DRM_FORMAT_R8 && fourcc != DRM_FORMAT_GR88 && fourcc != DRM_FORMAT_R16 && fourcc != DRM_FORMAT_GR1616) return 0;
+    typedef struct { uint32_t f; uint64_t m; int ok; unsigned gen; } Memo;
+    static Memo memo[16];
+    for (int i = 0; i < 16; i++) if (memo[i].gen == G.gen && memo[i].f == fourcc && memo[i].m == modifier) return memo[i].ok;
+    int ok = yuv_modifier_known(fourcc, modifier);
+    static int at;
+    memo[at] = (Memo){ fourcc, modifier, ok, G.gen };
+    at = (at + 1) % 16;
+    return ok;
+}
+
+static void quad_full(void) {
+    static const GLfloat v[] = { -1, -1, 0, 0,  1, -1, 1, 0,  -1, 1, 0, 1,  1, 1, 1, 1 };
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 16, v);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 16, v + 2);
+    glEnableVertexAttribArray(0);
+    glEnableVertexAttribArray(1);
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+}
+
+static GLuint yfbo;
+static unsigned yfbo_gen;
+
+/* draws with the bound program into tex (w × h); 0 ok */
+static int fbo_draw(GLuint tex, int w, int h) {
+    if (yfbo_gen != G.gen || !yfbo) { glGenFramebuffers(1, &yfbo); yfbo_gen = G.gen; }
+    glBindFramebuffer(GL_FRAMEBUFFER, yfbo);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tex, 0);
+    int ok = glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
+    if (ok) {
+        glViewport(0, 0, w, h);
+        glDisable(GL_BLEND);
+        glDisable(GL_SCISSOR_TEST);
+        quad_full();
+        glEnable(GL_BLEND);
+    }
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, 0, 0);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    return ok && glGetError() == GL_NO_ERROR ? 0 : -1;
+}
+
+/* *dst made or kept as an RGBA texture of w × h */
+static GpuTex *rgba_target(GpuTex **dst, int w, int h) {
+    GpuTex *t = *dst;
+    if (t && (t->external || t->gen != G.gen)) { gpu_tex_free(t); t = NULL; *dst = NULL; }
+    int fresh = !t;
+    if (!t) {
+        t = calloc(1, sizeof *t);
+        if (!t) return NULL;
+        glGenTextures(1, &t->id);
+        glBindTexture(GL_TEXTURE_2D, t->id);
+        tex_params(GL_TEXTURE_2D);
+        t->gen = G.gen;
+    } else glBindTexture(GL_TEXTURE_2D, t->id);
+    if (fresh || t->w != w || t->h != h) glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+    t->w = w;
+    t->h = h;
+    t->opaque = 1;
+    t->swap = 0;
+    *dst = t;
+    return t;
+}
+
+static void matrix4(int matrix, int full, float m4[16]) {
+    float m[12];
+    nv12_matrix(matrix, full, m);
+    /* column-major: (u_m · q).c = Σ_k m[c][k] q[k] */
+    for (int c = 0; c < 4; c++) for (int k = 0; k < 4; k++) m4[k * 4 + c] = c < 3 ? m[c * 4 + k] : (k == 3 ? 1.0f : 0.0f);
+}
+
+static void bind_plane(int unit, GLuint id, int ext) {
+    glActiveTexture(GL_TEXTURE0 + unit);
+    glBindTexture(ext ? GL_TEXTURE_EXTERNAL_OES : GL_TEXTURE_2D, id);
+}
+
+int gpu_yuv_convert(const GpuYuv *src, GpuTex **dst, int matrix, int full) {
+    return src ? gpu_yuv_convert_to(src, dst, src->w, src->h, matrix, full) : -1;
+}
+
+int gpu_yuv_convert_to(const GpuYuv *src, GpuTex **dst, int w, int h, int matrix, int full) {
+    if (!dst || !gpu_yuv_current(src) || !ctx_current() || w < 1 || h < 1 || w > src->w || h > src->h) return -1;
+    GLuint p = yuv_program(YP_CONV, src->ext);
+    if (!p) return -1;
+    while (glGetError() != GL_NO_ERROR) {}
+    GpuTex *t = rgba_target(dst, w, h);
+    if (!t) return -1;
+    float m4[16];
+    matrix4(matrix, full, m4);
+    glUseProgram(p);
+    bind_plane(1, src->tuv, src->ext);
+    bind_plane(0, src->ty, src->ext);
+    glUniform1i(glGetUniformLocation(p, "u_y"), 0);
+    glUniform1i(glGetUniformLocation(p, "u_uv"), 1);
+    glUniformMatrix4fv(glGetUniformLocation(p, "u_m"), 1, GL_FALSE, m4);
+    int r = fbo_draw(t->id, t->w, t->h);
+    glActiveTexture(GL_TEXTURE0);
+    return r;
+}
+
+int gpu_pack_current(const GpuPack *k) { return k && G.on && k->gen == G.gen; }
+long gpu_pack_bytes(const GpuPack *k) { return k ? (long)k->tw * 4 * k->h + (long)k->tw * 4 * (k->h / 2) : 0; }
+
+void gpu_pack_free(GpuPack *k) {
+    if (!k) return;
+    if (G.on && k->gen == G.gen && ctx_current()) { glDeleteTextures(1, &k->ty); glDeleteTextures(1, &k->tuv); }
+    free(k);
+}
+
+GpuPack *gpu_yuv_pack(const GpuYuv *src) {
+    if (!gpu_yuv_current(src) || !ctx_current()) return NULL;
+    GLuint py = yuv_program(YP_PKY, src->ext), puv = yuv_program(YP_PKUV, src->ext);
+    if (!py || !puv) return NULL;
+    GpuPack *k = calloc(1, sizeof *k);
+    if (!k) return NULL;
+    k->w = src->w;
+    k->h = src->h;
+    k->tw = (src->w + 3) / 4;
+    k->gen = G.gen;
+    while (glGetError() != GL_NO_ERROR) {}
+    glGenTextures(1, &k->ty);
+    glGenTextures(1, &k->tuv);
+    int hh[2] = { k->h, k->h / 2 };
+    GLuint ids[2] = { k->ty, k->tuv };
+    for (int i = 0; i < 2; i++) {
+        glBindTexture(GL_TEXTURE_2D, ids[i]);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, k->tw, hh[i], 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+    }
+    int bad = glGetError() != GL_NO_ERROR;    /* out of GPU memory, among others */
+    GLuint pr[2] = { py, puv };
+    GLuint srcs[2] = { src->ty, src->tuv };
+    float size[2][2] = { { (float)src->w, (float)src->h }, { (float)(src->w / 2), (float)(src->h / 2) } };
+    for (int i = 0; i < 2 && !bad; i++) {
+        glUseProgram(pr[i]);
+        bind_plane(0, srcs[i], src->ext);
+        glUniform1i(glGetUniformLocation(pr[i], "u_t"), 0);
+        glUniform2f(glGetUniformLocation(pr[i], "u_size"), size[i][0], size[i][1]);
+        glUniform2f(glGetUniformLocation(pr[i], "u_out"), (float)k->tw, (float)hh[i]);
+        if (fbo_draw(ids[i], k->tw, hh[i])) bad = 1;
+    }
+    if (bad) { gpu_pack_free(k); return NULL; }
+    return k;
+}
+
+int gpu_pack_convert(const GpuPack *k, GpuTex **dst, int matrix, int full) {
+    if (!dst || !gpu_pack_current(k) || !ctx_current()) return -1;
+    GLuint p = yuv_program(YP_UNPK, 0);
+    if (!p) return -1;
+    while (glGetError() != GL_NO_ERROR) {}
+    GpuTex *t = rgba_target(dst, k->w, k->h);
+    if (!t) return -1;
+    float m4[16];
+    matrix4(matrix, full, m4);
+    glUseProgram(p);
+    bind_plane(1, k->tuv, 0);
+    bind_plane(0, k->ty, 0);
+    glUniform1i(glGetUniformLocation(p, "u_y"), 0);
+    glUniform1i(glGetUniformLocation(p, "u_uv"), 1);
+    glUniform2f(glGetUniformLocation(p, "u_px"), (float)k->w, (float)k->h);
+    glUniform1f(glGetUniformLocation(p, "u_tw"), (float)k->tw);
+    glUniformMatrix4fv(glGetUniformLocation(p, "u_m"), 1, GL_FALSE, m4);
+    int r = fbo_draw(t->id, t->w, t->h);
+    glActiveTexture(GL_TEXTURE0);
+    return r;
+}
+
+int gpu_pack_ready(void) {
+    if (!G.on || !ctx_current()) return 0;
+    return yuv_program(YP_PKY, 0) && yuv_program(YP_PKUV, 0) && yuv_program(YP_UNPK, 0);
+}
+
 /* ---- drawing ---- */
 
 void gpu_draw(GpuTex *t, float dx, float dy, float dw, float dh, float sx, float sy, float sw, float sh, Rect clip, float op) {
@@ -917,6 +1341,252 @@ void gpu_draw_uv(GpuTex *t, float dx, float dy, float dw, float dh, const float 
     glEnableVertexAttribArray(1);
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
     glDisable(GL_SCISSOR_TEST);
+}
+
+/* ---- frosted glass over a GPU picture (gpu_draw_frosted) ----
+ * Three passes at 1/f of the size into two textures of this context (grown, never shrunk; a pass reads only the part it
+ * wrote, clamped there by hand since the texture may be larger), then the result into the box with a rounded mask. The
+ * blur is canvas_backdrop_blur's in shape: f = 4 from a radius of 12, 2 from 6; its three box passes of 2·(radius / 2f)
+ * + 1 are one Gaussian of the same variance here. */
+#define FROST_HEAD "#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n"
+static const char *fs_frost_blur =
+    FROST_HEAD
+    "varying vec2 v_uv; uniform sampler2D u_tex; uniform vec2 u_dir; uniform vec2 u_lo; uniform vec2 u_hi;\n"
+    "uniform float u_sig; uniform float u_n;\n"
+    "void main() { vec4 acc = vec4(0.0); float ws = 0.0;\n"
+    "  for (int i = -24; i <= 24; i++) { float fi = float(i); if (abs(fi) > u_n) continue;\n"
+    "    float w = exp(-fi * fi / (2.0 * u_sig * u_sig));\n"
+    "    acc += texture2D(u_tex, clamp(v_uv + u_dir * fi, u_lo, u_hi)) * w; ws += w; }\n"
+    "  gl_FragColor = acc / ws; }\n";
+static const char *vs_frost =
+    "attribute vec2 a_pos; attribute vec2 a_uv; attribute vec2 a_px; varying vec2 v_uv;\n"
+    "#ifdef GL_FRAGMENT_PRECISION_HIGH\nvarying highp vec2 v_px;\n#else\nvarying vec2 v_px;\n#endif\n"
+    "void main() { v_uv = a_uv; v_px = a_px; gl_Position = vec4(a_pos, 0.0, 1.0); }\n";
+static const char *fs_frost_out =
+    FROST_HEAD
+    "varying vec2 v_uv; uniform sampler2D u_tex; uniform vec4 u_box; uniform float u_rad;\n"
+    "#ifdef GL_FRAGMENT_PRECISION_HIGH\nvarying highp vec2 v_px;\n#else\nvarying vec2 v_px;\n#endif\n"
+    "void main() { vec2 c = (u_box.xy + u_box.zw) * 0.5, hs = (u_box.zw - u_box.xy) * 0.5;\n"
+    "  vec2 q = abs(v_px - c) - (hs - u_rad);\n"
+    "  float d = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - u_rad;\n"
+    "  float a = clamp(0.5 - d, 0.0, 1.0);\n"
+    "  gl_FragColor = vec4(texture2D(u_tex, v_uv).rgb, 1.0) * a; }\n";
+
+static struct {
+    unsigned gen;
+    int tried;
+    GLuint blur, out, tex[2], fbo;
+    int tw, th;
+    GLint b_tex, b_dir, b_lo, b_hi, b_sig, b_n, o_tex, o_box, o_rad;
+} FR;
+
+static GLuint frost_prog(const char *vs, const char *fs, int px) {
+    GLuint v = compile(GL_VERTEX_SHADER, vs), f = compile(GL_FRAGMENT_SHADER, fs);
+    if (!v || !f) { if (v) glDeleteShader(v); if (f) glDeleteShader(f); return 0; }
+    GLuint p = glCreateProgram();
+    glAttachShader(p, v);
+    glAttachShader(p, f);
+    glBindAttribLocation(p, 0, "a_pos");
+    glBindAttribLocation(p, 1, "a_uv");
+    if (px) glBindAttribLocation(p, 2, "a_px");
+    glLinkProgram(p);
+    glDeleteShader(v);
+    glDeleteShader(f);
+    GLint ok = 0;
+    glGetProgramiv(p, GL_LINK_STATUS, &ok);
+    if (!ok) { glDeleteProgram(p); return 0; }
+    return p;
+}
+
+static int frost_ready(void) {
+    if (FR.gen != G.gen) { memset(&FR, 0, sizeof FR); FR.gen = G.gen; }
+    if (FR.blur && FR.out) return 1;
+    if (FR.tried) return 0;
+    FR.tried = 1;
+    FR.blur = frost_prog(vs_src, fs_frost_blur, 0);
+    FR.out = frost_prog(vs_frost, fs_frost_out, 1);
+    if (!FR.blur || !FR.out) { fprintf(stderr, "gpu: the frosted glass programs failed: frosted surfaces blur on the CPU\n"); return 0; }
+    FR.b_tex = glGetUniformLocation(FR.blur, "u_tex"); FR.b_dir = glGetUniformLocation(FR.blur, "u_dir");
+    FR.b_lo = glGetUniformLocation(FR.blur, "u_lo"); FR.b_hi = glGetUniformLocation(FR.blur, "u_hi");
+    FR.b_sig = glGetUniformLocation(FR.blur, "u_sig"); FR.b_n = glGetUniformLocation(FR.blur, "u_n");
+    FR.o_tex = glGetUniformLocation(FR.out, "u_tex"); FR.o_box = glGetUniformLocation(FR.out, "u_box");
+    FR.o_rad = glGetUniformLocation(FR.out, "u_rad");
+    glGenFramebuffers(1, &FR.fbo);
+    glGenTextures(2, FR.tex);
+    return 1;
+}
+
+/* the two work textures at least w × h */
+static int frost_size(int w, int h) {
+    if (w <= FR.tw && h <= FR.th) return 0;
+    int tw = w > FR.tw ? w : FR.tw, th = h > FR.th ? h : FR.th;
+    for (int i = 0; i < 2; i++) {
+        glBindTexture(GL_TEXTURE_2D, FR.tex[i]);
+        tex_params(GL_TEXTURE_2D);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, tw, th, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+    }
+    FR.tw = tw;
+    FR.th = th;
+    return glGetError() == GL_NO_ERROR ? 0 : -1;
+}
+
+/* a quad over the whole viewport with these texture coordinates (left, bottom, right, top in NDC order) */
+static void frost_quad(float u0, float v0, float u1, float v1) {
+    const GLfloat v[] = { -1, -1, u0, v0,  1, -1, u1, v0,  -1, 1, u0, v1,  1, 1, u1, v1 };
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 16, v);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 16, v + 2);
+    glEnableVertexAttribArray(0);
+    glEnableVertexAttribArray(1);
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+}
+
+/* Into the framebuffer target (W × H, its y = 0 at NDC +1, as an output is drawn); clip in its pixels. */
+static int frost_core(GpuTex *t, float dx, float dy, float dw, float dh, float sx, float sy, float sw, float sh,
+                      float bx, float by, float bw, float bh, float rad, int blur, Rect clip, GLuint target, int W, int H) {
+    if (!G.on || !t || t->gen != G.gen || t->w <= 0 || t->h <= 0 || dw <= 0 || dh <= 0 || bw <= 0 || bh <= 0 || blur < 1) return -1;
+    if (!frost_ready()) return -1;
+    if (clip.x0 < 0) clip.x0 = 0;
+    if (clip.y0 < 0) clip.y0 = 0;
+    if (clip.x1 > W) clip.x1 = W;
+    if (clip.y1 > H) clip.y1 = H;
+    Rect bb = { (int)floorf(bx), (int)floorf(by), (int)ceilf(bx + bw), (int)ceilf(by + bh) };
+    clip = (Rect){ clip.x0 > bb.x0 ? clip.x0 : bb.x0, clip.y0 > bb.y0 ? clip.y0 : bb.y0, clip.x1 < bb.x1 ? clip.x1 : bb.x1, clip.y1 < bb.y1 ? clip.y1 : bb.y1 };
+    if (clip.x1 <= clip.x0 || clip.y1 <= clip.y0) return 0;
+    while (glGetError() != GL_NO_ERROR) {}
+    /* what the blur reads: the box and twice the radius around it, inside the picture */
+    int m = 2 * blur, f = blur >= 12 ? 4 : blur >= 6 ? 2 : 1;
+    float x0 = fmaxf(floorf(bx) - m, floorf(dx)), y0 = fmaxf(floorf(by) - m, floorf(dy));
+    float x1 = fminf(ceilf(bx + bw) + m, ceilf(dx + dw)), y1 = fminf(ceilf(by + bh) + m, ceilf(dy + dh));
+    if (x1 <= x0 || y1 <= y0) return -1;
+    int rw = (int)ceilf((x1 - x0) / f), rh = (int)ceilf((y1 - y0) / f);
+    if (rw < 1 || rh < 1 || rw > 4096 || rh > 4096 || frost_size(rw, rh)) return -1;
+    float tw = (float)FR.tw, th = (float)FR.th;
+    /* 1: the picture's part, at 1/f, into tex[0] (its row 0 the part's top) */
+    glBindFramebuffer(GL_FRAMEBUFFER, FR.fbo);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, FR.tex[0], 0);
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) { glBindFramebuffer(GL_FRAMEBUFFER, target); return -1; }
+    glViewport(0, 0, rw, rh);
+    glDisable(GL_BLEND);
+    glDisable(GL_SCISSOR_TEST);
+    int p = t->external ? 1 : 0;
+    glUseProgram(G.prog[p]);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(t->external ? GL_TEXTURE_EXTERNAL_OES : GL_TEXTURE_2D, t->id);
+    glUniform1i(G.u_tex[p], 0);
+    glUniform1f(G.u_op[p], 1.0f);
+    glUniform1f(G.u_opaque[p], 1.0f);
+    glUniform1f(G.u_swap[p], t->swap ? 1.0f : 0.0f);
+    float ex = x0 + (float)rw * f, ey = y0 + (float)rh * f;
+    float u0 = (sx + (x0 - dx) / dw * sw) / t->w, u1 = (sx + (ex - dx) / dw * sw) / t->w;
+    float v0 = (sy + (y0 - dy) / dh * sh) / t->h, v1 = (sy + (ey - dy) / dh * sh) / t->h;
+    frost_quad(u0, v0, u1, v1);
+    /* 2, 3: across into tex[1], then down into tex[0] */
+    int rs = blur / (2 * f) > 0 ? blur / (2 * f) : 1, win = 2 * rs + 1;
+    float sig = sqrtf(3.0f * (float)(win * win - 1) / 12.0f);
+    float n = ceilf(3 * sig);
+    if (n > 24) n = 24;
+    glUseProgram(FR.blur);
+    glUniform1i(FR.b_tex, 0);
+    glUniform2f(FR.b_lo, 0.5f / tw, 0.5f / th);
+    glUniform2f(FR.b_hi, (rw - 0.5f) / tw, (rh - 0.5f) / th);
+    glUniform1f(FR.b_sig, sig);
+    glUniform1f(FR.b_n, n);
+    for (int pass = 0; pass < 2; pass++) {
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, FR.tex[pass ? 0 : 1], 0);
+        glBindTexture(GL_TEXTURE_2D, FR.tex[pass ? 1 : 0]);
+        glUniform2f(FR.b_dir, pass ? 0 : 1 / tw, pass ? 1 / th : 0);
+        frost_quad(0, 0, rw / tw, rh / th);
+    }
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, 0, 0);
+    /* 4: into the box, its rounded mask, over what is there */
+    glBindFramebuffer(GL_FRAMEBUFFER, target);
+    glViewport(0, 0, W, H);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+    glEnable(GL_SCISSOR_TEST);
+    glScissor(clip.x0, H - clip.y1, clip.x1 - clip.x0, clip.y1 - clip.y0);
+    glUseProgram(FR.out);
+    glBindTexture(GL_TEXTURE_2D, FR.tex[0]);
+    glUniform1i(FR.o_tex, 0);
+    glUniform4f(FR.o_box, bx, by, bx + bw, by + bh);
+    float r = fminf(fmaxf(rad, 0), fminf(bw, bh) * 0.5f);
+    glUniform1f(FR.o_rad, r);
+    float qx0 = (float)bb.x0, qy0 = (float)bb.y0, qx1 = (float)bb.x1, qy1 = (float)bb.y1;
+    float nx0 = qx0 / W * 2 - 1, nx1 = qx1 / W * 2 - 1, ny0 = 1 - qy0 / H * 2, ny1 = 1 - qy1 / H * 2;
+    float a0 = (qx0 - x0) / f / tw, a1 = (qx1 - x0) / f / tw, b0 = (qy0 - y0) / f / th, b1 = (qy1 - y0) / f / th;
+    const GLfloat v[] = { nx0, ny0, a0, b0, qx0, qy0,  nx1, ny0, a1, b0, qx1, qy0,
+                          nx0, ny1, a0, b1, qx0, qy1,  nx1, ny1, a1, b1, qx1, qy1 };
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 24, v);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 24, v + 2);
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 24, v + 4);
+    glEnableVertexAttribArray(0);
+    glEnableVertexAttribArray(1);
+    glEnableVertexAttribArray(2);
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    glDisableVertexAttribArray(2);
+    glDisable(GL_SCISSOR_TEST);
+    return glGetError() == GL_NO_ERROR ? 0 : -1;
+}
+
+int gpu_draw_frosted(GpuTex *t, float dx, float dy, float dw, float dh, float sx, float sy, float sw, float sh,
+                     float bx, float by, float bw, float bh, float rad, int blur, Rect clip) {
+    if (!G.on || !G.cur) return -1;
+    return frost_core(t, dx, dy, dw, dh, sx, sy, sw, sh, bx, by, bw, bh, rad, blur, clip, 0, G.cur->W, G.cur->H);
+}
+
+int gpu_frost_image(GpuTex *t, float dx, float dy, float dw, float dh, float sx, float sy, float sw, float sh,
+                    float bx, float by, float bw, float bh, float rad, int blur, uint32_t *px, int W, int H) {
+    if (!G.on || W <= 0 || H <= 0 || W > 8192 || H > 8192) return -1;
+    if (!px) {          /* timing only: into a W × H image kept between calls, never read back */
+        static GLuint ktex, kfbo;
+        static int kw, kh;
+        static unsigned kgen;
+        if (kgen != G.gen || kw != W || kh != H) {
+            if (kgen != G.gen) ktex = kfbo = 0;
+            if (!ktex) { glGenTextures(1, &ktex); glGenFramebuffers(1, &kfbo); }
+            glBindTexture(GL_TEXTURE_2D, ktex);
+            tex_params(GL_TEXTURE_2D);
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, W, H, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+            glBindFramebuffer(GL_FRAMEBUFFER, kfbo);
+            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, ktex, 0);
+            kgen = G.gen; kw = W; kh = H;
+        }
+        int r = frost_core(t, dx, dy, dw, dh, sx, sy, sw, sh, bx, by, bw, bh, rad, blur, (Rect){ 0, 0, W, H }, kfbo, W, H);
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        return r;
+    }
+    GLuint tex = 0, fbo = 0;
+    glGenTextures(1, &tex);
+    glBindTexture(GL_TEXTURE_2D, tex);
+    tex_params(GL_TEXTURE_2D);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, W, H, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+    glGenFramebuffers(1, &fbo);
+    glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tex, 0);
+    int r = -1;
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE) {
+        glViewport(0, 0, W, H);
+        glDisable(GL_SCISSOR_TEST);
+        glClearColor(0, 0, 0, 0);
+        glClear(GL_COLOR_BUFFER_BIT);
+        r = frost_core(t, dx, dy, dw, dh, sx, sy, sw, sh, bx, by, bw, bh, rad, blur, (Rect){ 0, 0, W, H }, fbo, W, H);
+        glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+        if (!r) {
+            glReadPixels(0, 0, W, H, GL_RGBA, GL_UNSIGNED_BYTE, px);
+            r = glGetError() == GL_NO_ERROR ? 0 : -1;
+        }
+        /* glReadPixels' first row is NDC -1, the image's last: flipped, and RGBA bytes made ARGB words */
+        for (int y = 0; !r && y < H / 2; y++)
+            for (int x = 0; x < W; x++) { uint32_t a = px[(size_t)y * W + x]; px[(size_t)y * W + x] = px[(size_t)(H - 1 - y) * W + x]; px[(size_t)(H - 1 - y) * W + x] = a; }
+        for (size_t i = 0, n = (size_t)W * H; !r && i < n; i++) {
+            const uint8_t *b = (const uint8_t *)&px[i];
+            px[i] = (uint32_t)b[3] << 24 | (uint32_t)b[0] << 16 | (uint32_t)b[1] << 8 | b[2];
+        }
+    }
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glDeleteFramebuffers(1, &fbo);
+    glDeleteTextures(1, &tex);
+    return r;
 }
 
 static struct { uint32_t *px; int w, h, done; } rb;

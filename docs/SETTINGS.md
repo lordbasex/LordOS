@@ -19,8 +19,8 @@ pairing, Sound with a Bluetooth headset, a Linux app's notification and Files' "
 | Notifications | with Sound | `apps/settings/Notifications.jsx`, `sdk/notify.js`, `hw/notifyd.c` |
 | Date & Time | with Language & Region | `apps/settings/DateTime.jsx`, `hw/hw.c` (timedated) |
 | Wallpaper → Your pictures (0.8.8) | with Appearance, Desktop & Dock | `apps/settings/index.jsx` (`Wallpapers`; a PNG or JPEG of your own for the desktop or the login screen, picked with the system file dialog), `sdk/settings.js` (`addWallpaperImage`, `removeWallpaperImage`); see `WALLPAPERS.md` |
-| Desktop & Dock → Desktops (0.8.8) | with Appearance, Wallpaper | `apps/settings/Desktops.jsx` (`DesktopsSection`, in `Dock.jsx`): number of desktops, the Ctrl arrows switch (Lord Flow and themes that declare `desktopArrows`, such as Lord Workspaces; off by default since 0.8.9.1, #201), the four finger swipe and each desktop's name (0.8.8.3); see `DESKTOPS.md` |
-| Desktop & Dock → Menu Bar / Taskbar and Control Center (0.8.8.6, issue #58) | with Appearance, Wallpaper | `apps/settings/Dock.jsx` (`MenuBarSection`, `ControlCenterSection`), `sdk/menubarmodel.js` (`settings.menuBar`; everything on unless turned off, so no migration): Lord Flow's "Show the menu bar on every display" and Lord Classic's "Show the taskbar on every display" (one key, `settings.menuBarAllDisplays`, absent = on since 0.8.8.6; the same switch as Displays → "Show menu bar on all displays"), Cleaner's item (its own `cleaner.menuItem`), the keyboard layout, the on-screen keyboard's item, the notifications bell and the clock panel's calendar in both themes; Lord Flow's Control Center tiles (processor and memory, network and VPN, Wi-Fi, Bluetooth; since issue #114 also Do Not Disturb, Night Light, the brightness slider and Log Out, all on by default: no migration). The volume's output list is `sdk/soundoutputs.js`; Wallpaper → Thumbnail size is `settings.wallpaperThumbs` |
+| Desktop & Dock → Desktops (0.8.8) | with Appearance, Wallpaper | `apps/settings/Desktops.jsx` (`DesktopsSection`, in `Dock.jsx`): number of desktops, the Ctrl arrows switch (Flow and themes that declare `desktopArrows`, such as Workspaces; off by default since 0.8.9.1, #201), the four finger swipe and each desktop's name (0.8.8.3); see `DESKTOPS.md` |
+| Desktop & Dock → Menu Bar / Taskbar and Control Center (0.8.8.6, issue #58) | with Appearance, Wallpaper | `apps/settings/Dock.jsx` (`MenuBarSection`, `ControlCenterSection`), `sdk/menubarmodel.js` (`settings.menuBar`; everything on unless turned off, so no migration): Flow's "Show the menu bar on every display" and Classic's "Show the taskbar on every display" (one key, `settings.menuBarAllDisplays`, absent = on since 0.8.8.6; the same switch as Displays → "Show menu bar on all displays"), Cleaner's item (its own `cleaner.menuItem`), the keyboard layout, the on-screen keyboard's item, the notifications bell and the clock panel's calendar in both themes; Flow's Control Center tiles (processor and memory, network and VPN, Wi-Fi, Bluetooth; since issue #114 also Do Not Disturb, Night Light, the brightness slider and Log Out, all on by default: no migration). The volume's output list is `sdk/soundoutputs.js`; Wallpaper → Thumbnail size is `settings.wallpaperThumbs` |
 | Desktop & Dock → Title bars (0.8.8.7, issue #58) | with Appearance, Wallpaper | `apps/settings/Dock.jsx` (`WindowsSection`), `sdk/windowbuttons.js` (`settings.windowButtons`: `auto`, `left`, `right`; a new key with `auto` the old behavior, so no migration): the side of the close, minimize and maximize buttons in both themes' frames (`useWindowButtons` in `sdk/windowshell.jsx`), Cleaner's own frame and the `button-layout` Linux apps read |
 | Appearance → Window options (since 0.8.9.5, #151, #219) | with Desktop & Dock | `apps/settings/WindowPrefs.jsx` (`WindowPrefs`, in `index.jsx`'s Appearance): **Window buttons** Normal / Large / Extra large with a live preview (`settings.windowButtonSize`, `sdk/windowbuttons.js`), **Move and resize with** Off / ❖ + drag / Alt + drag (`settings.windowDragModifier`, `sdk/moddrag.js`, lord-server's `main.c`) and **Show tiling options in the window menu** (`settings.windowMenuTiling`, `sdk/windowmenu.js`); new keys whose defaults are today's behavior (Normal, Off, shown), so no migration; see `WINDOWS.md`, "Settings → Appearance → Window options" |
 | Keyboard → App switcher (0.8.8) | with Language & Region, Date & Time | `apps/settings/Switcher.jsx`: the keys, which apps show, size and look; see `SHORTCUTS.md` |
@@ -144,7 +144,7 @@ timer that sleeps until the next change (30 s steps only during the 30-minute fa
   action `display-brightness <name> <value>`: the name must be a real backlight under `/sys/devices`
   and the value within `0..max_brightness`. External monitors (DDC/CI) and virtual machines have
   none; the row says so. Untested on hardware (the VM has no backlight). A keyboard's brightness keys
-  go the same way (`sdk/hwkeys.js`), and so does the brightness slider in Lord Flow's Control Center and Lord
+  go the same way (`sdk/hwkeys.js`), and so does the brightness slider in Flow's Control Center and
   Classic's Quick Settings (issue #114, `useBacklight`/`setBacklight`: at most one request per 120 ms, the last
   position; shown only when there is a backlight), and its light keys through `keyboard-light <name> <value>`
   (`*::kbd_backlight` LEDs); neither has run on hardware.
@@ -226,7 +226,7 @@ and signals dispatched to handlers.
     type into the computer (CVE-2020-0556), so LordOS never sets it.
 - **On or off across restarts.** BlueZ doesn't keep an adapter's power: with AutoEnable it is on
   after every boot, which is what lets a mouse reconnect at the login screen. The switch (Settings,
-  Lord Flow's Control Center, Lord Classic's Quick Settings) goes through `setBluetoothPower`, which
+  Flow's Control Center, Classic's Quick Settings) goes through `setBluetoothPower`, which
   keeps the choice in `settings.json` (`bluetoothOff`); when the user's last choice was off, the
   session turns the adapter off again at login, once per appearance of the adapter (a dongle
   plugged in again, bluetoothd restarted), and leaves it on if it is turned on later by other means
@@ -581,8 +581,8 @@ The first session of a new account on an installed system opens a three-step cho
 language chosen in the installer. It never appears on the live system, on the OVA image's first boot (the installer
 runs there), on the login screen, or for anyone who has already used LordOS.
 
-1. **Choose your desktop**: a panel over the dimmed desktop with the crown, and three cards, Lord Flow, Lord Classic and
-   Lord Workspaces (a real picture of each, its name and the theme's own description). Their order is random every
+1. **Choose your desktop**: a panel over the dimmed desktop with the crown, and three cards, Flow, Classic and
+   Workspaces (a real picture of each, its name and the theme's own description). Their order is random every
    time it starts; none is chosen and none is marked as recommended, so **See it live** waits for a choice.
 2. **Live**: the chosen desktop is applied for real with the same live switch as Settings → Appearance → Desktop style
    (`themes.use`, which discards the JS context). The panel becomes a small box (330 px) on the end side of the work
@@ -596,7 +596,7 @@ runs there), on the login screen, or for anyone who has already used LordOS.
 **Back** works on every step; going from 2 to 1 keeps the pick and the theme already applied (nothing is switched
 back), and a new pick switches again when the person goes on. Keys: Tab goes round the controls (the chooser is in the
 modal layer, so it has the keyboard), Space and Enter press the focused one, Enter alone presses the main button and
-Escape is Back. "Welcome to LordOS" (`SYSTEM.md`) and Lord Workspaces' activity onboarding wait until it is done.
+Escape is Back. "Welcome to LordOS" (`SYSTEM.md`) and Workspaces' activity onboarding wait until it is done.
 
 How it works:
 
@@ -637,7 +637,7 @@ Not hardware pages, listed here so this document points to them:
 
 - **Appearance → Desktop style** lists every installed theme and is the only place to choose one; the
   separate Themes page is gone (an old link to it opens Appearance). The two LordOS themes are now
-  called **Lord Flow** (menu bar and Dock) and **Lord Classic** (taskbar and start menu); the choice
+  called **Flow** (menu bar and Dock) and **Classic** (taskbar and start menu); the choice
   is kept (`THEMES-GUIDE.md`).
 - **Sharing → Advanced: root over SSH**, off by default, administrators only, every change confirmed
   with the administrator's own password (`REMOTE.md`, "Root over SSH").

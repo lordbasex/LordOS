@@ -49,8 +49,8 @@
       "pt": "Vinda de arquivos: páginas limpas que o kernel pode descartar" } }
   ],
   "footnote": {
-    "en": "The ws08 session of the 0.8.9.1 memory work (3 × 1080p, Lord Workspaces, 7 widgets, a Terminal running Claude Code), at rest. The Terminal's Instant Replay adds up to 6 MB per tab (about 1 MB in use in these runs). Source: heaptrack, the memory report in compositor.log and /proc/<pid>/smaps; docs/perf/MEMORY-HEAPTRACK.md.",
-    "es": "La sesión de ws08 del trabajo de memoria de la 0.8.9.1 (3 × 1080p, Lord Workspaces, 7 widgets, una Terminal con Claude Code), en reposo. El Instant Replay de la Terminal suma hasta 6 MB por pestaña (alrededor de 1 MB en uso en estas pruebas). Fuente: heaptrack, el informe de memoria en compositor.log y /proc/<pid>/smaps; docs/perf/MEMORY-HEAPTRACK.md.",
-    "pt": "A sessão da ws08 do trabalho de memória da 0.8.9.1 (3 × 1080p, Lord Workspaces, 7 widgets, um Terminal com o Claude Code), em repouso. O Instant Replay do Terminal soma até 6 MB por aba (cerca de 1 MB em uso nestes testes). Fonte: heaptrack, o relatório de memória no compositor.log e /proc/<pid>/smaps; docs/perf/MEMORY-HEAPTRACK.md."
+    "en": "The ws08 session of the 0.8.9.1 memory work (3 × 1080p, Workspaces, 7 widgets, a Terminal running Claude Code), at rest. The Terminal's Instant Replay adds up to 6 MB per tab (about 1 MB in use in these runs). Source: heaptrack, the memory report in compositor.log and /proc/<pid>/smaps; docs/perf/MEMORY-HEAPTRACK.md.",
+    "es": "La sesión de ws08 del trabajo de memoria de la 0.8.9.1 (3 × 1080p, Workspaces, 7 widgets, una Terminal con Claude Code), en reposo. El Instant Replay de la Terminal suma hasta 6 MB por pestaña (alrededor de 1 MB en uso en estas pruebas). Fuente: heaptrack, el informe de memoria en compositor.log y /proc/<pid>/smaps; docs/perf/MEMORY-HEAPTRACK.md.",
+    "pt": "A sessão da ws08 do trabalho de memória da 0.8.9.1 (3 × 1080p, Workspaces, 7 widgets, um Terminal com o Claude Code), em repouso. O Instant Replay do Terminal soma até 6 MB por aba (cerca de 1 MB em uso nestes testes). Fonte: heaptrack, o relatório de memória no compositor.log e /proc/<pid>/smaps; docs/perf/MEMORY-HEAPTRACK.md."
   }
 }

@@ -21,7 +21,7 @@
 // one goes the same way as a history entry's. Both files are written by lord.clipboard.saveStore: 0600 in a 0700 folder.
 // No global keys paste them yet: that needs its own security review (docs/ROADMAP.md).
 import { createElement as h, useEffect, useRef, useState } from 'react';
-import { View, Text, Image, addListener, screen, mainBox } from '@lordos/runtime';
+import { View, Text, Image, addListener, screen, mainBox, displayFor, displays } from '@lordos/runtime';
 import { createStore, useStore } from './store.js';
 import { useTheme } from './theme.js';
 import { t, formatDate } from './i18n.js';
@@ -260,13 +260,25 @@ setTimeout(loadSnippets, 0);
 
 export const clipboardPanel = createStore(false);       // false | 'quick' | 'full'
 let target = null;                                       // where to paste on choosing
+// The display it opens on: the focused window's (Settings → Clipboard → Open panel from a window on another display
+// opened it on the main one; BUG-27 of the ws170 QA), else the main display.
+let panelOn = null;
+const focusedDisplay = () => {
+  try { const w = wm.get(wm.focused()); const d = w ? displayFor(wm.frame(w)) : null; return d ? d.id : null; } catch (e) { return null; }
+};
+function panelBox() {
+  const d = panelOn == null ? null : displays().find((x) => x.id === panelOn);
+  return d ? { left: d.x, top: d.y, width: d.w, height: d.h } : mainBox();
+}
 function openPanel(mode) {
   if (!clipboardPanel.get()) {
     const top = wm.focused();
     target = { text: focusToken(), linux: !!(top && String(top).startsWith('linux#')) };
+    panelOn = focusedDisplay();
   }
   clipboardPanel.set(mode);
 }
+export const openClipboardPanel = (mode) => openPanel(mode);
 export const closeClipboardPanel = () => { clipboardPanel.set(false); setTimeout(() => restoreFocus(target?.text), 0); };
 // ❖V and ❖⇧V: the keys are in sdk/shortcuts.js.
 export function toggleClipboardPanel(mode) {
@@ -346,10 +358,10 @@ function QuickPanel() {
     if (/^[1-9]$/.test(e.char || '') && !q) { const it = shown[Number(e.char) - 1]; if (it) pick(it); return true; }
     return false;
   };
-  return h(View, { onClick: close, style: { position: 'absolute', ...mainBox() } },
+  return h(View, { onClick: close, style: { position: 'absolute', ...panelBox() } },
     h(View, {
       onClick: (e) => e.stopPropagation(),
-      style: { position: 'absolute', left: Math.round((mainBox().width - W) / 2), top: 70, width: W, padding: 10, gap: 4, borderRadius: 12,
+      style: { position: 'absolute', left: Math.round((panelBox().width - W) / 2), top: 70, width: W, padding: 10, gap: 4, borderRadius: 12,
         backgroundColor: th.windowBg, border: `1px solid ${th.separator}`, boxShadow: '0 16px 40px rgba(0,0,0,0.45)' },
     },
     h(View, { style: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 } },
@@ -406,7 +418,7 @@ function FullPanel() {
   const shownS = snips.filter((s) => matchSnippet(s, q));
   const cur = shown[Math.min(sel, shown.length - 1)] || null;
   const curS = shownS[Math.min(ssel, shownS.length - 1)] || null;
-  const W = Math.min(860, mainBox().width - 40), H = Math.min(540, mainBox().height - 120);
+  const W = Math.min(860, panelBox().width - 40), H = Math.min(540, panelBox().height - 120);
   // the row the keys chose is scrolled into view, and only then: the list never moves by itself (GitHub #204)
   const reveal = (i) => {
     const sv = scroll.current;
@@ -565,11 +577,11 @@ function FullPanel() {
       doomed === curS.id ? btn(t('shell.clipboard.snippets.confirmDelete'), () => delSnippet(curS), true) : btn(t('shell.clipboard.delete'), () => setDoomed(curS.id))),
   ] : h(Text, { style: { fontSize: 12, color: th.textDim } }, snips.length ? t('shell.clipboard.noSelection') : t('shell.clipboard.snippets.empty')));
 
-  return h(View, { onClick: close, style: { position: 'absolute', ...mainBox(), backgroundColor: 'rgba(0,0,0,0.25)' } },
+  return h(View, { onClick: close, style: { position: 'absolute', ...panelBox(), backgroundColor: 'rgba(0,0,0,0.25)' } },
     h(View, {
       ref: box,
       onClick: (e) => { e.stopPropagation(); if (!editing && !hasTextFocus()) refocus(); },
-      style: { position: 'absolute', left: Math.round((mainBox().width - W) / 2), top: Math.round((mainBox().height - H) / 2), width: W, height: H,
+      style: { position: 'absolute', left: Math.round((panelBox().width - W) / 2), top: Math.round((panelBox().height - H) / 2), width: W, height: H,
         borderRadius: 14, backgroundColor: th.windowBg, border: `1px solid ${th.separator}`, boxShadow: '0 24px 60px rgba(0,0,0,0.5)', overflow: 'hidden' },
     },
     h(View, { style: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12 } },
@@ -623,7 +635,7 @@ export function ClipboardToast() {
     return () => clearTimeout(timer.current);
   }, [msg]);
   if (!msg) return null;
-  return h(View, { style: { position: 'absolute', left: Math.round(mainBox().left + mainBox().width / 2 - 170), width: 340, top: mainBox().top + mainBox().height - 150, alignItems: 'center', pointerEvents: 'none' } },
+  return h(View, { style: { position: 'absolute', left: Math.round(panelBox().left + panelBox().width / 2 - 170), width: 340, top: panelBox().top + panelBox().height - 150, alignItems: 'center', pointerEvents: 'none' } },
     h(View, { style: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, backgroundColor: th.windowBg, border: `1px solid ${th.separator}`, boxShadow: '0 8px 24px rgba(0,0,0,0.35)' } },
       h(Text, { style: { fontSize: 12, color: th.text } }, msg)));
 }

@@ -167,6 +167,7 @@
     "other": "{count} güncellenecek"
   },
   "remove": "Kaldır",
+  "removeAsk": "{name} kaldırılsın mı?",
   "rescue.ask": "Bu bilgisayardaki hiçbir hesap yönetici değil. Root parolasını biliyorsanız bu hesabı yönetici yapabilirsiniz. Bu, yalnızca bilgisayar yeniden başlatıldıktan sonra geçerli olur.",
   "rescue.button": "Beni Yönetici Yap",
   "rescue.noSudo": "Bu bilgisayardaki hiçbir hesap yönetici değil ve sudo paketi yüklü değil. Root olarak apt install sudo komutunu çalıştırın, sonra burada yeniden deneyin.",
@@ -233,7 +234,7 @@
   },
   "suggest.nvidiaDriver.detail": "Şu anda LordOS ile gelen özgür sürücü nouveau kullanılıyor. Üreticinin sürücüsü ({packages}) genellikle daha iyi 3B performans ve güç yönetimi sağlar.",
   "suggest.nvidiaDriver.note.nouveau": "Yükleyene kadar özgür nouveau sürücüsü kullanılmaya devam eder; paketi kaldırmak ona geri döner.",
-  "suggest.nvidiaDriver.note.older": "Yaklaşık 2014’ten eski kartlar bu sürücü sürümünce desteklenmez; onlarda özgür sürücüyü koruyun. LordOS masaüstü bu sürücüyle henüz test edilmedi.",
+  "suggest.nvidiaDriver.note.older": "Yaklaşık 2014'ten eski kartlar bu sürücü sürümünce desteklenmez; onlarda özgür sürücüyü kullanmaya devam edin. Bu sürücüyle LordOS masaüstü deneyseldir: bir topluluk raporu kartta birleştirildiğini gösteriyor (580 sürücülü bir GTX 1070); daha eski bir raporda işlemci birleştiriyordu.",
   "suggest.nvidiaDriver.note.secureBoot": "Sürücü bu bilgisayarda çekirdeğiniz için (DKMS) ve her çekirdek güncellemesinden sonra yeniden derlenir. Güvenli Önyükleme açıksa, bir sonraki yeniden başlatmada imzalama anahtarını kaydetmeniz gerekir, yoksa sürücü yüklenmez.",
   "suggest.nvidiaDriver.title": "Tescilli grafik sürücüsü",
   "suggest.nvidiaDriver.unavailable": "Üreticinin sürücüsü Debian’ın contrib ve non-free bileşenlerini gerektirir ve bu bilgisayarın paket kaynaklarında ikisi birden etkin değil. Özgür sürücü nouveau çalışmaya devam eder.",

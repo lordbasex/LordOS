@@ -13,8 +13,11 @@
 #define MEDIA_MAX_SRC 48
 #define MEDIA_APP_MAX 48
 #define MEDIA_CROP_NODES 64       /* LAG_WIN_MAX: a machine's windows in apps mode */
+#define MEDIA_VIEW_NODES 16       /* plain nodes showing all of one source (a moving wallpaper on every display) */
+#define MEDIA_BLUR_MAX 8          /* blurred nodes over one view of an NV12 source kept (the Dock, the menu bar, a menu) */
 
 typedef struct MAudio MAudio;
+struct MAmb;                    /* mambient.c: a moving wallpaper's player */
 
 enum { SK_NONE = 0, SK_PLAYER, SK_CAMERA, SK_IMAGE, SK_CAPTURE, SK_SCREENREC, SK_AUDIOREC, SK_STREAM, SK_M3U };   /* SK_M3U: lord-stream's channel list */
 
@@ -50,7 +53,11 @@ typedef struct {
     unsigned painted_seq;       /* the frame_seq the last paint read (Machines acknowledges frames with it) */
     /* drawing */
     MediaView view;
-    int node, box_w, box_h, sent_w, sent_h;
+    int node, box_w, box_h, sent_w, sent_h;     /* node: the plain node painted last (its pointer, Machines) */
+    /* every plain node (no Node.crop) that shows all of it, with the box (physical px) its last paint had: one player
+     * shared by the displays (sdk/motion.jsx) damages and presents each one, not only the one painted last (mviews.c) */
+    int view_nodes[MEDIA_VIEW_NODES], view_w[MEDIA_VIEW_NODES], view_h[MEDIA_VIEW_NODES];
+    int views_over;                     /* a node found no slot: a new frame damages the whole screen */
     int crop_nodes[MEDIA_CROP_NODES];   /* nodes that show a part of it (Node.crop): each one damaged for its part */
     uint32_t *cache;            /* scaled/rotated (when copying isn't enough) */
     int cache_w, cache_h;
@@ -92,6 +99,32 @@ typedef struct {
     unsigned pd_base, pd_last;
     int pd_n, pd_x0, pd_y0, pd_x1, pd_y1;
     unsigned pd_band, pd_full;          /* copies remade in part, whole (mview-test) */
+    /* NV12 frames (proto.h MF_NV12, docs/MEDIA.md "Video frames"; mambient.c): lord-media's ring is nv_map, the GPU shows
+     * the frame converted by a shader (vtex, which gtex points at), and map is lord-server's own BGRA buffer
+     * (ring_slots 1, an anonymous mapping), filled only where the CPU needs pixels: rows nv_y0..nv_y1 hold frame nv_seq */
+    int nv;
+    uint8_t *nv_map;
+    size_t nv_len;
+    MpRing nv_ring;
+    int nv_slot;
+    unsigned nv_seq;
+    int nv_y0, nv_y1;
+    struct GpuYuv *yuv;
+    struct GpuTex *vtex;
+    int fmt_sent;                       /* the MM_FORMAT asked last (MF_*) */
+    int nv_capable;                     /* a lord-media player (play()): it may send NV12 or dmabufs */
+    int rate;                           /* play()'s rate (a respawn passes it again) */
+    int dma_refused;                    /* a zero-copy frame was refused: the memfd ring for good */
+    double dma_win;
+    int dma_n;                          /* zero-copy frames in the second since dma_win (a flood is cut off) */
+    /* each plain view: hidden by the compositor (mambient.c: covered, fullscreen app, dark screen); a new frame is
+     * presented only where a view is visible. blur_*: the blurred strips over each view (mview.c nv_blur_strips) */
+    unsigned char view_hidden[MEDIA_VIEW_NODES];
+    float blur_box[MEDIA_BLUR_MAX * 2][4];
+    int blur_node[MEDIA_BLUR_MAX * 2], nblur;
+    double blur_at;                     /* when the blurred strips were last refreshed (media_src_blur_frame) */
+    int blur_pending;                   /* a newer frame than the strips show, waiting for MEDIA_BLUR_MS */
+    struct MAmb *amb;                   /* a moving wallpaper's player (play's ambient): its pause, stop and loop cache */
     /* player state */
     int64_t pos, dur;
     int playing;
@@ -117,6 +150,10 @@ typedef struct {
     /* its picture belongs to a protected window (shown in a NODE_MEDIA inside a protected node, or marked by its owner:
      * lord.vm.protect): never copied out of lord-server (media_src_exportable). Set once, never cleared. */
     int protect;
+    /* a screen capture taken while an AI agent owned the input (Hands, hands_agent_owns_input), or a picture made from
+     * one (crop, resize, turns, markup): never copied, saved or read as text (js_media.c agent_capture; security scan
+     * 0.8.9.6.2, F1). Set once, never cleared. */
+    int agent_cap;
 } MediaSrc;
 
 /* media.c */
@@ -149,6 +186,29 @@ void media_src_tex_off(MediaSrc *s);
 void media_src_tex_fresh(MediaSrc *s);
 /* how many nodes show a part of it now */
 int  media_src_crop_count(MediaSrc *s);
+/* mviews.c: a plain node shows all of s (media_paint, js_media_node), at bw × bh physical px (0: not painted yet); a node
+ * dropped (it shows a part now). media_src_view_count: the live plain nodes. media_src_view_box: the box the helper
+ * scales to, the largest one shown (0 if none) */
+void media_src_view_note(MediaSrc *s, int node, int bw, int bh);
+void media_src_view_drop(MediaSrc *s, int node);
+int  media_src_view_count(MediaSrc *s);
+int  media_src_view_box(MediaSrc *s, int *bw, int *bh);
+/* the plain node at slot i of view_nodes (NULL when gone): mambient.c walks the views */
+struct Node *media_src_view_at(MediaSrc *s, int i);
+/* an NV12 source's blurred strips over view node (logical boxes x0, y0, x1, y1, n of them) replace that node's; the
+ * strips of visible views are damaged with each new frame (media_src_blur_damage) */
+void media_src_blur_note(MediaSrc *s, int node, const void *boxes, int n);
+void media_src_blur_damage(MediaSrc *s);
+/* A new frame of a GPU-drawn moving wallpaper: its blurred strips (the menu bar, the Dock, frosted windows and widgets
+ * over it) are repainted on the CPU at most every media_blur_interval_ms(), not with every frame (ws170 QA BUG-14: three
+ * 4K displays spent most of lord-server's main thread re-blurring them). 1 if they were damaged now, 0 if the refresh
+ * waits (blur_pending); media_src_blur_due says when, and damages them once it is time. */
+#define MEDIA_BLUR_MS 200
+int    media_blur_interval_ms(void);        /* MEDIA_BLUR_MS, or LORD_MOTION_BLUR_MS (0: every frame, as before) */
+int    media_src_blur_frame(MediaSrc *s, double now);
+double media_src_blur_due(MediaSrc *s, double now);   /* ms until the waiting refresh (after doing it when due), -1 none */
+/* mambient.c: rows [y0, y1) of the shown NV12 frame in map (converted, or read back from the GPU), or NULL; map otherwise */
+const uint32_t *media_src_rows(MediaSrc *s, int y0, int y1);
 int  media_spawn(int kind, const char *params, const int *fds, int nfds, pid_t *pid);
 /* the same with lord-stream (0.8.8.10: network players and M3U lists, src/media/stream; streamurl.h) */
 int  media_spawn_stream(int kind, const char *params, const int *fds, int nfds, pid_t *pid);
@@ -203,6 +263,23 @@ int  maudio_ring_fd(const MAudio *a);     /* the ring's memfd (still owned by a)
 
 /* mview.c */
 void media_view_reset(MediaSrc *s);
+
+/* media.c */
+uint8_t *media_map_sealed(int fd, size_t need);    /* a helper's memfd: sealed against shrinking, at least need bytes */
+void media_helper_stop(MediaSrc *s);               /* its helper ended; the source stays (a moving wallpaper's stop) */
+
+/* mambient.c: NV12 and zero-copy frames, moving wallpapers (docs/MOVING-WALLPAPERS.md) */
+int  media_nv_ring(MediaSrc *s, const MediaMsg *m, int fd);     /* MM_RING with MF_NV12: 0 taken, -1 refused */
+void media_nv_frame(MediaSrc *s, int slot, int64_t pts);       /* MM_FRAME of an NV12 ring */
+void media_dma_frame(MediaSrc *s, const MediaMsg *m, const char *payload, int *fds);   /* MM_DMAFRAME (fds closed by the caller) */
+void media_nv_reset(MediaSrc *s);                  /* back to a BGRA ring */
+void media_nv_free(MediaSrc *s);                   /* everything NV12 and ambient a source holds */
+void media_src_format_check(MediaSrc *s);          /* MM_FORMAT follows the GPU (and zero-copy) */
+/* play()'s ambient: a moving wallpaper (loop, no sound): paused when unseen, stopped after a while, its loop cached */
+void media_ambient_new(MediaSrc *s, const char *path, int cache_mb, int fps_cap);
+void media_ambient_free(MediaSrc *s);
+void media_ambient_box(MediaSrc *s);               /* the size it's shown at changed */
+int  media_ambient_control(MediaSrc *s, const char *cmd, double v);   /* 1 when it handled a control() */
 
 /* capture.c */
 /* display: a display's connector id (lord.screen.displays[].id): that display at its physical resolution; 0 for

@@ -1,3 +1,9 @@
+# Wallpapers
+
+Settings → Wallpaper is a gallery (0.8.9.6.2, "The gallery" below) of four kinds of wallpaper: LordOS's built-in pictures
+(`assets/wallpapers/index.json`), the catalog's still pictures (Abstract, Epic, Anime; downloaded when chosen), the moving
+wallpapers (most of this document) and your own pictures.
+
 # Moving wallpapers
 
 Short loops behind the desktop and the login screen, chosen in Settings → Wallpaper. They exist only with the hardware for
@@ -29,15 +35,15 @@ name, which three monitors of one model share. The rules are in `sdk/wallpapermo
   plus its connector when two share the model). A picture for one display also turns that display's moving wallpaper
   off (`settings.motion[displayId] = null`, which wins over the one for all displays); a picture for all clears the
   per-display pictures and the moving wallpapers, as before.
-- **The Control Center's quick pictures** (Lord Flow, Lord Workspaces) change the display the Control Center opened
+- **The Control Center's quick pictures** (Flow, Workspaces) change the display the Control Center opened
   on when there are several.
 - Removing one of your own pictures sends a display that showed it back to the picture of every display, and the
   picture of every display back to the theme's default.
 - The login screen keeps one picture.
-- **Never chosen** (0.8.9): `settings.wallpaper` is `null` and the theme's default shows: Lumo Celestial in Lord Flow
-  and Lord Classic, Cyberpunk City HD's panorama in Lord Workspaces (settings migration 5 turned the saved Celestial
+- **Never chosen** (0.8.9): `settings.wallpaper` is `null` and the theme's default shows: Lumo Celestial in Flow
+  and Classic, Cyberpunk City HD's panorama in Workspaces (settings migration 5 turned the saved Celestial
   default into `null`; docs/WORKSPACES.md, "Wallpaper and slideshow").
-- **A slideshow** of a category's still pictures, with a different one on each display if wanted, is Lord Workspaces'
+- **A slideshow** of a category's still pictures, with a different one on each display if wanted, is Workspaces'
   only (docs/WORKSPACES.md, "Wallpaper and slideshow"); a moving wallpaper chosen turns it off, and turning it on
   turns the moving wallpapers off.
 
@@ -53,9 +59,20 @@ the rest 12.5 to 30 fps. No 120, 144 or 240 fps source with a clear license was 
 
 ## When it pauses
 
-`sdk/motion.jsx` pauses the decoder, and `pauseReason` says why: Reduce motion, a fullscreen window, every display showing
-it covered by a window, five minutes with no input, the battery at 20 % or less and discharging, or the CPU above 85 % for
-two readings 5 s apart. The login screen pauses after five minutes with no input.
+Which display shows it is lord-server's own knowledge, **per monitor** (`server/src/media/mambient.c`, details and numbers
+in [MOVING-WALLPAPERS.md](MOVING-WALLPAPERS.md)): a display's copy stops being presented when opaque windows cover its
+whole area together, a Linux app is fullscreen on it, or the screen is off; the decoder pauses only when no display shows
+it, and after 10 s with none, lord-media is ended and its GPU loop cache freed (it starts again, at the same place, when
+a display shows it). Other desktops pause globally: a game in full screen on one monitor pauses every monitor there.
+
+`sdk/motion.jsx` adds the reasons only JS knows, and `pauseReason` says which: Reduce motion, five minutes with no input,
+the battery (Settings → Wallpaper → On battery: Pause, the default; Lower frame rate, 15 fps and a pause at 20 % or
+less; Keep playing), or the CPU above 85 % for two readings 5 s apart. The login screen pauses after five minutes with no
+input.
+
+Settings → Wallpaper also has the **Frame rate** (Video's own, 30 or 15 fps) and the **GPU memory for loops** (Off to
+2 GB, 1 GB by default): after one whole pass a loop plays from GPU memory with lord-media paused, within that budget and
+never more than the card's VRAM allows.
 
 One video per file, however many displays show it. The still wallpaper stays drawn underneath, so a failure, a missing
 file or a helper crash just shows it.
@@ -69,14 +86,21 @@ Videos are downloaded on demand by closed admin actions (`server/src/hw/wallpape
 
 | Action | Who | What |
 |---|---|---|
-| `wallpaper-get "<id> <variant>"` | anyone | downloads a catalog file to `/var/lib/lordos/wallpapers/<sha256>.mp4` |
-| `wallpaper-remove "<id> <variant>"` | admin | deletes it |
-| `wallpaper-login "<id> <variant>"` or `default` | admin | the login screen plays it (`login.mp4`) or the built-in one |
+| `wallpaper-get "<id> <variant>"` | anyone | downloads a catalog file to `/var/lib/lordos/wallpapers/<sha256>.mp4` (codec `hevc`, `h264`) or `<sha256>.jpg` (codec `jpeg`, a still picture) |
+| `wallpaper-remove "<id> <variant>"` | admin | deletes it, either kind |
+| `wallpaper-login "<id> <variant>"` or `default` | admin | the login screen plays it (`login.mp4`; a video variant only) or the built-in one |
+| `wallpaper-login "still <id>"` or `"still cat:<id>"` | admin | the login screen shows that built-in or catalog picture, with no video (`login-still`) |
 
 JS names an entry, never a URL or a path. The base must be the project's GitHub owner on `raw.githubusercontent.com`, the
 bytes go through `fetch_batch` (a child as `nobody`, in the Store's scope, so the firewall sees `lordos:store`), and a file
-whose size or hash isn't the catalog's is deleted. `lord-media` keeps its sandbox and receives an open file, and
-`media_open_input` accepts those two system folders besides the user's own files. `server/tests/wallpaper_find_test.c` covers the lookup.
+whose size or hash isn't the catalog's is deleted. The extension a file is kept with comes from the variant's `codec`, read
+as root (`hw_wallpaper_find`): `hevc` and `h264` are `.mp4` and their `file` must end in `.mp4`, `jpeg` is `.jpg` and its
+`file` must end in `.jpg`; any other codec is no entry. The `file` must be a relative `[a-z0-9._/-]` name with no `..`,
+`//` or leading dot or slash, and the `size` a whole number of bytes, at most 100 MB. `lord-media` keeps its sandbox and receives an open file, and
+`media_open_input` accepts those two system folders besides the user's own files. `server/tests/wallpaper_find_test.c` covers the lookup, and
+`server/tests/wallpaper_admin_test.c` the actions themselves with a fake download (a picture kept as `.jpg`, a video as
+`.mp4`, refused arguments never fetch, a wrong hash or a 404 never kept, remove, `still cat:<id>`, every entry of the
+shipped catalog accepted).
 
 An added video stays in the user's files. It needs at most 10 s and a format this machine decodes in hardware.
 
@@ -132,3 +156,84 @@ A moving wallpaper plays with `hwOnly`: if the hardware decoder doesn't start, o
 Files live in a separate repository, `LordOS-wallpapers`, because 353 MB of video doesn't belong in the code's history. Its
 README credits each clip; licenses come from each file's own page. Only public domain, CC0, CC BY and CC BY-SA sources are
 used.
+
+# The gallery and the still pictures (0.8.9.6.2)
+
+## The catalog's still pictures
+
+The catalog (`assets/wallpapers/motion.json`, a copy of the `LordOS-wallpapers` repository's `catalog.json`) keeps its
+structure. A still picture is an item like a moving one, in the section `abstract`, `epic` or `anime`, whose variants have
+codec `jpeg`, `fps` and `seconds` 0:
+
+```json
+{ "name": "1080.jpeg", "codec": "jpeg", "w": 1920, "h": 1080, "fps": 0.0, "seconds": 0.0,
+  "file": "stills/<section>/<id>/1080.jpg", "size": 437074, "sha256": "…" }
+```
+
+and the same with `2160.jpeg`, 3840 × 2160. Its 320 × 180 thumbnail ships as `assets/wallpapers/motion/<id>.thumb.jpg`,
+next to the moving wallpapers'. 0.8.9.6.2 ships the 50 Epic pictures; nothing in the code depends on how many there
+are. The pictures are made with AI for LordOS and released as CC0. `sdk/motion.jsx` plays only the video items
+(`motionCatalog`): a `jpeg` variant is never a moving wallpaper.
+
+## How a chosen picture is saved and drawn
+
+A catalog picture is saved as **`cat:<catalog id>`** wherever a wallpaper id goes: `settings.wallpaper` (every display),
+`settings.wallpapers[connector]` (one display), `settings.loginWallpaper` and `login-still` (the login screen,
+`wallpaper-login "still cat:<id>"`), and a slideshow's category is the collection's section. Older settings keep working
+as they were: no migration.
+
+`findWallpaper` (sdk/wallpapers.js) resolves `cat:<id>` after the theme's own list and your pictures: it lists
+`/var/lib/lordos/wallpapers` (at most every 10 s, or at once after a download or a removal in this session) and offers
+the variants whose `<sha256>.jpg` is there at the catalog's size. Every theme (Flow, Classic, Workspaces,
+Celeste), the greeter and the slideshow already go through `findWallpaper` and `wallpaperSrc`, so each display draws the
+smallest file that covers it. A picture whose files are gone (removed, or settings brought from another computer)
+gives `null`, and the theme's default shows (the login screen: its own).
+
+**Quality** (`settings.wallpaperQuality`): `auto` (the default), `hd` or `4k`. Auto takes the 4K file only for a display
+wider than 1920 or taller than 1080 device pixels (its scale applied) and the HD file for the others, display by display;
+choosing a picture downloads what the displays it goes on need. HD and 4K offer only that file when it is on this
+computer, and otherwise what is. The rules are in `sdk/wallpapergallery.js` (`autoQuality`, `variantsToGet`,
+`drawnVariant`, `stillWallpaper`), tested by `server/tests/wallpaper_gallery_test.mjs`.
+
+## Built-in pictures with a catalog twin
+
+A catalog still item whose id is a built-in wallpaper's (`assets/wallpapers/index.json`, e.g. Cyberpunk City HD's
+`cyberpunk-panorama`, section = the built-in's category) is that built-in's 4K, never a picture of its own: `stillItems`
+(the `cat:<id>` pictures) leaves it out and `twinItems` holds it. There is no special case for a category in the code.
+
+- **One tile** in the built-in collection: ✓ (the HD file is built in), the 4K badge; the sheet lists the built-in HD
+  ("included, works offline") and the twin's 4K with its size; the collection's page offers Download all · 4K.
+- **Settings keep the plain built-in id.** Choosing it where a display wants 4K (Auto above 1920 × 1080, or 4K) fetches
+  the twin's largest variant first (`wallpaper-get "<id> 2160.jpeg"`).
+- **Drawing**: `findWallpaper` passes a built-in through `withTwinFile` → `withTwin`: Auto adds the twin's 4K file to the
+  built-in's variants once it is on disk, so `wallpaperSrc` picks it per display and the built-in HD everywhere else and
+  while it isn't there; HD keeps the built-in files only; 4K keeps the 4K file when it is here, else the built-in. A
+  built-in that already ships a larger file than the twin's keeps its own (`twinExtra` is null). The same path serves
+  every theme, the login screen (`login-still` holds the built-in id) and the slideshow (`withDownloadedStills`).
+- **Free up space** may delete a twin's 4K only when nothing of this account shows it: the desktop and every display,
+  the login screen, a running slideshow of its collection, or the theme's default while the wallpaper setting is unset.
+  The built-in HD is what shows afterwards.
+
+## The page
+
+`apps/settings/WallpaperGallery.jsx`:
+
+- **What shows now**: a large picture with its name, collection and license; For (Desktop / Login screen), Display (All /
+  each display, with several) and Quality, with the resolution each display gets.
+- **Search and filters**: All, On this computer, Pictures (built-in and catalog pictures), Moving, My photos, each with its
+  count. All leaves your pictures to My photos.
+- **Collections**: with no search and All, a card per collection (a stack of three thumbnails, its count, NEW on the
+  still collections), then one row of each with See all. Order: the still collections, the built-in categories
+  (`WALLPAPER_CATEGORIES`, then a theme's own), the moving sections. A collection's page offers Download all in HD or 4K
+  (the bytes still to fetch) and Use as slideshow where the theme has one (two pictures or more on this computer).
+- **Tiles**: a cloud (downloads when chosen), a check (on this computer), 4K or HD, a play mark for a moving one, the
+  download's progress along the bottom edge.
+- **A sheet per wallpaper**: a large picture, credits, the quality options with the catalog's sizes, Use on desktop,
+  Login screen, Only <display>, and Remove download when this account doesn't use it.
+- **The bottom**: the space the catalog's files on this computer take, **Free up space** (deletes the ones this account
+  doesn't use: the desktop and every display, the login screen, the moving wallpapers, random's videos and a running
+  slideshow's collection stay), the thumbnails' size, the slideshow, the moving wallpapers' options.
+
+The store is shared by every account and only an administrator removes from it (`wallpaper-remove`); another account's
+wallpaper whose file is removed falls back to its theme's default. `server/tests/app_scene_headless.sh
+settings_wallpaper_scene` drives the page headless and keeps screenshots.

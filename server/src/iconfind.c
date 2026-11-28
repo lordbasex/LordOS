@@ -115,8 +115,11 @@ int iconfind_svg_allowed(const char *real, const char *home) {
     /* LordOS's own assets (root's, from the package): Machines' symbols and the systems' logos */
     static const char *const sys[] = { "/usr/share/", "/usr/local/share/", "/opt/", "/var/lib/flatpak/exports/share/",
                                        "/var/lib/flatpak/app/", "/usr/lib/lordos/assets/", NULL };
+    /* a web app's icon: the site's own, fetched into the cache (ui/webicon.c), or the registry's (sdk/apps.js
+     * webAppIcon); left out, a site's SVG icon was never drawn (QA ws174: WhatsApp's row stayed blank) */
     static const char *const own[] = { "/.local/share/icons/", "/.icons/", "/.local/share/flatpak/exports/share/",
-                                       "/.local/share/flatpak/app/", NULL };
+                                       "/.local/share/flatpak/app/", "/.cache/lordos/web/icons/",
+                                       "/.config/lordos/web/icons/", NULL };
     if (!real || real[0] != '/' || !ends_with(real, ".svg") || strstr(real, "/../")) return 0;
     for (int i = 0; sys[i]; i++) if (!strncmp(real, sys[i], strlen(sys[i]))) return 1;
     size_t hl = home ? strlen(home) : 0;

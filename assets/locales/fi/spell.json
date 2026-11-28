@@ -1,0 +1,22 @@
+{
+  "menu.looking": "Haetaan ehdotuksia…",
+  "menu.none": "Ei ehdotuksia",
+  "menu.add": "Lisää ”{word}” sanastoon",
+  "menu.ignore": "Ohita",
+  "settings.title": "Oikeinkirjoitus",
+  "settings.hint": "Väärin kirjoitetut sanat alleviivataan punaisella aaltoviivalla LordOSin tekstikentissä; napsauta sanaa hiiren oikealla saadaksesi ehdotuksia. Tarkistus tehdään tällä tietokoneella, ei koskaan verkossa. Salasana-, haku- ja osoitekenttiä ei tarkisteta.",
+  "settings.check": "Tarkista oikeinkirjoitus kirjoittaessa",
+  "settings.languages": "Oikeinkirjoitus: kielet",
+  "settings.defaultHint": "Ei valintaa: käyttöliittymäsi kieli ja englanti, kun niiden sanastot on asennettu. Verkkosovellukset käyttävät samoja.",
+  "settings.chosenHint": "Sana on oikein, kun jokin valitsemistasi kielistä tuntee sen (enintään 4). Verkkosovellukset käyttävät käyttöliittymäsi kieltä ja englantia.",
+  "settings.none": "Sanastoa ei ole asennettu. Asenna sellainen alta.",
+  "settings.useDefault": "Käytä oletuksia",
+  "settings.more": "Lisää kieliä",
+  "settings.moreHint": "Sanastot Debianista. Asentaminen vaatii järjestelmänvalvojan salasanan.",
+  "settings.installing": "Asennetaan…",
+  "settings.install": "Asenna",
+  "settings.words": "Oma sanasto",
+  "settings.wordsHint": "Sanat, jotka lisäsit toiminnolla ”Lisää sanastoon”, täällä tai verkkosovelluksessa.",
+  "settings.remove": "Poista",
+  "settings.noWords": "Ei vielä sanoja."
+}

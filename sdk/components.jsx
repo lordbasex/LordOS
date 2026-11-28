@@ -2,8 +2,8 @@
 // adapt to any theme.
 import { View, Text, addListener, displayFor, onCommit, onScreenChange, capsLock } from '@lordos/runtime';
 import { Component, createContext, memo, use, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { useTheme } from './theme.js';
-import { getApp, windows, openedAt, wm, activeDesktop, onActiveDesktop, appContentNodes, appRegistry } from './windows.js';
+import { useTheme, stateBorder, bevelStyle } from './theme.js';
+import { getApp, windows, openedAt, wm, activeDesktop, onActiveDesktop, appContentNodes, appRegistry, workAreaOf } from './windows.js';
 import { onDesktop } from './desktopmodel.js';
 import { useStore } from './store.js';
 import { textDirection, direction, t as tr } from './i18n.js';
@@ -17,11 +17,18 @@ import { revealAfter, eyeShown, maskedText, eyeLabel, capsAfter, capsHint, capsF
 import { Layer, Overlay, shellLayers } from './layers.js';
 import { ContextMenu } from './contextmenu.jsx';
 import { dialogStack } from './dialogkeys.js';
+import { appDenied } from './handsdeny.js';
+import { optionIndex } from './handsmodel.js';
 import { stat as fsStat, isRemote as fsIsRemote } from './fs.js';
 import { dropSorter, dropCount } from './filedrop.js';
 import { setTextFocusBridge, useFocusArea, focusRingColor } from './focus.js';
 import { rangeKey, choiceKey, scrollKey } from './focusmodel.js';
 import { wheelValue } from './controlmodel.js';
+import { crashReport } from './crashreport.js';
+import { useSpellRanges, spellSuggest, spellAddWord, spellIgnore } from './spell.js';
+import { spellMenuItems, rangeAt, underlines } from './spellmodel.js';
+import { writingMenuFor, WritingPanel } from './writing.jsx';
+import { stillThere, forField } from './writingmodel.js';
 
 // ---- actions that take a while (docs/MAIN-THREAD.md) ----
 // Everything on the screen, the pointer too, waits for the JavaScript of the desktop: an action that blocks (an
@@ -84,20 +91,25 @@ export function Spinner({ size = 14, color, thickness }) {
 // answered even when the action blocks.
 // The shared controls are Tab stops (sdk/focus.js) unless disabled or focusable={false}: Space and Enter press a
 // button or flip a Toggle, the arrows move a Slider, a Stepper or a Segmented control.
-export function Button({ label, onClick, primary, style, small, plain, disabled, destructive, icon, focusable = true, busy = false, pending = false }) {
+export function Button({ label, onClick, primary, style, small, plain, disabled, destructive, icon, focusable = true, busy = false, pending = false, handsDeny }) {
   const t = useTheme();
   const [hover, setHover] = useState(false);
   const [run, running] = usePending((...a) => onClick?.(...a));
   const waiting = busy || running;
   const fg = primary ? '#fff' : destructive ? '#ff453a' : t.text;
+  const neutral = !primary && !plain;
   const bg = primary ? t.accent : plain ? (hover && !disabled ? t.hover : 'transparent') : t.control;
+  // richer tokens (sdk/theme.js): a gradient fill, a raised bevel and a border per state for neutral buttons
+  const rich = neutral ? { ...(t.buttonBg ? { background: t.buttonBg } : null), ...bevelStyle(t, false),
+    ...stateBorder(t, disabled ? 'disabled' : hover ? 'hover' : 'normal') } : null;
   const border = t.buttonBorder && !plain ? { border: `1px solid ${primary ? t.accent : t.separator}` } : null;
   const press = disabled || waiting ? undefined : pending ? (e) => { run(e); } : onClick;
   return (
     <View onClick={press} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
+      accessibilityRole="button" accessibilityState={{ disabled: !!disabled, busy: !!waiting }} handsDeny={handsDeny || undefined}
       focusable={focusable && !disabled}
       style={[{ height: small ? 22 : 28, paddingHorizontal: small ? 10 : 14, borderRadius: small ? t.controlRadiusSmall : t.controlRadius, flexDirection: 'row', gap: 6,
-        justifyContent: 'center', alignItems: 'center', backgroundColor: bg, ...border,
+        justifyContent: 'center', alignItems: 'center', backgroundColor: bg, ...border, ...rich,
         opacity: disabled ? 0.4 : waiting ? 0.75 : hover && !plain ? 0.85 : 1 }, style]}>
       {waiting ? <Spinner size={small ? 10 : 12} color={fg} /> : icon ? <Text style={{ fontSize: small ? 12 : 14, color: fg }}>{icon}</Text> : null}
       {/* a button held narrower than its label (maxWidth) ends it with "…" instead of cutting both ends (GitHub #231) */}
@@ -139,7 +151,9 @@ export function Toggle({ on, onChange, small, focusable = true, busy = false, pe
   };
   const w = small ? 36 : 42, h = small ? 20 : 24, k = h - 4;
   return (
-    <View onClick={flip} focusable={focusable} style={{ width: w, height: h, borderRadius: h / 2, direction: 'ltr',
+    <View onClick={flip} focusable={focusable} accessibilityRole="switch" accessibilityState={{ checked: !!shown }}
+      handsSetValue={(v) => { const want = /^(1|true|on|yes)$/i.test(String(v)); if (want !== !!on) flip(); }}
+      style={{ width: w, height: h, borderRadius: h / 2, direction: 'ltr',
       backgroundColor: shown ? t.accent : t.control, opacity: waiting ? 0.7 : 1 }}>
       <View style={{ position: 'absolute', top: 2, left: shown ? w - k - 2 : 2, width: k, height: k, borderRadius: k / 2,
         backgroundColor: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.35)', alignItems: 'center', justifyContent: 'center' }}>
@@ -165,11 +179,16 @@ export function Segmented({ options, value, onChange, appearance = 'accent', sma
     return true;
   };
   return (
-    <View focusable={focusable && options.length > 0} onKeyDown={onKey} style={[{ flexDirection: 'row', backgroundColor: t.control, borderRadius: small ? t.controlRadiusSmall : t.controlRadius + 1, padding: 2 }, style]}>
+    <View focusable={focusable && options.length > 0} onKeyDown={onKey} accessibilityRole="tablist"
+      // Hands: set_value picks a segment by its value or its label (sdk/handsmodel.js optionIndex)
+      accessibilityValue={String(options.find(([v]) => v === value)?.[1] ?? '')}
+      handsSetValue={(want) => { const i = optionIndex(options, want); if (i < 0) return false; if (options[i][0] !== value) onChange(options[i][0]); return true; }}
+      style={[{ flexDirection: 'row', backgroundColor: t.control, borderRadius: small ? t.controlRadiusSmall : t.controlRadius + 1, padding: 2 }, style]}>
       {options.map(([v, label, disabled]) => {
         const on = value === v;
         return (
-          <View key={v} onClick={disabled ? undefined : () => onChange(v)} style={{ paddingHorizontal: small ? 10 : 14, height: small ? 18 : 24, borderRadius: Math.max(2, (small ? t.controlRadiusSmall : t.controlRadius) - 1),
+          <View key={v} onClick={disabled ? undefined : () => onChange(v)} accessibilityRole="tab" accessibilityState={{ selected: on, disabled: !!disabled }}
+            style={{ paddingHorizontal: small ? 10 : 14, height: small ? 18 : 24, borderRadius: Math.max(2, (small ? t.controlRadiusSmall : t.controlRadius) - 1),
             justifyContent: 'center', alignItems: 'center', flexGrow: fill ? 1 : 0, opacity: disabled ? 0.4 : 1,
             backgroundColor: on ? (neutral ? raised : t.accent) : 'transparent',
             boxShadow: on && neutral ? '0 1px 2px rgba(0,0,0,0.18)' : 'none' }}>
@@ -192,6 +211,7 @@ export function SidebarItem({ label, selected, onClick, icon, detail, indent = 0
   const sel = t.mode === 'dark' ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.06)';
   return (
     <View onClick={onClick} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
+      accessibilityRole="row" accessibilityState={{ selected: !!selected }}
       style={{ height: 28, paddingLeft: 10 + indent * 14, paddingRight: 10, borderRadius: t.controlRadiusSmall, flexDirection: 'row', alignItems: 'center', gap: 8,
         backgroundColor: filled ? t.accent : selected ? sel : hover ? t.hover : 'transparent' }}>
       {selected && ind ? <View style={{ position: 'absolute', insetInlineStart: 0, top: 8, width: 3, height: 12, borderRadius: 2, backgroundColor: t.accent }} /> : null}
@@ -392,6 +412,10 @@ export function ScrollView({ style, contentStyle, children, scrollRef, gutter, r
       const m = measure() || metrics;
       const mx = Math.max(0, m.content - m.view);
       if (mx > 0 && d) scrolled();
+      // a view that moves takes the wheel: the page around it doesn't scroll too (a list inside a page, as Privacy's
+      // Add app list); at its end the wheel goes on to the page, as in a browser
+      const at = Math.min(offset, max);
+      if (d && Math.max(0, Math.min(mx, at + d)) !== at) e.stopPropagation?.();
       setOffset((o) => Math.max(0, Math.min(mx, Math.min(o, max) + (d || 0))));
     }} onMouseMove={onMove} onMouseLeave={() => { st.current.ui = { ...st.current.ui, near: false, hover: false }; update({ near: false, hover: false }); schedule(); }}
       focusable={focusable ?? max > 0} onKeyDown={onKey} onRevealFocus={(r) => reveal(r, true)}
@@ -473,6 +497,9 @@ export function releaseTextFocus(token, onChange) {
   if (focused === token) setFocus(null);
 }
 export const textFocusOwner = () => focused;
+// the box (host instance) of the TextInput or TextArea with the keys, null for none or an app's own field: Hands asks
+// whether the keys would go to a password field (sdk/hands.jsx)
+export const textFocusBox = () => (focused === null ? null : boxes.get(focused)?.current || null);
 // For panels that take the keyboard for a moment (Search, clipboard): remember the focused
 // field, give focus back on close and paste the clipboard into it as if it were Ctrl+V.
 export const focusToken = () => focused;
@@ -515,15 +542,21 @@ function fieldMenuItems(send, { hist, sel, secure, value }) {
 
 // The menu at { x, y } of the field's box (anchor), above the window (layers.js). keepFocus: choosing an item leaves the
 // field focused. It stays inside the display (or, in an isolated app, the window) the field is on.
-function FieldMenu({ anchor, at, items, onClose }) {
-  const win = useContext(AppWindowContext);
-  let bounds;
+// In the desktop's process the area is the display's work area (the Dock and the bar stay clear), and the bounds say how
+// far up and to the start it may go too (top, left: negative, from the field's corner), so a menu opened near the
+// bottom edge goes up instead of being cut (QA 0.8.9.6.2).
+function fieldBounds(anchor, win) {
   try {
     const r = lord.getLayout(anchor.current.id);
     const host = !shellLayers() && win?.overlayHost ? lord.getLayout(win.overlayHost.id) : null;
-    const d = host ? { x: host[0], y: host[1], w: host[2], h: host[3] } : displayFor({ x: r[0], y: r[1], w: r[2], h: r[3] });
-    bounds = { w: d.x + d.w - r[0], h: d.y + d.h - r[1] };
-  } catch (e) { bounds = undefined; }
+    let d = host ? { x: host[0], y: host[1], w: host[2], h: host[3] } : displayFor({ x: r[0], y: r[1], w: r[2], h: r[3] });
+    if (!host) { const a = workAreaOf(d); if (a && a.w > 0 && a.h > 0) d = a; }
+    return { left: d.x - r[0], top: d.y - r[1], w: d.x + d.w - r[0], h: d.y + d.h - r[1] };
+  } catch (e) { return undefined; }
+}
+function FieldMenu({ anchor, at, items, onClose }) {
+  const win = useContext(AppWindowContext);
+  const bounds = fieldBounds(anchor, win);
   return (
     <Overlay anchor={anchor}>
       <View keepFocus style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, pointerEvents: 'box-none' }}>
@@ -531,6 +564,29 @@ function FieldMenu({ anchor, at, items, onClose }) {
       </View>
     </Overlay>
   );
+}
+
+// The spelling and ✨ AI parts every text field shares (docs/SPELLING.md, docs/AI.md "Writing").
+// A misspelled word's wavy line (the engine's wavyColor: a box of 3 px painted alone, so a line coming or going damages
+// only its own box); its colour follows the theme's mode.
+const squiggleColor = (t) => (t.mode === 'dark' ? '#ff6961' : '#e0352b');
+function Squiggles({ list, top, edge = 'left', shift = 0, color }) {
+  return list.map((u, i) => <View key={`sq${i}`} style={{ position: 'absolute', top, height: 3, [edge]: u.x - shift, width: Math.max(2, u.w), wavyColor: color, pointerEvents: 'none' }} />);
+}
+// The rows a field's menu gets around its own: the spelling rows of the word under the pointer first (spell: { word,
+// suggestions, loading }), then the field's, then ✨ AI when something is selected (writing: its row or null).
+function withExtras(base, spell, writing, act) {
+  const top = spell ? spellMenuItems({ word: spell.word, suggestions: spell.suggestions, loading: spell.loading, tr,
+    onReplace: act.replace, onAdd: (w) => spellAddWord(w), onIgnore: (w) => spellIgnore(w) }) : [];
+  return [...top, ...base, ...(writing ? ['-', writing] : [])];
+}
+// the spelling part of a right click at pos: the bad range there, its word, its suggestions on their way
+function spellAt(ranges, value, pos, set) {
+  const r = rangeAt(ranges, pos);
+  if (!r) { set(null); return; }
+  const word = [...(value || '')].slice(r[0], r[1]).join('');
+  set({ word, range: r, loading: true, suggestions: [] });
+  spellSuggest(word).then((list) => set((cur) => (cur && cur.word === word ? { ...cur, loading: false, suggestions: list } : cur)));
 }
 
 // onKeyDown(e) optional: return true if the key was already handled (e.g. Shift+Enter).
@@ -553,8 +609,9 @@ function FieldMenu({ anchor, at, items, onClose }) {
 // Where the caret and the selection go comes from the text as drawn (lord.text.carets): in Hebrew or Arabic with numbers
 // or Latin the selection may be several boxes and ← → move on screen, and the caret never stops inside an emoji, a flag
 // or a letter with its accents.
-export function TextInput({ value, onChange, placeholder, onSubmit, onCancel, onKeyDown, autoFocus, style, secure, eye, size = 13, selectAll = false }) {
+export function TextInput({ value, onChange, placeholder, onSubmit, onCancel, onKeyDown, autoFocus, style, secure, eye, size = 13, selectAll = false, select = null, spellCheck = true, writing: allowWriting = true }) {
   const t = useTheme();
+  const win = useContext(AppWindowContext);
   const token = useRef({}).current;
   const [isFocused, setIsFocused] = useState(false);
   const [blink, setBlink] = useState(true);
@@ -562,7 +619,10 @@ export function TextInput({ value, onChange, placeholder, onSubmit, onCancel, on
   const caret = useRef(null);
   const textBox = useRef(null);
   const len = (v) => [...(v || '')].length;
-  const at = useRef({ value, pos: len(value), anchor: selectAll && value ? 0 : null });    // caret and selection, for the value they were made in
+  // caret and selection, for the value they were made in; select: [start, end] in characters to select first (Files'
+  // rename selects the name without its extension), selectAll the whole text
+  const at = useRef(Array.isArray(select) && value ? { value, pos: Math.min(len(value), select[1]), anchor: Math.max(0, select[0]) }
+    : { value, pos: len(value), anchor: selectAll && value ? 0 : null });
   const hist = useRef(newHistory(secure));  // undo and redo (textfieldmodel.js); none for a password field
   hist.current = historyFor(hist.current, secure);   // a password field keeps no history; a change of secure drops it
   const prim = useRef(null);                // the selection last published as the primary selection (primarymodel.js)
@@ -576,8 +636,11 @@ export function TextInput({ value, onChange, placeholder, onSubmit, onCancel, on
   adopt(value);
   const box = useRef(null);
   const [menu, setMenu] = useState(null);   // the right-click menu: { x, y } in the field's box
+  const [spellMenu, setSpellMenu] = useState(null);   // the misspelled word under the right click (spellAt)
+  const [job, setJob] = useState(null);     // ✨ AI's panel: { action, target, model, text, range, at }
+  const rangesRef = useRef([]);
   const menuOpen = useRef(false);
-  menuOpen.current = !!menu;
+  menuOpen.current = !!menu || !!job;
   const scroll = useRef(0);                 // how far the text is moved toward its start edge, to keep the caret in sight
   const pressing = useRef(false);           // a drag that selects
   const [, redraw] = useState(0);
@@ -752,8 +815,23 @@ export function TextInput({ value, onChange, placeholder, onSubmit, onCancel, on
   };
   const onMenu = (ev) => {
     ev.stopPropagation();                                          // the field's menu, not the one of the view it is in
-    try { const [bx, by] = lord.getLayout(box.current.id); setMenu({ x: ev.x - bx, y: ev.y - by }); } catch (e) { /* not laid out yet */ }
+    try { const [bx, by] = lord.getLayout(box.current.id); setMenu({ x: ev.x - bx, y: ev.y - by }); } catch (e) { return; /* not laid out yet */ }
+    if (!secure) spellAt(rangesRef.current, value, posAtX(ev.x), setSpellMenu); else setSpellMenu(null);
   };
+  // a misspelled word replaced by a suggestion, or the selection by ✨ AI's answer: a step of the history, as a paste
+  const replaceRange = (a, b, text) => {
+    const p = latest.current;
+    adopt(p.value);
+    const cur = at.current, r = replaceSel({ value: p.value || '', pos: b, anchor: a }, text);
+    hist.current = record(hist.current, cur, r, 'paste', lord.now());
+    at.current = r;
+    if (r.value !== p.value) p.onChange(r.value);
+    publish();
+    redraw((n) => n + 1);
+  };
+  const checking = !secure && spellCheck !== false && !(isFocused && imeSt.preedit);
+  const ranges = useSpellRanges(value || '', checking, isFocused ? clampPos(value, at.current.pos) : -1);
+  rangesRef.current = ranges;
 
   const shown = secure ? maskedText(value, shownRef.current) : value || '';
   const chars = [...shown];
@@ -819,6 +897,10 @@ export function TextInput({ value, onChange, placeholder, onSubmit, onCancel, on
     // (paint_capture_until); the maintainer's rule: a password is never captured (GitHub #219 follow-up)
     <View ref={box} onMouseDown={onDown} onDoubleClick={onDouble} onClick={onClick} onContextMenu={onMenu}
       focusable focusRing={false} onFocus={onKeyFocus} protected={!!secure}
+      // Hands (docs/HANDS.md): a text field with its placeholder as its name and its value, never a password's
+      accessibilityRole="textfield" accessibilityLabel={placeholder || undefined} accessibilityState={{ secure: !!secure }}
+      accessibilityValue={secure ? undefined : value || ''}
+      handsSetValue={secure ? undefined : (v) => { latest.current.onChange?.(String(v)); return true; }}
       style={[{ height: Math.max(28, size + 15), paddingHorizontal: 10, borderRadius: t.controlRadius, flexDirection: 'row', alignItems: 'center',
         // the cursor goes to the logical end: on the left if the text is Arabic or Hebrew
         direction: secure ? 'ltr' : value ? textDirection(value) : 'inherit',
@@ -841,14 +923,22 @@ export function TextInput({ value, onChange, placeholder, onSubmit, onCancel, on
           <>
             {shown ? <Text style={{ position: 'absolute', top: 0, [edge]: -sx, fontSize: size, lineHeight: lineH, color: t.text, whiteSpace: 'nowrap' }}>{shown}</Text>
               : <Text style={{ position: 'absolute', top: 0, [edge]: 0, fontSize: size, lineHeight: lineH, color: t.textDim, whiteSpace: 'nowrap' }}>{placeholder || ''}</Text>}
+            {ranges.length && !secure ? <Squiggles edge={edge} shift={sx} top={Math.round(lineH / 2 + size * 0.5) - 1} color={squiggleColor(t)}
+              list={underlines(ranges, 0, chars.length, (a, b) => (lay ? selRects(lay, a, b).map((r) => ({ x: fromStart(r.x, r.w), w: r.w }))
+                : [{ x: measure(chars.slice(0, a).join('')), w: measure(chars.slice(a, b).join('')) }]))} /> : null}
             {isFocused && <View ref={caret} style={{ position: 'absolute', top: 1.5, height: size + 3, width: 1.5, [edge]: caretX - sx,
               backgroundColor: blink && !sel ? t.accent : 'transparent' }} />}
           </>
         )}
       </View>
       {startSide ? null : tail}
-      {menu ? <FieldMenu anchor={box} at={menu} onClose={() => setMenu(null)}
-        items={fieldMenuItems((e) => handlers.get(token)?.(e), { hist: hist.current, sel: !!selRange(at.current), secure, value })} /> : null}
+      {menu ? <FieldMenu anchor={box} at={menu} onClose={() => { setMenu(null); setSpellMenu(null); }}
+        items={withExtras(fieldMenuItems((e) => handlers.get(token)?.(e), { hist: hist.current, sel: !!selRange(at.current), secure, value }), spellMenu,
+          writingMenuFor({ secure, selected: secure ? '' : selectedText(at.current), allowed: allowWriting !== false,
+            open: (o) => setJob({ ...o, text: selectedText(at.current), range: selRange(at.current), at: menu }) }),
+          { replace: (w) => spellMenu && replaceRange(spellMenu.range[0], spellMenu.range[1], w) })} /> : null}
+      {job ? <WritingPanel anchor={box} at={job.at} bounds={fieldBounds(box, win)} job={job} onClose={() => setJob(null)}
+        onReplace={(text) => { if (!stillThere(latest.current.value, job.range, job.text)) return false; replaceRange(job.range[0], job.range[1], forField(text, false)); return true; }} /> : null}
     </View>
   );
 }
@@ -884,8 +974,9 @@ function FieldTip({ text }) {
 // in one piece with the caret and the selection over it. A paste keeps its line breaks. Grows with its rows. A triple
 // click selects the line (up to its line breaks, not the row); Undo, Redo, the right-click menu and the primary selection
 // (select to copy, middle click to paste) work as in a TextInput.
-export function TextArea({ value, onChange, placeholder, onCancel, style, size = 13, minRows = 3 }) {
+export function TextArea({ value, onChange, placeholder, onCancel, style, size = 13, minRows = 3, spellCheck = true, writing: allowWriting = true }) {
   const t = useTheme();
+  const win = useContext(AppWindowContext);
   const token = useRef({}).current;
   const [isFocused, setIsFocused] = useState(false);
   const [blink, setBlink] = useState(true);
@@ -906,8 +997,11 @@ export function TextArea({ value, onChange, placeholder, onCancel, style, size =
   };
   adopt(value);
   const [menu, setMenu] = useState(null);
+  const [spellMenu, setSpellMenu] = useState(null);
+  const [job, setJob] = useState(null);
+  const rangesRef = useRef([]);
   const menuOpen = useRef(false);
-  menuOpen.current = !!menu;
+  menuOpen.current = !!menu || !!job;
   const pressing = useRef(false);
   const [, redraw] = useState(0);
   const order = useContext(FieldOrder);
@@ -1054,8 +1148,23 @@ export function TextArea({ value, onChange, placeholder, onCancel, style, size =
   };
   const onMenu = (ev) => {
     ev.stopPropagation();                                          // the field's menu, not the one of the view it is in
-    try { const [bx, by] = lord.getLayout(box.current.id); setMenu({ x: ev.x - bx, y: ev.y - by }); } catch (e) { /* not laid out yet */ }
+    try { const [bx, by] = lord.getLayout(box.current.id); setMenu({ x: ev.x - bx, y: ev.y - by }); } catch (e) { return; /* not laid out yet */ }
+    spellAt(rangesRef.current, value, posAtXY(ev.x, ev.y), setSpellMenu);
   };
+  const replaceRange = (a, b, text) => {
+    const p = latest.current;
+    adopt(p.value);
+    const cur = at.current, r = replaceSel({ value: p.value || '', pos: b, anchor: a }, text);
+    hist.current = record(hist.current, cur, r, 'paste', lord.now());
+    at.current = r;
+    if (r.value !== p.value) p.onChange(r.value);
+    publish();
+    redraw((n) => n + 1);
+  };
+  const checking = spellCheck !== false && !(isFocused && preedit);
+  const ranges = useSpellRanges(value || '', checking, isFocused ? clampPos(value, at.current.pos) : -1);
+  rangesRef.current = ranges;
+  const sqColor = squiggleColor(t), sqTop = Math.round(lineH / 2 + size * 0.5) - 1;
 
   const chars = [...(value || '')];
   const pos = isFocused ? clampPos(value, at.current.pos) : chars.length;
@@ -1065,6 +1174,8 @@ export function TextArea({ value, onChange, placeholder, onCancel, style, size =
   return (
     <View ref={box} onMouseDown={onDown} onDoubleClick={onDouble} onClick={onClick} onContextMenu={onMenu}
       focusable focusRing={false} onFocus={onKeyFocus}
+      accessibilityRole="textarea" accessibilityLabel={placeholder || undefined} accessibilityValue={value || ''}
+      handsSetValue={(v) => { onChange?.(String(v)); return true; }}
       style={[{ minHeight: minRows * lineH + 2 * pad, padding: pad, borderRadius: t.controlRadius, direction: 'ltr',
         backgroundColor: t.inputBg, border: `1px solid ${isFocused && t.inputFocus !== 'underline' ? t.accent : t.separator}`, overflow: 'hidden' }, style]}>
       {isFocused && t.inputFocus === 'underline' ? <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 2, backgroundColor: t.accent, pointerEvents: 'none' }} /> : null}
@@ -1098,13 +1209,20 @@ export function TextArea({ value, onChange, placeholder, onCancel, style, size =
           <View key={i} style={{ height: lineH }}>
             {boxes.map((bx, j) => <View key={`sel${j}`} style={{ position: 'absolute', top: 1, left: bx.x, width: Math.max(1, bx.w), height: lineH - 2, backgroundColor: t.accent, opacity: 0.38, borderRadius: 2 }} />)}
             {text ? <Text style={textStyle}>{text}</Text> : null}
+            {ranges.length ? <Squiggles top={sqTop} color={sqColor} list={underlines(ranges, r.start, r.end, (a2, b2) => (rl ? selRects(rl, a2, b2)
+              : [{ x: measure(chars.slice(r.start, r.start + a2).join('')), w: measure(chars.slice(r.start + a2, r.start + b2).join('')) }]))} /> : null}
             {mine && <View ref={caret} style={{ position: 'absolute', top: (lineH - size - 3) / 2, left: rl ? layCaretX(rl, pos - r.start) : measure(chars.slice(r.start, pos).join('')), width: 1.5, height: size + 3,
               backgroundColor: blink && !sel ? t.accent : 'transparent' }} />}
           </View>
         );
       })}
-      {menu ? <FieldMenu anchor={box} at={menu} onClose={() => setMenu(null)}
-        items={fieldMenuItems((e) => handlers.get(token)?.(e), { hist: hist.current, sel: !!selRange(at.current), secure: false, value })} /> : null}
+      {menu ? <FieldMenu anchor={box} at={menu} onClose={() => { setMenu(null); setSpellMenu(null); }}
+        items={withExtras(fieldMenuItems((e) => handlers.get(token)?.(e), { hist: hist.current, sel: !!selRange(at.current), secure: false, value }), spellMenu,
+          writingMenuFor({ secure: false, selected: selectedText(at.current), allowed: allowWriting !== false,
+            open: (o) => setJob({ ...o, text: selectedText(at.current), range: selRange(at.current), at: menu }) }),
+          { replace: (w) => spellMenu && replaceRange(spellMenu.range[0], spellMenu.range[1], w) })} /> : null}
+      {job ? <WritingPanel anchor={box} at={job.at} bounds={fieldBounds(box, win)} job={job} onClose={() => setJob(null)}
+        onReplace={(text) => { if (!stillThere(latest.current.value, job.range, job.text)) return false; replaceRange(job.range[0], job.range[1], forField(text, true)); return true; }} /> : null}
     </View>
   );
 }
@@ -1153,8 +1271,9 @@ export function Stepper({ value, onChange, min = -Infinity, max = Infinity, step
 
 // Horizontal slider (drag or click on the bar). It runs from the start edge: min is on the right in right to left.
 // A Tab stop: ← → (swapped in right to left) and ↓ ↑ move it by step (a twentieth of the range unless given), Page Down
-// and Page Up by a tenth, Home and End to the ends. The wheel over it moves it by step too.
-export function Slider({ value, onChange, min = 0, max = 1, width = 160, step, focusable = true }) {
+// and Page Up by a tenth, Home and End to the ends. The wheel over it moves it by step too. track: the bar's color when
+// t.control wouldn't show (a slider on a box that is t.control itself).
+export function Slider({ value, onChange, min = 0, max = 1, width = 160, step, focusable = true, track }) {
   const t = useTheme();
   const rtl = direction() === 'rtl';
   const w = useWheelStep();
@@ -1182,9 +1301,11 @@ export function Slider({ value, onChange, min = 0, max = 1, width = 160, step, f
   const f = (value - min) / (max - min || 1);
   return (
     <View ref={ref} onMouseDown={(e) => { drag.current = true; at(e.x); }} focusable={focusable} onKeyDown={onKey}
+      accessibilityRole="slider" accessibilityValue={String(Math.round(value * 1000) / 1000)}
+      handsSetValue={(v) => { const n = Number(v); if (!Number.isFinite(n)) return false; onChange(Math.max(min, Math.min(max, n))); return true; }}
       onFocus={w.onFocus} onBlur={w.onBlur} onWheel={(e) => w.wheel(e, { value, min, max, step: step || (max - min) / 20 }, onChange)}
       style={{ width, height: 20, borderRadius: 10, justifyContent: 'center', direction: 'ltr' }}>
-      <View style={{ height: 4, borderRadius: 2, backgroundColor: t.control }}>
+      <View style={{ height: 4, borderRadius: 2, backgroundColor: track || t.control }}>
         <View style={{ width: Math.max(0, f * width), height: 4, borderRadius: 2, backgroundColor: t.accent, ...(rtl ? { marginLeft: Math.max(0, (1 - f) * width) } : null) }} />
       </View>
       <View style={{ position: 'absolute', left: (rtl ? 1 - f : f) * (width - 16), top: 2, width: 16, height: 16, borderRadius: 8,
@@ -1272,23 +1393,41 @@ export function FilesDropHint({ over, title, note }) {
 // An app that throws while it renders or in an effect stops at its own window: the window shows what happened and a
 // button to close it, and the rest of the desktop keeps running. Without it React unmounts the whole shell, a black
 // screen (0.8.8.10: Photos restored with a picture that no longer existed). The error goes to the log.
-function CrashNotice({ id, name }) {
+function CrashNotice({ id, name, app, error, componentStack }) {
   const t = useTheme() || {};
+  const [copied, setCopied] = useState(false);
+  const report = crashReport({ app, name, version: (typeof lord !== 'undefined' && lord.version) || '', error, componentStack });
+  // "Copy details": the report for a GitHub issue (no history entry: lord.clipboard directly, clipboard.js imports this file)
+  const copy = () => { try { lord.clipboard.set(report, { secure: false, origin: 'lordos' }); setCopied(true); } catch (e) { /* no clipboard */ } };
+  const btn = (primary) => ({ paddingHorizontal: 14, paddingVertical: 7, borderRadius: t.controlRadius || 8, backgroundColor: primary ? t.accent : t.control || 'rgba(127,127,127,0.18)' });
   return (
     <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, padding: 24, backgroundColor: t.windowBg }}>
       <Text style={{ fontSize: 15, fontWeight: 600, color: t.text, textAlign: 'center' }}>{tr('shell.app.crashed', { app: name })}</Text>
       <Text style={{ fontSize: 12.5, color: t.textDim, textAlign: 'center', maxWidth: 360 }}>{tr('shell.app.crashedBody')}</Text>
-      <View onClick={() => wm.close(id)} style={{ marginTop: 6, paddingHorizontal: 14, paddingVertical: 7, borderRadius: t.controlRadius || 8, backgroundColor: t.accent }}>
-        <Text style={{ fontSize: 13, fontWeight: 600, color: t.onAccent || '#fff' }}>{tr('shell.app.crashedClose')}</Text>
+      <Text style={{ fontSize: 11.5, color: t.textDim, textAlign: 'center', maxWidth: 460, fontFamily: 'monospace', direction: 'ltr' }}>{String(error?.message || error || '').slice(0, 300)}</Text>
+      <View style={{ flexDirection: 'row', gap: 8, marginTop: 6 }}>
+        <View onClick={copy} style={btn(false)}>
+          <Text style={{ fontSize: 13, fontWeight: 600, color: t.text }}>{copied ? tr('shell.app.crashedCopied') : tr('shell.app.crashedCopy')}</Text>
+        </View>
+        <View onClick={() => wm.close(id)} style={btn(true)}>
+          <Text style={{ fontSize: 13, fontWeight: 600, color: t.onAccent || '#fff' }}>{tr('shell.app.crashedClose')}</Text>
+        </View>
       </View>
+      {copied ? <Text style={{ fontSize: 11.5, color: t.textDim, textAlign: 'center', maxWidth: 400 }}>{tr('shell.app.crashedReport', { url: 'github.com/lordbasex/LordOS/issues' })}</Text> : null}
     </View>
   );
 }
 class AppBoundary extends Component {
-  constructor(props) { super(props); this.state = { failed: false }; }
-  static getDerivedStateFromError() { return { failed: true }; }
-  componentDidCatch(err) { console.error(`app ${this.props.app}: ${err?.message || err}`); }
-  render() { return this.state.failed ? <CrashNotice id={this.props.id} name={this.props.name} /> : this.props.children; }
+  constructor(props) { super(props); this.state = { failed: false, error: null, componentStack: '' }; }
+  static getDerivedStateFromError(error) { return { failed: true, error }; }
+  componentDidCatch(err, info) {
+    console.error(`app ${this.props.app}: ${err?.message || err}`);
+    this.setState({ componentStack: String(info?.componentStack || '') });
+  }
+  render() {
+    const st = this.state;
+    return st.failed ? <CrashNotice id={this.props.id} name={this.props.name} app={this.props.app} error={st.error} componentStack={st.componentStack} /> : this.props.children;
+  }
 }
 
 // Memoized, and so is the app's element: a theme re-renders its whole tree when a setting, the window list or the
@@ -1332,7 +1471,8 @@ export const AppHost = memo(function AppHost({ id, focused: asked }) {
   return (
     <AppWindowContext.Provider value={value}>
       <AppFocusContext.Provider value={!!focused}>
-        <View ref={area} protected={prot} style={{ flex: 1, alignSelf: 'stretch' }}>
+        {/* handsDeny: an app whose every answer is the person's own (sdk/handsdeny.js, docs/HANDS.md) */}
+        <View ref={area} protected={prot} handsDeny={appDenied(app.id)} style={{ flex: 1, alignSelf: 'stretch' }}>
           {body}
           <View ref={setOverlayHost} style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, pointerEvents: 'box-none' }} />
         </View>

@@ -1,5 +1,6 @@
 /* js_sec.c — lord.perms and lord.sign (see js_sec.h). Strict input validation; the permission
  * state lives in perms.c (a file the apps cannot write). */
+#include "js_hands.h"
 #include "js_sec.h"
 #include "js_sys.h"
 #include "js_err.h"
@@ -44,6 +45,7 @@ static JSValue f_perm_builtin_default(JSContext *c, JSValueConst t, int argc, JS
 }
 
 static JSValue f_perm_set(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    HANDS_GUARD(c);                         /* never on an AI agent's input (Hands) */
     (void)t; (void)argc;
     const char *app = JS_ToCString(c, argv[0]), *pn = JS_ToCString(c, argv[1]), *st = JS_ToCString(c, argv[2]);
     int p = app && pn ? perm_from_name(pn) : -1;

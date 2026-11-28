@@ -23,6 +23,7 @@
 #include "vmgpu.h"
 #include "qmp.h"
 #include "vmproto.h"
+#include "vmdispconn.h"
 #include "vmmem.h"
 #include "vmsandbox.h"
 #include "vmseccomp.h"
@@ -1248,7 +1249,9 @@ static struct {
     long long ml_wait;                  /* waiting for vm-memlock until then (ms), 0 not waiting */
     char vgpu_render[32], vgpu_dev[96];
     int notify_fd;
-    int display_n;
+    int display_n;                       /* the display connections' names (vmdisplay<n>): only grows */
+    VmDispConns disp;                    /* the ones alive and the rate (vmdispconn.h) */
+    int net_unix_fd;                     /* /proc/self/net/unix, opened before lord-vm's own Landlock; -1 none */
     int cred_fd[MAX_CREDS];
     char cred_name[MAX_CREDS][130];
     int ncreds;
@@ -1402,6 +1405,7 @@ static struct {
      * lord-server's), size, what was written and acknowledged, what came before (a resume), the part file's descriptor
      * (lord-server's), the running SHA-256, a child hashing what came before, the offers' rate */
     int lag_send_ok, rx_state;
+    int lag_oldlordos;                    /* the tools said "oldlordos": the guest's LordOS is too old for apps mode */
     uint32_t rx_gid, rx_id, rx_next;
     uint64_t rx_size, rx_off, rx_acked, rx_prefix;
     int rx_fd, rx_hpipe;
@@ -1442,6 +1446,30 @@ static struct {
     uint64_t sc_seen[512];
     int sc_nseen;
 } S;
+
+/* the display connections whose client end was closed are no longer alive (vmdispconn.h): /proc/net/unix read again */
+static void disp_prune(void) {
+    if (S.net_unix_fd < 0 || lseek(S.net_unix_fd, 0, SEEK_SET) < 0) return;
+    size_t cap = 1 << 16, n = 0;
+    char *b = malloc(cap);
+    while (b) {
+        if (n == cap) {
+            if (cap >= (8u << 20)) { free(b); return; }     /* never more than 8 MB: not pruned */
+            char *nb = realloc(b, cap * 2);
+            if (!nb) break;
+            b = nb; cap *= 2;
+        }
+        ssize_t r = read(S.net_unix_fd, b + n, cap - n);
+        if (r < 0 && errno == EINTR) continue;
+        if (r < 0) { free(b); return; }
+        if (r == 0) break;
+        n += (size_t)r;
+    }
+    if (!b) return;
+    int gone = vm_disp_prune(&S.disp, b, n);
+    free(b);
+    if (gone) vlog("display: %d connection(s) closed by their client, %d alive", gone, S.disp.n);
+}
 
 /* what the guest said of the transfer folder */
 enum { XG_UNKNOWN = 0, XG_MOUNTED, XG_NEEDS_WINFSP, XG_NO_SERVICE, XG_FAILED };
@@ -2556,6 +2584,8 @@ static int mem_backing(const VmMachine *m) {
 /* the hub of a group's internal link: the workstation's only card is on hub 0, a gateway's second card on hub 1 (hub 0
  * is its passt card's) */
 #define LINK_HUB(m) ((m)->network == VM_NET_LINK ? 0 : 1)
+/* whether the machine has a group's link card (19.3): a Workstation's only card, or a Gateway's second one */
+static int link_card_of(const VmMachine *m) { return m->group[0] && (m->network == VM_NET_LINK || (m->role == VM_ROLE_GATEWAY && m->link_mac[0])); }
 #define XNIC_HUB 10                     /* an imported machine's other cards' hubs: 10 .. 10 + VM_EXTRA_NICS - 1 */
 #define MAXARGS 192
 static char *qargv[MAXARGS];
@@ -3282,6 +3312,11 @@ static void build_qemu_args(void) {
         arg("-netdev"); argf("hubport,id=lnk0,hubid=%d", LINK_HUB(m));
         arg("-device"); argf("virtio-net-pci,id=link0,netdev=lnk0,mac=%s,addr=0x%x", m->link_mac, VM_LINK_SLOT_GATEWAY);
     }
+    /* (QA 0.8.9.6.2, BUG-N) and a port with nothing behind it on that hub, so the pulled cable drops frames. A hub whose
+     * card is its only port can't receive: QEMU queues the card's first frame there and stops its transmit queue until
+     * that queue is flushed, and adding the link's port later flushes nothing. A Workstation started before its Gateway
+     * sent its ARP into the empty hub and never sent again; a port without a peer always takes frames and drops them */
+    if (link_card_of(m)) { arg("-netdev"); argf("hubport,id=lnkz,hubid=%d", LINK_HUB(m)); }
     /* an imported machine's other cards: there with their addresses, so the guest keeps its interfaces. In Shared and
      * Host-only each sits on a hub of its own (XNIC_HUB + i), where its own passt goes once the machine runs
      * (xnic_attach); in Bridged and Isolated it has no backend: its cable is out */
@@ -4814,7 +4849,7 @@ static void begin_snapshot(int ci, uint32_t seq, int kind, const char *text) {
  * untrusted: lines and frames have hard limits, and only text goes on to lord-server. */
 /* what org.lordos.agent's helper brings (kept when qemu-guest-agent comes and goes) */
 #define VAC_LAG (VAC_CLIPBOARD | VAC_CLIP_NOTOOL | VAC_CLIP_LAZY | VAC_DISPLAY | VAC_OPEN | VAC_PLACE | (int)LAG_CAP_WINDOWS | VAC_EXTRA | VAC_EXTRA_OFF | \
-                 VAC_SHELL | VAC_LINKS | VAC_NOTIFY | VAC_SEND)
+                 VAC_SHELL | VAC_LINKS | VAC_NOTIFY | VAC_SEND | VAC_OLD_LORDOS)
 enum { AQ_IGNORE = 0, AQ_SYNC, AQ_INFO, AQ_OSINFO, AQ_PING, AQ_JEXEC, AQ_JSTATUS, AQ_FOPEN, AQ_FWRITE, AQ_FCLOSE, AQ_INSTALL, AQ_INHIBIT,
        AQ_IDEXEC, AQ_IDSTATUS, AQ_FXEXEC, AQ_FXSTATUS, AQ_FXOPEN, AQ_FXWRITE, AQ_FXCLOSE, AQ_DEVRAW,
        AQ_WIEXEC, AQ_WISTATUS, AQ_WIOPEN, AQ_WIWRITE, AQ_WICLOSE, AQ_XEXEC, AQ_XSTATUS, AQ_INSTSTATUS,
@@ -7036,6 +7071,7 @@ static void drain_lag(void) {
                 S.lag_links = (hw & AG_HELLO_LINKS) != 0;
                 S.lag_notify = (hw & AG_HELLO_NOTIFY) != 0;
                 S.lag_send_ok = (hw & AG_HELLO_SEND) != 0;
+                S.lag_oldlordos = !S.lag_windows && (hw & AG_HELLO_OLDLORDOS) != 0;
                 if (!S.lag_send_ok) rx_lost("the guest's tools don't send files any more");
                 if (!S.lag_shell) shell_end("the guest's tools have no shell any more", 0);
                 /* "noclip": the helper runs but the guest has no clipboard tool (xclip, wl-clipboard); it says hello
@@ -7057,7 +7093,8 @@ static void drain_lag(void) {
                             (S.lag_open && S.ag_windows ? VAC_OPEN : 0) | (S.lag_place && S.ag_windows ? VAC_PLACE : 0) |
                             (S.lag_extra && S.extra_avail ? VAC_EXTRA : 0) | (S.lag_extra && S.lag_extraoff ? VAC_EXTRA_OFF : 0) |
                             (S.lag_shell ? VAC_SHELL : 0) | (S.lag_links && S.m.guest_links ? VAC_LINKS : 0) |
-                            (S.lag_notify && S.m.guest_notify ? VAC_NOTIFY : 0) | (S.lag_send_ok && !S.m.guest_files_off && !S.m.profile_lock ? VAC_SEND : 0);
+                            (S.lag_notify && S.m.guest_notify ? VAC_NOTIFY : 0) | (S.lag_send_ok && !S.m.guest_files_off && !S.m.profile_lock ? VAC_SEND : 0) |
+                            (S.lag_oldlordos ? VAC_OLD_LORDOS : 0);
                 if (!S.lag_open && !S.lag_place) open_all_end();
                 host_hello(0);
                 if (S.lag_display && S.disp_w) { uint8_t d[8]; ag_display_write(d, S.disp_w, S.disp_h); lag_send(AGK_DISPLAY, d, 8); }
@@ -7269,7 +7306,7 @@ static void console_out(const char *b, size_t n);
  * socket backend lk<gen> on hub port lh<gen>, and the previous one comes off first, as the network's healing does with
  * passt. The descriptor must be one end of a connected AF_UNIX stream pair made by a process of this account: never a
  * listening socket, a file, or a socket to anything else. The two QEMUs then exchange frames directly. */
-static int link_card(void) { return S.m.group[0] && (S.m.network == VM_NET_LINK || (S.m.role == VM_ROLE_GATEWAY && S.m.link_mac[0])); }
+static int link_card(void) { return link_card_of(&S.m); }
 
 static int link_fd_ok(int fd, char *why, size_t wn) { return vm_link_fd_ok(fd, why, wn); }
 
@@ -7455,7 +7492,10 @@ static void handle_request(int ci, const VmMsg *m, int fd) {
     case VM_DISPLAY: {
         if (S.m.display != VM_DISPLAY_WINDOW) { reply(ci, m->seq, VME_NO_DISPLAY, "this machine has no display"); return; }
         if (!alive) { reply(ci, m->seq, VME_WRONG_STATE, "not running"); return; }
-        if (S.display_n >= 16) { reply(ci, m->seq, VME_BUSY, "too many display connections"); return; }
+        /* (QA of 0.8.9.6.2) a bound on the connections alive at once and a rate, never on the run's total */
+        if (!vm_disp_rate_ok(&S.disp, now_ms())) { reply(ci, m->seq, VME_BUSY, "too many display connections in a short time"); return; }
+        if (S.disp.n >= VM_DISP_LIVE_MAX) disp_prune();
+        if (S.disp.n >= VM_DISP_LIVE_MAX) { reply(ci, m->seq, VME_BUSY, "too many display connections"); return; }
         int sv[2];
         if (socketpair(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0, sv)) { reply(ci, m->seq, VME_INTERNAL, strerror(errno)); return; }
         char args[96];
@@ -7974,7 +8014,7 @@ static void on_qmp_event(const JVal *root) {
         if (id && !strcmp(id, "qga-port")) { S.qga_open = open; if (open) qga_sync(); else ag_lost("the guest closed qemu-guest-agent's port"); }
         else if (id && !strcmp(id, "lag-port")) {
             vlog("agent: the guest %s org.lordos.agent", open ? "opened" : "closed");
-            if (!open) { if (S.layout[4]) { static const int none[6]; layout_set(none); } S.lag_hello = 0; S.lag_disps[0] = 0; S.lag_clipx = S.lag_clipreq = S.lag_display = S.lag_windows = S.lag_open = S.lag_place = S.lag_pointer = S.lag_gvt = S.lag_extra = S.lag_extraoff = S.extra_avail = S.lag_perf = 0; S.lag_shell = S.lag_links = S.lag_notify = 0; shell_end("the guest closed org.lordos.agent", 0); S.lag_send_ok = 0; rx_lost("the guest closed org.lordos.agent: what came is kept for when it offers the file again"); S.perf_said = 0; S.disp_n = 0; S.tablet = 0; S.tablet_far = 0; S.lag_win_n = 0; S.clip_gen = 0; S.ag_caps &= ~VAC_LAG; S.lag_n = 0; lag_windows_off(); open_all_end(); ag_broadcast(); }
+            if (!open) { if (S.layout[4]) { static const int none[6]; layout_set(none); } S.lag_hello = 0; S.lag_disps[0] = 0; S.lag_clipx = S.lag_clipreq = S.lag_display = S.lag_windows = S.lag_open = S.lag_place = S.lag_pointer = S.lag_gvt = S.lag_extra = S.lag_extraoff = S.extra_avail = S.lag_perf = 0; S.lag_shell = S.lag_links = S.lag_notify = 0; shell_end("the guest closed org.lordos.agent", 0); S.lag_send_ok = 0; S.lag_oldlordos = 0; rx_lost("the guest closed org.lordos.agent: what came is kept for when it offers the file again"); S.perf_said = 0; S.disp_n = 0; S.tablet = 0; S.tablet_far = 0; S.lag_win_n = 0; S.clip_gen = 0; S.ag_caps &= ~VAC_LAG; S.lag_n = 0; lag_windows_off(); open_all_end(); ag_broadcast(); }
         }
     } else if (!strcmp(ev, "JOB_STATUS_CHANGE")) {
         const char *id = data ? json_str(data, "id") : NULL, *st = data ? json_str(data, "status") : NULL;
@@ -8102,7 +8142,12 @@ static void on_qmp_reply(const JVal *root, int ok) {
         if (p.kind == P_CD_LAST) cd_done();
         break;
     case P_ADDCLIENT:
-        if (ok) { VmMsg r = vm_msg(VM_DISPLAY_FD, p.seq, 0, 0, 0, 0, ""); send_to(p.client, &r, p.fd); vlog("display: connection %d handed to client %d", S.display_n, p.client); }
+        if (ok) {
+            struct stat dst;
+            if (p.fd >= 0 && !fstat(p.fd, &dst)) vm_disp_add(&S.disp, (unsigned long)dst.st_ino, now_ms());
+            VmMsg r = vm_msg(VM_DISPLAY_FD, p.seq, 0, 0, 0, 0, ""); send_to(p.client, &r, p.fd);
+            vlog("display: connection %d handed to client %d (%d alive)", S.display_n, p.client, S.disp.n);
+        }
         else reply(p.client, p.seq, VME_QMP, desc);
         if (p.fd >= 0) close(p.fd);
         break;
@@ -8834,6 +8879,7 @@ static int cmd_start(const char *dir, int argc, char **argv) {
     S.keeper_fd = S.passt_pidfd = S.tpm_q = S.xfer_dfd = S.fx_cpipe = S.fx_stagefd = S.sess_fd = S.sc_fd = S.key_fd = S.key_w = S.fw_fd = S.render_fd = S.render_qfd = S.vs_pidfd = S.vs_fd = S.vs_qemu_end = S.vs_qfd = S.vs_err = -1;
     for (int i = 0; i < 2 + VM_DATA_DISKS; i++) S.sess_fds[i] = -1;
     S.qmp.fd = -1;
+    S.net_unix_fd = -1;
     for (int i = 0; i < MAX_CLIENTS; i++) S.cl[i].fd = -1;
     for (int i = 0; i < argc; i++) {
         if (!strcmp(argv[i], "--paused")) S.paused_start = 1;
@@ -9085,6 +9131,8 @@ static int cmd_start(const char *dir, int argc, char **argv) {
         }
         logind_open();
         cpu_begin();
+        /* the display connections' liveness (vmdispconn.h): this namespace's unix sockets, read again when needed */
+        if (S.net_unix_fd < 0) S.net_unix_fd = open("/proc/self/net/unix", O_RDONLY | O_CLOEXEC);
         S.sandbox |= vm_jail_self(S.dir, S.rundir, S.xfer_on && S.xfer_dfd >= 0 ? S.xfer_path : NULL);
         vlog("lord-vm: own Landlock %s", S.sandbox & VMS_SUPERVISOR_LANDLOCK ? "applied (machine folder only)" : "not available");
         VmMsg i = info_msg();
@@ -12435,6 +12483,16 @@ static int copy_sparse_fd(int a, const char *to) {
 }
 
 static void exp_progress(double pct) { printf("{\"progress\":%.1f}\n", pct); fflush(stdout); }
+/* while a disk is converted: qemu-img's own percentage within that disk's share of the job (an OVA's one disk was the
+ * whole wait, and the line came only at its end: "0 %" for minutes, VM 116 QA). exp_from, exp_span: the share. The
+ * line is written only when it moves a tenth of a percent. */
+static double exp_from, exp_span, exp_last = -1;
+static void exp_tool_progress(double pct) {
+    double v = exp_from + exp_span * pct / 100.0;
+    if (v - exp_last < 0.1) return;
+    exp_last = v;
+    exp_progress(v);
+}
 
 /* a machine's disk (format, plus its base for a linked clone) converted to out with qemu-img, jailed: reads the disk
  * and the base, writes only in out_dir. ofmt "qcow2" (encrypted again under the key when the machine is) or "vmdk"
@@ -12558,11 +12616,17 @@ static int cmd_export(const char *dir, int argc, char **argv) {
         } else if (i) snprintf(p2, sizeof p2, "%s/data-%d.%s", dd, i, ext);
         else snprintf(p2, sizeof p2, "%s/system.%s", dd, ext);
         int bad;
+        /* the disks take 95 % of the job (an OVA's 85 %: its checksums and its package come after) */
+        double share = ova ? 85.0 : 95.0;
+        exp_from = total > 0 ? share * (double)done / (double)total : 0;
+        exp_span = total > 0 ? share * (double)s2.st_blocks * 512 / (double)total : share;
+        tool_progress = exp_tool_progress;
         if (convert) bad = exp_convert(&m, p1, m.raw, i == 0 ? m.base : NULL, ova ? "vmdk" : ext, p2, ova ? tmp : dd, err, sizeof err);
         else { bad = copy_reflink(p1, p2) && copy_sparse(p1, p2); if (bad) snprintf(err, sizeof err, "%s", strerror(errno)); }
+        tool_progress = NULL;
         if (bad) { fprintf(stderr, "lord-vm: exporting disk %d failed: %.200s\n", i + 1, err); goto out; }
         done += (long long)s2.st_blocks * 512;
-        exp_progress(total > 0 ? 95.0 * (double)done / (double)total : 95.0);
+        exp_progress(total > 0 ? share * (double)done / (double)total : share);
         if (ova) {
             oi.disk[i].file = vmdk_name[i];
             oi.disk[i].capacity = (uint64_t)(i ? m.data_gb[i - 1] : m.disk_gb) << 30;
@@ -12592,6 +12656,7 @@ static int cmd_export(const char *dir, int argc, char **argv) {
             if (sha256_file(p2, sums[i + 1])) { free(ovf); fprintf(stderr, "lord-vm: can't read %s\n", p2); goto out; }
         }
         for (int i = 0; i <= nd; i++) sump[i] = sums[i];
+        exp_progress(92);
         char *mf = vmx_mf(names, sump, nd + 1);
         int of = open(dreal, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW, 0600);
         long long now = (long long)time(NULL);
@@ -12743,21 +12808,10 @@ static int cmd_import_lordvm(const char *src, int argc, char **argv) {
     if (!realpath(src, real)) { fprintf(stderr, "lord-vm: %s: %s\n", src, strerror(errno)); return 1; }
     int sfd = open(real, O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW);
     if (sfd < 0) { fprintf(stderr, "lord-vm: %s isn't a folder\n", real); return 1; }
-    /* the manifest: at most VMX_MANIFEST_MAX, regular, read through the folder's descriptor */
-    int mfd = openat(sfd, "manifest.json", O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK);
-    struct stat st;
-    if (mfd < 0 || fstat(mfd, &st) || !S_ISREG(st.st_mode) || st.st_size <= 0 || st.st_size > (off_t)VMX_MANIFEST_MAX) {
-        if (mfd >= 0) close(mfd);
-        close(sfd);
-        fprintf(stderr, "lord-vm: %s has no manifest.json: not a LordOS export\n", real);
-        return 1;
-    }
-    char *mt = malloc((size_t)st.st_size + 1);
-    ssize_t got = mt ? pread(mfd, mt, (size_t)st.st_size, 0) : -1;
-    close(mfd);
+    /* the manifest: at most VMX_MANIFEST_MAX, regular, read through the folder's descriptor (the same reader as
+     * lord-server's exportInfo) */
     VmxManifest man;
-    if (got != st.st_size || vmx_manifest_parse(mt, (size_t)got, &man, err, sizeof err)) { free(mt); close(sfd); fprintf(stderr, "lord-vm: the manifest: %s\n", err[0] ? err : "unreadable"); return 1; }
-    free(mt);
+    if (vmx_manifest_read(sfd, &man, err, sizeof err)) { close(sfd); fprintf(stderr, "lord-vm: %s: not a LordOS export: %s\n", real, err); return 1; }
     if (man.encrypted && !key_have()) { close(sfd); fprintf(stderr, "lord-vm: the machine is encrypted: its key is needed (--key-fd)\n"); return 4; }
     if (!man.encrypted && key_have()) key_wipe();
     int fds[VMX_MAX_FILES];

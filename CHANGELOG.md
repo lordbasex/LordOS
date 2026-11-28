@@ -10,6 +10,1827 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
+## [0.8.9.6.2-beta] - 2026-11-28
+
+An update of the package through the Store and `apt`, with no new images. **Hands**: an AI agent such as Claude Code
+can use the LordOS desktop through `lordos-mcp` (read windows, click and type through lord-server, with a banner and a
+Stop, and person-only places out of its reach). **Spell checking** in LordOS's own text fields (`lord-spell`, Hunspell in
+a sandbox) and **✨ Writing** on selected text with the local model; the Brain can use the graphics card and a chosen
+number of cores. **Community themes**: style packs and app skins, installing a desktop style from a file with its own
+security piece, `minLordOS` and translated texts; the official themes get names of their own. **Settings → Wallpaper**
+is a gallery with three new collections, and moving wallpapers cost a fraction of what they did. The **toolkit audit**
+(`lordos-testbench --toolkits`) checks GTK and Qt apps and reaches the hardware report; Qt and GTK 3 on Xwayland follow
+dark mode. Web apps get a Chrome-like right-click menu, spell checking and the groundwork for calls. Lumo is the 3D Lumo.
+Fixes include the interface language for Linux apps and a New Folder button in the file dialog (#262), Machines in
+French (#266), the keyboard light with the display off (#270), the installer on a GPT disk with several partitions
+(#280), lord-nvgpu with Debian's NVIDIA packages (#273), Brave and Vulkan apps closing at the open-file limit (#251),
+screenshots with several displays (#252) and stalls on a spinning disk (#250), plus the findings of a Claude Security
+scan of this version and of the QA runs on the maintainer's PC, VM 116, VM 127 and a Raspberry Pi 5. New: a horizontal
+scroll bar in Text Editor (#264), "Close the window when the machine stops" in Machines (#267), % and ± in Calculator
+(#271) and Files' "Properties" (#279).
+
+### Security
+- **Hands: an AI agent's input no longer takes a screen capture or recording through Screenshots** (security scan of
+  0.8.9.6.2, F1). An agent could press ❖⇧3 (or ❖⇧4, Print Screen, a toolbar button) and get a full, unredacted PNG
+  of every display in `~/Pictures/Screenshots` and on the clipboard, including the handsDeny pages and the windows
+  outside its allowlist that Hands' own Screenshot paints black. Screenshots now refuses every capture, area
+  selection, recording and Enter on a waiting selection when the input is the agent's (`lord.hands.injecting()`),
+  with "Only you can do this" (`hands.refused`), and no longer needs the 15-second timeout for an agent's selection.
+  As a backstop, lord-server refuses `lord.media.screenshot` and `lord.media.screenRecord` to an agent's input
+  (`hands_native_guard`), and a capture another run takes while the agent owns the input is marked (`agent_cap`,
+  inherited by crops, resizes, turns and markup) and never copied, saved or read by OCR. Tests: `build/hands-test`
+  (both names refused, `media.saveImage`/`copyImage`/`crop` left alone) and the Screenshots scene of
+  `tests/textfield_menu_test.mjs` (no `screenshot` or `screenRecord` call for an agent's ❖⇧3, ❖⇧4, window, record;
+  the person's ❖⇧3 still captures both displays).
+- **Community themes: the text focus is the facade's own, never LordOS's** (security scan of 0.8.9.6.2, F2). A
+  theme's SDK had LordOS's `takeTextFocus`, `releaseTextFocus`, `restoreFocus`, `textFocusOwner` and `focusToken`,
+  so a theme could watch for the keyring prompt's password field (or any other shell field) and point every key at
+  its own handler. Those five are gone from the theme's allowlist and the facade gives a theme its own version
+  (`sdk/themefocusmodel.js`): its tokens are registered under tokens the facade makes, LordOS's real tokens never
+  reach it (while a LordOS field has the keys it sees one frozen stand-in that no call takes back), and it has the
+  keys only under the policy of its own key listeners (`themeFocusBlocked`, as `themeHearsKeys`): never while a LordOS
+  field has them, any keyboard layer is open (a system prompt, LordOS's search, a sheet), a dialog owns the keyboard
+  or a LordOS window has the focus (a Linux app's only while the theme holds the keyboard), checked when it takes
+  them and again at each key; and it is never sticky: a pointerdown on an app window takes the keys back. The
+  LordOS-themes `flow` and `classic` menus use the same names and keep working by mouse; their keyboard navigation now
+  works only while no LordOS window is focused. Tests: `tests/theme_focus_model_test.mjs` (40 checks: the stand-in,
+  refusals, each blocking condition, per-key checks, the drop) and the `probe` fixture of
+  `tests/community_theme_headless.sh` (a LordOS `TextInput` with the keys: the theme sees the stand-in, can't take or
+  restore the keys, and hears no key).
+- **Hands: an AI agent's input never trusts a mail certificate or changes a mail account** (security scan of
+  0.8.9.6.2, F3). Mail's certificate dialog was not handsDeny and Mail is not a person-only app, so an agent's click
+  on **Trust** (with someone in the middle presenting their own certificate) saved that fingerprint, and lord-maild
+  then sent the password and the mail through them. Now, while the agent owns the input, the broker refuses the
+  isolated Mail's `save` of the accounts file (`hands.refused`) unless it changes only display fields (name, full
+  name, signature, color, folded and collapsed folders, saving to Sent; the notify, mail-paused and dav-paused
+  switches): a trusted certificate, a server, the user, address or way in, an account added or removed, a trusted
+  sender or anything unparseable is refused (`brokermail_cfg_guarded`, fail closed). In the shell's own process
+  `lord.mail.saveConfig` is on `hands_native_guard`'s list. Every sheet of Mail's account setup (Add Account, the
+  certificate warning, the password prompt, the accounts panel) is `handsDeny` too. Tests: `build/brokermail-test`
+  (10 cases of what is guarded, an agent's Trust and Add Account refused with nothing saved, a signature change
+  saved, the person's own Trust saved) and `build/hands-test` (`mail.saveConfig` refused, `mail.config` and
+  `mail.request` left alone).
+- **Hands: a person-only Settings page is out of an agent's reach as a whole, Cloud's sheets included** (security
+  scan of 0.8.9.6.2, F4). Only the page's body was `handsDeny`: Cloud's **Add Account** button in the header and every
+  Cloud sheet (Add Account, credentials, Remove Account, Empty Trash) were outside it, so an agent could add an account
+  of its choosing or press the red confirm of Empty Trash (the provider's trash, for good) or Remove Account (with its
+  pending uploads), which were plain views, not `ConfirmDialog`s. Now the whole content column of a person-only page
+  is `handsDeny`, header included, and Cloud's sheets are drawn in one `handsDeny` box; Remove Account and Empty Trash
+  confirm in destructive `ConfirmDialog`s (Enter is Cancel, an agent's click and key refused); and lord-server refuses
+  to an agent's input (`hands_native_guard`) every `lord.cloud` call that signs in, changes an account or its
+  credentials, publishes or destroys: `add` and `answer` (a new account and its questions), `beginSignIn` and
+  `openSignInPage` (the browser's sign-in and the token it brings), `remove`, `setEnabled`, `emptyTrash` (the
+  provider's trash, for good), `link` (a public link shares files outside the machine, so only the person makes one)
+  and `delete` (it unlinks in the mount, so the file goes on the server: not the Trash, nothing Files can put back,
+  unlike moving a file to the Trash). Unlinking a share, pausing, keeping, freeing space, renaming an account and the
+  bandwidth options stay open. Tests: `tests/hands_deny_test.mjs` (the column and the sheets, both confirms; Mail's
+  six setup sheets for F3) and `build/hands-test` (the nine names refused; `status`, `list`, `links`, `unlink`,
+  `cancelSignIn`, `rename`, `pause`, `keep`, `free` and `setOptions` left alone).
+- **Spelling: bounded work, so a long line can't freeze the desktop** (security scan of 0.8.9.6.2, F5). The file-name
+  pattern (`FILE_NAME`, `sdk/spellmodel.js`) backtracked quadratically over a long run of letters without a dot, over
+  the whole field's text, on every render (each caret blink) on lord-server's one JS thread: a mail with a
+  100,000-letter line, quoted in a reply, froze the session until the watchdog. Now only the first 50,000 code points
+  of a text are checked (`TEXT_MAX`), the text is cut at whitespace first, a chunk longer than 256 code points
+  (`CHUNK_MAX`: a hash, a URL, base64, never a word) is skipped, and the file-name pattern is anchored and tried only
+  where a name can start in one short chunk. `spellRanges` is memoized per text, languages, caret, verdicts and the
+  person's words, so a caret blink doesn't scan again. Test: `tests/spell_model_test.mjs` (100,000 letters, a long run
+  of name characters, a long text, a long chunk, file names still blanked, positions kept).
+- **Web apps: a notification's tag no longer reaches the log as a hash** (security scan of 0.8.9.6.2, F6). The
+  `notify:` line of a web app's log carried 8 hex digits of FNV-1a seeded with a 64-bit salt and a splitmix finalizer:
+  every step invertible, so two or three notifications whose tags someone knew (chat ids, often phone numbers) let
+  them recover the state and test candidate numbers against the other lines of a shared log; and a failed
+  `getrandom` fell back to a time-and-pid salt. Now the line says only the tag's place in this run's order of first
+  appearance (`page tag 3`, `other` after 1,024, `none` without one: `webpage_tag_id`), computed from nothing of the
+  tag, and the salt and its fallback are gone. The "replaced" check compares an in-memory 64-bit key that is never
+  logged (`webpage_tag_key`). docs/WEBAPPS.md updated. Test: `build/webapp-test` (numbering, another run's other
+  order, a full table, the tag never in the line).
+- **Notes: a crafted first line no longer freezes the desktop when a file is imported** (security scan of 0.8.9.6.2,
+  F7). `titleOf` ran its image pattern (`!\[[^\]]*\]\([^)]*\)`) over the whole first line, up to 8 MB, before cutting
+  the title to 60 characters: a `notes.md` whose first line was a long run of `![` without `]` was quadratic on
+  lord-server's JS thread (100,000 of them: about 10 s in V8, longer in QuickJS) on each import and each rescan of
+  `~/Notes`. Now the line is cut to 512 code points before any pattern, the image pattern is bounded
+  (`{0,256}`/`{0,1024}`, no line breaks) and only the first 4,096 lines are looked at for the title. Test:
+  `tests/notes_model_test.mjs` (100,000 and 4,000,000 `![` in under a second, an image still stripped).
+- **Community themes: no forged lines in the session log** (security scan of 0.8.9.6.2, F8). `lord.log` (the theme's
+  own and through `console`) wrote the theme's text to stderr unchanged, and lord-log splits on line breaks and takes
+  each line's subsystem from its own `word: ` prefix: `lord.log('ok\nlord-server: community theme evil confirmed by
+  the person')` printed a line the Logs app, support reports and an agent's `read_app_log` showed as lord-server's.
+  Now, in a community session, every `lord.log` text and every exception's message and stack (whatever realm threw
+  it: a theme's Error can travel through LordOS's code) is printed line by line, each line cleaned (C0 and C1
+  controls, DEL, line separators, bidi controls and malformed bytes become `?`; at most 2,048 bytes and 64 lines per
+  call) and prefixed: `js: theme <id>: ` while the theme's code is on the stack or in its realm, `js: ` otherwise
+  (`src/ui/logclean.c`). Outside a community session nothing changes. Tests: `build/logclean-test` (controls,
+  separators, bidi, UTF-8 kept, cut lines, the prefix on every line, the line cap) and the `probe` fixture of
+  `tests/community_theme_headless.sh` (forged lines through `lord.log`, `console` and a thrown Error all come out
+  prefixed, none starts a line of its own).
+
+### Added
+- **Text Editor: a horizontal scroll bar for lines wider than the window** (GitHub #264, first part; soft word wrap
+  is planned for 0.8.9.6.3). Along the bottom of the text column, it shows when the widest line doesn't fit; drag its
+  thumb or click its track. Sideways scrolling (Shift and the wheel, or a touchpad's sideways swipe, now read too) stops
+  at the end of the widest line instead of running on. The widest line is measured again only when the text or the
+  tab size changes (`widest`, `clampLeft` in `apps/editor/scrollbar.js`, `apps/editor/EditorView.jsx`). Checked with a
+  headless screenshot of a 1,600-character line. Test: `tests/editor_scrollbar_test.mjs`.
+- **Machines: "Close the window when the machine stops"** (GitHub #267; Configure → Startup and shutdown, per machine,
+  `closeOnStop` in its `app.json`, off by default). After a clean stop (the guest shut down, LordOS shut down, Shut Down
+  or Turn Off) the machine's window closes. After a failure, a reset Machines restarts, or the installer's restart, the
+  window stays as before, so an error stays on screen (`closesOnStop` in `apps/machines/model.js`, `vmwindow.jsx`,
+  `configure.jsx`). Every UI language; the Machines feature page (en, es, pt) names it. Test: `tests/vm_model_test.mjs`.
+- **Calculator: % and ± keys** (GitHub #271). **%** after **+** or **−** takes that percent of what comes before it
+  (200 + 10% = 220, 200 − 10% = 180, 2 × 100 + 10% = 220); anywhere else it divides by 100 (200 × 10% = 20, 50% = 0.5).
+  **±** changes the sign of the number being typed (a minus in front of it, or taken away; a binary minus stays). On
+  the keyboard, **%** and **F9**. The keypad has six rows (C ± % ÷ · ( ) ⌫ × · 7 8 9 − · 4 5 6 + · 1 2 3 . · 0 =), the
+  window is a little taller, and app skins get each key's `span`. The arithmetic moved to `apps/calculator/model.js`
+  (still no `eval`). Help's Calculator page (en, es, pt) explains both. Tests: `tests/calculator_model_test.mjs` and
+  two new checks in `tests/calculator_skin_scene.mjs`.
+- **Flatpak apps can notify: `org.freedesktop.portal.Notification`** (BUG-J of the ws171 QA: AddNotification answered
+  UnknownMethod; approved by the maintainer on 2026-11-27 with limits). lord-server's portal serves `AddNotification`
+  and `RemoveNotification` (version 1) for Flatpak apps only: the caller is known only by its root-owned
+  `app-lordos-fp-<id>.scope`, an app with the firewall's "no notifications" isn't shown, and anyone else is refused.
+  The banner is the one Linux apps' notifications get (Settings → Notifications, Do Not Disturb), named and drawn with
+  the icon of the app's own installed export (the icon it sends is read past). Title and body are plain text; at most
+  three buttons, plain labels whose action names stay in lord-server and go back only as `ActionInvoked` to the
+  connection that added the notification. Their ids (`PNOTE_BASE` and up) can't be reached through the Notifications
+  server (`NOTIFYD_ID_MAX`). Tests: `portal-cast-test` (shown, replaced, a button's action, Remove; a bad id, a
+  long id, the wrong signature, a native caller, an unknown one and a restricted app refused), `notifyd-test`.
+  docs/FLATPAK.md.
+- **Hands (Manos): an AI agent uses the LordOS desktop** (in development; approved by the maintainer on 2026-11-26,
+  AGENTS.md; docs/HANDS.md). Modelled on Claude in Chrome: Claude Code today, and later Lumo's own agent, reads the
+  windows as a tree, clicks, types, scrolls and takes screenshots through lord-server.
+  - **`lordos-mcp`** (`/usr/bin/lordos-mcp`, an MCP server over stdio; `claude mcp add -s user lordos-mcp -- lordos-mcp`) with
+    the tools `windows_context`, `open_app`, `open_path`, `close_window`, `read_window`, `find`, `computer` (screenshot,
+    left/right/middle/double/triple click, hover, drag, type, key chords, scroll, zoom, wait), `set_value`,
+    `read_app_log` and `record` (an animated GIF, returned or saved under a bare name in `~/Pictures/LordOS QA`). No tool
+    runs code. Coordinates are the last screenshot's pixels, mapped back to the desktop.
+  - **`read_window`**: LordOS's UI tree as compact text with stable `ref_N` ids, roles, names, states, values (never a
+    password's) and boxes; the SDK's controls now say their role, state and value (`accessibilityRole`,
+    `accessibilityState`, `accessibilityValue`) and offer `handsSetValue` (`sdk/handsmodel.js`, `sdk/hands.jsx`).
+  - **`org.lordos.Hands1`** on the session bus (`server/src/ui/handsbus.c`): closed, typed methods, every argument checked
+    in C, the same user only; **the injection path** (`server/src/main.c`): the agent's input goes through lord-server's
+    own path (hit test, focus, Wayland and X11 apps) tagged as the agent's, never `/dev/uinput`, ydotool or evdev.
+  - **Consent and control**: off until the person turns on Settings → AI → Hands for the session; a system-layer prompt
+    per connection ("A program running on your account asked to control your computer", its name and program path as
+    reported, not verified; This session / Deny); a banner on every display while an agent acts ("Claude Code is using
+    your computer", Stop) in a new `agent` layer (105); the panic key **Ctrl+Alt+Esc**; the person's own input pauses the
+    agent for 3 s ("user is active"); locking the screen stops it; an optional per-app allowlist; rate limits; every call
+    a closed-word line in `shell.log`.
+  - **Never**: the system layer (permission, keyring, password and polkit prompts, the file chooser of Linux apps, the
+    banner), password fields (typing or reading), protected windows, the lock screen and the greeter, Settings → AI →
+    Hands and the theme-trust sheet (`handsDeny`), and the person's own answers: every destructive confirmation, signing
+    out, the power dialog (its countdown cancels when an agent opened it), Machines' automation permission, encryption
+    choice and recovery key, and the pages and apps listed in `sdk/handsdeny.js` (Settings → Network, Sharing, Cloud,
+    Privacy with the firewall, Users, Web apps, Flatpak, Updates, Session; Store, Passwords, Backups, Disks, Imager,
+    the installer, Remote Desktop), the Terminal's Passwords bars, Monitor's firewall controls and Sentinela's blocklist;
+    no key at all while a protected dialog has the keyboard. Security-state natives (the vault, filling a terminal
+    password, the firewall, permissions, administrator actions, theme trust, power) refuse natively while an agent's
+    input is recent; no paste of a secret; the key gate runs before every chord; Flatpak apps can't reach Hands1. Screenshots
+    show them black, failing closed; with an allowlist, everything but the allowed windows is black.
+  - **QA mode**: `lordos-mcp --headless APP` starts a private headless desktop (`lord-server --headless --hands-qa`, a
+    private bus, a demo home with sample files, and a demo identity: "Alex Demo", login "demo", host "demo-pc", never
+    the real account) so an agent can test an app while the person keeps working. It is not a sandbox (same user, no
+    namespaces: a Terminal there still reaches the real home and `/media`), and docs/HANDS.md says so; real isolation
+    is planned for 0.8.9.6.3.
+  - **Settings → AI → Hands**: the session switch, what it can and can never do, the allowlist, the connected clients
+    with Stop, how to add it to Claude Code; the Hands piece of Lumo is ready and "Hands" is one of Lumo's functions.
+  - Texts in all 35 languages.
+- **Hands: the agent's own cursor, human and machine motion** (asked by the maintainer on 2026-11-26, after watching an
+  agent validate his checklist with no pointer moving; docs/HANDS.md "The agent's cursor").
+  - **The cursor**: a violet arrow with the client's name "· reported" (as the prompt says: what the program calls
+    itself, not verified; cleaned in C at Hello, cut again in the shell), a ripple where it clicks, a pulse at the field
+    it types into, a quick ring where a machine-mode action lands; it fades 4 s after the last action and goes with
+    Stop. Drawn from C (`server/src/hands/handscur.c`) in a layer of its own at zIndex 99.5, built once by the shell
+    out of React's sight (`sdk/hands.jsx` `HandsCursor`, `runtime` `overlayTree`): above every theme layer, below the
+    system band (prompts and the banner stay above it), no clicks; a glide's frames change only its position (its box is
+    the damage). Never in the agent's own screenshots nor in `read_window`.
+  - **The person's pointer never moves**: the agent borrows the pointer's position for its input; the person's pointer
+    image stays where they left it and their next pointer input takes it back from there (`main.c` `hands_reclaim`).
+  - **Human mode** (the live desktop's default): the cursor glides to each target along a slightly curved, eased path in
+    250 to 900 ms by Fitts's law, hovers 90 to 170 ms, then acts; a drag carries it with the button held, a scroll comes
+    in up to 4 steps, text is typed at 25 to 60 ms a character (at most 10 s a call). Reduce motion makes the glides
+    short and straight. `Pointer`, `Scroll`, `Type` and `SetValue` answer when the action is done (`HANDS_E_PENDING`,
+    `handsbus.c` keeps the call). Every step passes the gate when it happens (the glide injects nothing; the hover, the
+    click, each scroll step and each character are gated then; a refused drop lets go where the drag began); the
+    person's input stops it at once (a held button released) and still pauses the agent 3 s; one action at a time.
+    `server/src/hands/handsmotion.c` has the math.
+  - **Machine mode** (the `--headless` QA default): at once, as before, with the flash.
+  - **Choosing it**: Settings → AI → Hands → *Agent motion: Human / Machine* (`settings.hands.motion`,
+    `lord.hands.motion`); `hands_mode` (a new lordos-mcp tool, `SetMode` on `org.lordos.Hands1`), `lordos-mcp --mode`,
+    and `mode` on one `computer` or `set_value` call. In all 35 languages (`hands.cursor.label`, `hands.settings.motion*`).
+  - A `where` test hook (test builds only) says where the person's pointer image is.
+- **How many processor cores the Brain uses** (asked and approved by the maintainer on 2026-11-26; docs/AI.md "The
+  engine's threads"). The engine always ran with `-t 2 -tb 2` in a cgroup of two cores; on an i9-10900 with Qwen3 1.7B
+  a Writing job takes 6.1 s on 2 threads, 3.4 s on 4 and 2.0 s on 8.
+  - **Settings → AI → "Where they run"**: a slider *Processor: cores for the Brain* under the Brain's Automatic /
+    Processor / Graphics card, from *Automatic (N)* (half the online cores, at least 1, at most 16) to every online
+    core, with the hint that more cores answer faster but load the computer more. It counts on the processor and for
+    the layers a GPU couldn't take. `settings.brain.cpuThreads` (0 automatic, the default; nothing to migrate),
+    `setBrainThreads` → the new `lord.sentinela.threads(n)` → `llm_set_threads`, sent once the slider rests. In all 35
+    languages (`settings.aiStore.foot.brainCores*`). `brainCores` and `brainThreads` in `sdk/aistore.js`; `Slider`
+    takes an optional `track` color (its bar was invisible on a box of the control color).
+  - **lord-llm** gets the count as one more environment word, `LORD_LLM_THREADS=<n>`, and checks it itself: digits only,
+    1..its online cores (at most 64, lord-sessiond's `cpu.max` cap); anything else exits 2 with no engine. `-t` and
+    `-tb` are that count (the backend's fixed argument list with only those two values written in, `llmjail_argv`) and
+    `lordos-sentinela.scope`'s `cpu.max` is 100 % per thread. Low priority (nice 15, `SCHED_BATCH`, idle I/O) stays.
+  - **A change** restarts an idle engine at once with the same model and backend and a busy one at its next job; the
+    same effective count restarts nothing. The engine's state adds `cpus`, `threadsAuto`, `threads` and `runThreads`.
+  - **Tests**: `build/llm-engine-test` checks automatic and the clamping, the argument list for every backend and count,
+    lord-llm refusing nine bad values, the engine started with 1, automatic and too many threads (clamped), and an idle
+    engine restarted with a new count without a job; `ai_store_test.mjs` the setting and the slider; the
+    `settings_ai_scene` the slider and its hint.
+  - **Fixed** on the way: a GPU engine that ran out of memory and died at once could be reported as "couldn't start"
+    instead of "ran out of memory" when the log's reader lagged its death (`gpu_gave_up` now waits a moment for it;
+    `llm-engine-test` failed about one run in three under load).
+- **The official themes have names of their own and live in their own repository, LordOS-themes** (approved by the
+  maintainer on 2026-11-26).
+  - **Renamed:** Lord Flow is now **Flow**, Lord Classic **Classic**, Lord Celeste **Celeste** and Lord Workspaces
+    **Workspaces** (Luna already had its own name), in all 35 languages and everywhere they show: Settings →
+    Appearance, the first-start chooser, the installer and Imager's look step, Help, the Dock and Keyboard pages, the
+    rescue hint, the wallpaper gallery, the shortcut sheets, the docs, the paper and the site. **The ids don't change**
+    (`default`, `classic`, `celeste`, `workspaces`, `luna`, `greeter`): settings store them, so no migration is needed.
+    `tools/brand-check.mjs` (run by `i18n-check.mjs`) now refuses a theme name that starts with "Lord" in a
+    `theme.json` or in any language's `shell.theme.<id>.name`.
+  - **Each theme names its author:** every official `theme.json` has `author` Federico Pereira, `email`
+    fpereira@iperfex.com, `organization` IPERFEX and `license` MIT, the fields `sdk/thememeta.js` already checks, so
+    Settings → Appearance shows the author, organization and email rows on each official theme's page. **Celeste is an
+    official theme now** (no `community` flag, so no "Community · unofficial" pill), with its real author instead of
+    "author pending"; `THIRD_PARTY.md` still credits Caelestia for the layout idea.
+  - **LordOS-themes** (github.com/lordbasex/LordOS-themes, modelled on LordOS-wallpapers): one folder per theme
+    (`flow/` is the id `default`; `classic/`, `celeste/`, `workspaces/`, `luna/`), each with its source as it was under
+    `themes/<id>/`, `theme.json`, three screenshots from the theme tour scene with the demo identity, `README.md`,
+    `LICENSE` and `PROVENANCE.md`; at the root `catalog.json` (id, folder, name, author, email, organization, version,
+    minLordOS, the verified star, and the size and SHA-256 of every source file, doc and screenshot), a README index
+    with the screenshots, and `CONTRIBUTING.md` pointing to lordos-theme-kit and the "New desktop style" issue form.
+    `tools/catalog.mjs` there writes `catalog.json` and the index (`--check` for CI).
+  - **How LordOS gets them: a vendored snapshot with a pin, not a submodule,** so `npm run build`, the .deb, the ISO and
+    the Raspberry Pi image keep building offline from the tree as before. `themes/upstream.json` pins the commit (and
+    tag) and the SHA-256 of its catalog, `themes/catalog.json` is that commit's catalog (as
+    `assets/wallpapers/motion.json` is the wallpapers'), and `themes/<id>/` holds the source. `tools/themes-sync.mjs
+    --from <clone> [--ref <commit|tag>]` copies a commit from a local clone with only `git cat-file`/`ls-tree`, checks
+    every file's size and SHA-256 and refuses a commit with a file its catalog doesn't list (nothing is written then);
+    with no arguments it checks offline that `themes/<id>/` is exactly the pinned snapshot; `--export <clone>` copies
+    the tree's themes back for a commit there. `tools/build-theme.mjs` and the code manifest are unchanged: the bundles
+    are built and listed as before and signed on the maintainer's machine (tools/release/).
+  - **Tests:** `server/tests/themes_sync_test.mjs` (in `make test`: the tree is the pinned snapshot; catalogs with
+    `..`, absolute or hidden paths, reserved or repeated ids, or a bad hash are refused), `celeste_model_test.mjs`
+    checks Celeste's author fields. The theme tour scene (`server/tests/theme_tour_scene/pre.js`) now uses the demo
+    identity, so its screenshots never show the real account or host.
+- **The Brain (the local language model of Sentinela and Writing) on the graphics card** (in development, asked by the
+  maintainer on 2026-11-26; the new device access is **awaiting the maintainer's approval**, AGENTS.md; docs/AI.md
+  "The Brain on the GPU"). Until now the engine ran on the processor only (`-ngl 0 -dev none`).
+  - **Settings → AI → "Where they run"** now has **Automatic / Processor / Graphics card** for the Brain, like the
+    Voice (`settings.brain.backend`, default automatic; `setBrainBackend` → the new `lord.sentinela.backend(mode)`),
+    and under it what the engine really used: *Brain: on the graphics card (Vulkan, AMD Radeon RX 580 Series)*,
+    *… 20 of 29 layers; the rest on the processor*, or the processor with its reason (chosen, no usable card, the card
+    couldn't start it, it ran out of memory, an untested card on arm64). In all 35 languages (`brainCpu` no longer says
+    the engine never uses the card). `brainWhere` in `sdk/aistore.js`, tested by `server/tests/ai_store_test.mjs`.
+  - **Choosing at run time** (`server/src/llm/engine.c`): automatic = CUDA when llama.cpp's `libggml-cuda.so` and
+    `/dev/nvidiactl` are there, else Vulkan when `libggml-vulkan.so` and a render node are there, else the processor
+    (on arm64 automatic keeps the processor; Graphics card tries the Pi's GPU). lord-llm gets the choice as one closed
+    word (`LORD_LLM_BACKEND=cpu|vulkan|cuda`) and runs the engine with that backend's fixed arguments
+    (`-ngl auto -dev Vulkan0 -lv 4`: llama.cpp's `--fit` puts as many layers on the card as fit with 1 GB to spare).
+  - **Falling back:** a GPU that can't start the engine, has no room for a layer, or runs out of memory while
+    answering is given up on until the choice changes, and the job runs again at once on the next backend (a streamed
+    Writing answer too, before its first word). The engine's stderr is now a pipe lord-server reads on a thread: only
+    the device's name (printable ASCII, ≤ 80 characters), the layers offloaded and out-of-memory lines are understood.
+  - **Sandbox** (`server/src/llm/llmjail.c`), only for the backend in use: Vulkan reaches the render nodes
+    `/dev/dri/renderD128`–`191` (DRM's major only, with their ioctls), lists `/dev/dri` and reads `/etc/vulkan` and the
+    parts of `/sys` Mesa uses, never `/dev/dri/card*`; CUDA reaches `/dev/nvidiactl`, `/dev/nvidia<N>`,
+    `/dev/nvidia-uvm(-tools)` and `/proc/driver/nvidia`. The processor's sandbox is unchanged; without a cgroup the
+    address-space limit stays for the processor only.
+  - **CUDA as its own optional package**, `llama.cpp-cuda` (`apt/recipes/llama.cpp-cuda/build.sh`, catalog
+    `section: "addon"`, never a Store page): only `libggml-cuda.so`, from the same pinned llama.cpp source, built in a new
+    `nvidia-cuda` build image (NVIDIA's CUDA 13.5 compiler from NVIDIA's own Debian 13 repository, key
+    `apt/keys/nvidia-cuda.asc` checked by fingerprint `0218 2E60 104F CDC2 6EAE 1B85 97A5 D4CB 8793 F200`) for Turing and
+    newer cards; it depends on NVIDIA's `cuda-cudart-13-5`, `libcublas-13-5` and `libcuda1`, so it installs only where
+    NVIDIA's repository is (the Store's NVIDIA card, docs/NVIDIA-PLAN.md Part A). Not built yet. llama.cpp's own
+    package already had every CPU variant and Vulkan as run-time modules; nothing proprietary enters the base system.
+  - **Measured** on the development PC (i9-10900, RX 580 8 GB, Mesa 25.0.7; `llama-bench`, prompt / generation
+    tokens per second): Qwen3 1.7B 72.7 / 20.1 on the processor with the engine's 2 threads against **1038 / 110** on
+    the RX 580 through Vulkan; Qwen3 4B 29.4 / 8.2 against **423 / 52**. A Sentinela analysis takes 0.85 s instead of
+    9.3 s (1.7B, warm) and 1.8 s instead of 23.3 s (4B).
+  - **Tests:** `build/llm-engine-test` runs the fake engine with fake ggml modules and devices: Vulkan chosen, its
+    device and layers read, the render node and its DRM ioctl reachable only under Vulkan, `card0` and NVIDIA's node
+    never, the processor's sandbox when chosen, CUDA first, a module writable by others ignored, every fallback with its
+    reason, a hostile device name cleaned; `--real` with `LLM_BACKEND=auto|cpu|gpu` prints where it ran.
+    `tests/settings_ai_scene` checks and photographs the new row.
+- **Spell checking in LordOS's own text fields** (`lord-spell`, `server/src/spell/`, `sdk/spell.js`, `sdk/spellmodel.js`;
+  in development, approved by the maintainer on 2026-11-26; `docs/SPELLING.md`). Misspelled words get a wavy red
+  underline as you type in any `TextInput` or `TextArea`, Notes and Mail's body; a right click on one starts the
+  field's menu with up to 8 suggestions, **Add to dictionary** and **Ignore**.
+  - **`lord-spell`**, a new sandboxed helper, is the only program that loads Hunspell (`libhunspell-1.7.so.0`,
+    dlopen'd only from the root-owned system library folders); lord-server never links or loads it. lord-server opens
+    the chosen dictionaries (`/usr/share/hunspell`) and hands them over as descriptors; the helper loads them, closes
+    everything else and takes `sandbox_apply_helper` (no files, network, sockets or exec) before it reads a word.
+    Strict length-capped frames both ways (`spellproto.c`): up to 64 words of 64 bytes → one bit each, or one word →
+    at most 8 suggestions; a malformed frame or no answer in 4 s and it is killed. UTF-8 and Latin-1 dictionaries.
+  - **Which words:** links, addresses, paths, code, words with digits, abbreviations and one letter are left alone; a
+    word is checked only when a dictionary in use is written in its script, so Arabic or Hebrew text without a
+    dictionary stays clean; the word being typed waits until the caret leaves it; new words are asked about 350 ms
+    after the last key, in batches.
+  - **The line** is the engine's new `wavyColor` style (`paint.c` `paint_wavy`): a 3 px node per word painted as one
+    alpha mask, so a line coming or going damages only its own box (`build/engine-test`'s damage fuzz passes).
+  - **Opt-out:** `spellCheck={false}`; password fields are never checked; the search field and LordOS's address,
+    host, user, path, port, key and URL fields opt out. The Terminal and Text Editor are not checked.
+  - **Languages** (Settings → Keyboard → Spelling: languages): at most 4 installed dictionaries; with none chosen,
+    `server/src/spellang.h`'s rule shared with lord-web (copied unchanged from `feat/web-context-menu`): the
+    interface language with its region first, then English. **More languages** installs Debian 13's `hunspell-*`
+    dictionaries through `pkg-install` (a closed list of 28 packages). The images and the `lordos` package's
+    Recommends add `libhunspell-1.7-0`, `hunspell-en-us`, `hunspell-es` and `hunspell-pt-br`.
+  - **One personal dictionary with the web apps:** enchant's word lists (`~/.config/enchant/<tag>.dic`), the files
+    lord-web's WebKit learns into, written only by lord-server (0600, renamed into place, unknown lines kept).
+  - Tests: `build/spell-test` (parser fuzz of 400,000 payloads, ASan and UBSan, a sandbox probe build that answers only
+    when files, sockets and exec are refused, a malformed-answer build, the person's dictionary, the system's es_ES);
+    `server/tests/spell_model_test.mjs`; `server/tests/spell_scene` (headless screenshots in light and dark).
+- **✨ AI on selected text: Writing** (`server/src/llm/writing.c`, `sdk/writing.jsx`, `sdk/writingmodel.js`; in
+  development, approved by the maintainer on 2026-11-26; `docs/AI.md`, "Writing"). With text selected, the right-click
+  menu offers ✨ AI ▸ Correct spelling and grammar, Improve writing, Make it shorter and Translate to (a list of
+  languages). On whenever a model is installed, unless the person turns it off in Settings → AI → Writing (a new
+  function card; an explicit off is kept for good, never turned back on by a new model); without a model it is off. It uses
+  Sentinela's local llama-server in its sandbox, nothing goes online. It runs in the shell: the app only hands over
+  the selection and gets the final text back if the person clicks **Replace** in the panel, which shows the answer as
+  it streams, with **Copy** and **Discard**. The prompts are fixed in C per action, the text is fenced with a random
+  nonce, the answer is read strictly (chunked server-sent events, at most 16 KB) and shown as plain text. Never in a
+  password field; at most 4,000 characters. Tests: `build/llm-engine-test` (requests, streams, fuzz, a streamed job
+  through the fake engine, cancel), `server/tests/writing_model_test.mjs`, `spell_scene`.
+  - **In web apps too** (`server/src/web/webmenu.c`, `ui/webask.c`, `sdk/webappsmodel.js`, `sdk/hardware.jsx`): lord-web's
+    menu carries the whole selection (not one the page cut; never a password field's), cleaned by `webai_clean` in
+    lord-web and again in lord-server; the shell shows ✨ AI ▸ and its panel. Replace, only for a selection in a text
+    field, goes to lord-web as `WriteReplace` (lord-server only, checked by pid), which inserts the text only if the
+    focused field is still a non-password text field with exactly that selection. Tests: `build/webapp-test`,
+    `webapps_model_test.mjs`.
+  - **Fixed after the maintainer's test on ws164** (in WhatsApp's message box with Qwen3 1.7B; `fix/ai-writing`):
+    - **Correct, Improve and Translate gave the text back almost unchanged.** The cause was the prompt: one long system
+      text with the rules and a user message that held only the fenced text, so the 1.7B model copied it (only a capital
+      letter added, even for a translation). Now a short system text, the task in each user message right before the
+      fenced text, and fixed worked examples as earlier turns: a Spanish and an English correction, two improvements,
+      a shortening, and for each of the 35 translation targets its own informal chat line and a sentence with a
+      request in it translated as text. Sampling top-k 20 / top-p 0.8 (Qwen3's non-thinking values). Measured with the
+      real engine and model (`build/writing-real-check`, by hand): "ayer fuimos al cine y la pelicula…" → "Ayer fuimos
+      al cine y la película…, pero había…"; "i realy dont know wich one is beter" → "I really don't know which one is
+      better"; "Mañana a la tarde paso por tu casa…" → "Tomorrow afternoon I will pass by your house…"; "No sé si voy
+      a poder ir a la fiesta del sábado…" → "Não sei se vou poder ir à festa do sábado…"; a request inside the text is
+      translated, not obeyed. 1.7B still misses real-word errors ("esas" for "estás") and changes little to improve:
+      the panel suggests Qwen3 4B under Improve and Translate while the model is 1.7B (`docs/AI.md`, "What the models
+      do").
+    - **Replace did nothing in a web app's rich message box.** The shell's panel holds the keyboard, so the web app's
+      window had lost it and WebKit treated the page as unfocused; the check required `document.hasFocus()` and refused
+      every time. Now the menu marks the focused field, Replace waits (up to 3 s) until the window has the keyboard
+      back, and inserts the text as a paste would (`document.execCommand('insertText')`, which runs the page's
+      `beforeinput`), so editors with their own model such as WhatsApp's Lexical take it; WebKit's InsertText only when
+      the field didn't change. Still only in that same field, focused, editable, not a password, with exactly the
+      selection sent; a refusal is logged with one word of a closed list. Test: `build/web-ai-replace-check` (a
+      textarea, a contenteditable box and a Lexical-like editor on the real WebKit, and the refusals).
+    - **"Translate to" showed "zh-Hans" and "zh-Hant"** instead of the languages' names: the language catalogs
+      (`tools/gen-language-names.mjs`) now name LordOS's interface languages with a script too ("Chino simplificado",
+      "簡体中国語"…), checked for every target in every catalog by `writing_model_test.mjs`.
+  - **`lumo`: Writing from the terminal** (`server/src/cli/lumo.c`, `server/src/llm/lumo.c`, `server/src/ui/writebus.c`;
+    in development, **awaiting the maintainer's approval**; `docs/AI.md`, "Writing from the terminal"). `lumo corregir
+    "texto"` / `lumo correct "text"`, `mejorar`/`improve`, `resumir`/`summarize`, `traducir en "texto"` / `translate
+    pt "text"`, text from standard input (`echo texto | lumo corregir`), `lumo estado`/`status` and `--help`. The answer
+    streams to stdout, safe for a terminal; messages follow the locale (35 languages). It never reaches the model
+    itself: it asks the session's lord-server over a new session-bus service, `org.lordos.Writing1` (Status, Start,
+    Read, Cancel; only the same uid, checked with the bus; a job only for the connection that started it, cancelled
+    when it leaves; at most 4), which runs the panel's own job with `writing.c`'s fixed prompts. It follows the
+    panel's switch and model; off, it says to turn it on in Settings → AI → Writing. Exit status 0/1/2/3/4/5/130.
+    Installed as `/usr/bin/lumo` (a link to `/usr/lib/lordos/bin/lumo`, `tools/iso/mkdeb.sh`); no Debian package has a
+    `lumo` command. Tests: `build/lumo-test` (pure parts, then the real command against a private dbus-daemon and a
+    stand-in lord-server: status, streaming, a translation, stdin, Writing off in Spanish, no session, wrong command,
+    text too long, a job another connection can't read).
+  - **Fixed:** Speech ▸ Start from a web app's menu read nothing for a selection in WhatsApp's message box (ws162): it
+    now reads the selection the menu carries (up to 16,384 characters, cleaned twice, never a password field's) instead
+    of the session's primary selection. And "Search the web for “…”" with a long selection no longer loses its end at
+    the menu's edge: rows grow up to 420 px and the quoted words end in “…” inside the label.
+- **`dig`, `nslookup` and `host` in every image:** `bind9-dnsutils` joins the command-line tools of the PC ISO and the
+  Raspberry Pi image (`tools/iso/packages-tools.sh`) and the `lordos` package's Recommends, so updated systems get it too.
+- **Web apps: a right-click menu like Chrome's, per context, and spell checking** (`server/src/web/webmenu.c`,
+  `webedit.c`, `websearch.c`, `webselect.c`, `server/src/spellang.c`, `sdk/webappsmodel.js`; in development, requested by
+  the maintainer 2026-11-26; `docs/WEBAPPS.md`, "Editing" and "Spelling"). Right-clicking selected text in a messaging
+  web app showed only Copy and Select All. Now, in LordOS's own menu style and from a closed list of item names checked
+  by `lord-web` and `lord-server`:
+  - **text field:** WebKit's spelling suggestions (up to five), Ignore Spelling, Add to Dictionary, Undo (Ctrl+Z), Redo
+    (Ctrl+Shift+Z), Cut (Ctrl+X) and Copy (Ctrl+C) with a selection, Paste (Ctrl+V), **Paste as Plain Text**
+    (Ctrl+Shift+V, also a new key: the session's text only), Select All (Ctrl+A) and **Emoji** (❖., LordOS's picker);
+  - **selected text:** Copy, **Copy Link to Highlight** (the page's address with a `#:~:text=` fragment: the whole
+    text up to 80 characters, else its first and last four words), **Search the Web for “…”** (the selection cut to 30
+    characters in the row; the person's browser opens the chosen engine's fixed search address with only the selected
+    text, up to 512 bytes, percent-encoded) and **Speech ▸** (Start Speaking ❖Esc, Stop Speaking, Save as Audio…);
+  - **link:** Open Link in Browser, Copy Link Address; **image:** Open Image in Browser, **Save Image As…**, Copy Image,
+    Copy Image Address; **video or audio:** Play/Pause, Mute/Unmute, Loop and Show Controls (checked when on), Save
+    Video As… / Save Audio As… for an http(s) source; **page:** Back (Alt+←), Forward (Alt+→) when possible, Reload
+    (Ctrl+R), Select All;
+  - **Inspect** last, only while Settings → Web Apps → Developer mode is on, with the Window menu's question.
+  - **Search engine:** Settings → Web Apps → Search the web, a closed choice of Google (the default, as Chrome),
+    DuckDuckGo, Bing or Startpage, kept in `~/.config/lordos/web/search.json` (a folder `lord.fs` can't write) through
+    the new `lord.webapps.searchEngine()` and `setSearchEngine(name)`.
+  - **Speech:** `lord-web` now makes the person's page selection the session's primary selection (Wayland's
+    `zwp_primary_selection`, once the selection settles and right after a click or key, at most 256 KB, never a
+    password field's), as a browser on Linux does; LordOS's existing Speech reads that one, so ❖Esc and the window's
+    Edit → Speech now read a web app's selection too, and a middle click pastes it elsewhere. No second voice path.
+  - **Save Image As… / Save Video As…** ask with LordOS's save dialog (the FileChooser portal's `SaveFile`), then use
+    the page's own download path into the chosen file, or, for an image the page made (`blob:`), the bytes Copy Image
+    reads. The file must be in the home folder, outside hidden folders and not a `*.desktop` launcher, also with its
+    folder's links resolved (`webdl_target_ok`).
+  - **Spelling:** `lord-web` turns WebKit's spell checker on with the dictionaries one small model picks
+    (`server/src/spellang.h`, for LordOS's own text fields later too): the interface language's (its region first) and
+    English's, only installed hunspell dictionaries. On WPEPlatform (2.54) the page script leaves a right click in a text
+    field to WebKit, which then asks for its own menu; `lord-web` takes its suggestions, Ignore Spelling and Learn
+    Spelling into LordOS's menu and shows nothing of WebKit's (on 2.48 the default stays prevented: that port took no
+    more mouse input once asked). `lordos-web` recommends `hunspell-en-us`, `hunspell-es` and `hunspell-pt-br`.
+  - **Untrusted text:** the only page strings in a menu, the selection's few words and the suggestions, are cleaned by
+    `lord-web` and again by `lord-server` (`websearch_snippet`: control characters, bidi embeddings, overrides and
+    isolates and invalid UTF-8 removed, whitespace collapsed, 30 characters and an ellipsis) and shown isolated in
+    their own direction, so the menu works in right-to-left languages. `org.lordos.WebApps1.Menu` takes two more
+    arguments, `checked` and `text`, and the spelling `guesses` (the older call is still accepted).
+  - **Left out:** Print… (WPE WebKit has no print operation and `webkit_web_view_save` writes only MHTML, so there is
+    nothing to send to the printer, and no dead item is shown), Translate (LordOS has no translator) and Cast.
+  - Words in all 35 languages (`shell.edit.*`, `webapps.search.*`, `webruntime` `save.*`). Tests: `webapp-test` (832
+    checks: the items per context, the check marks, the search address, the cleaning, the highlight link, the save
+    target, the dictionary choice), `webapps_model_test.mjs` (the rows the shell shows, Inspect only with developer
+    mode, the shell's own items) and the new headless `web-menu-check` on WPE WebKit 2.54 (WebKit's suggestions with
+    hunspell-es, a word replaced after the menu, the view still taking clicks). Not yet checked on screen.
+- **The toolkit bindings ship with LordOS, and Qt follows dark mode** (asked for by the maintainer on 2026-11-26).
+  `python3-gi`, `gir1.2-gtk-3.0`, `gir1.2-gtk-4.0`, `python3-pyqt5`, `python3-pyqt6`, `qtwayland5`, `qt6-wayland`,
+  `qgnomeplatform-qt5` and `qgnomeplatform-qt6` (all in trixie for amd64 and arm64) are in the ISO and the Raspberry Pi
+  image (`PKGS_TOOLKITS`) and Recommends of the `lordos` package (`TOOLKITRECS`), so the Store's update brings them to
+  installed systems and `lordos-testbench --toolkits` no longer shows "not installed" on a fresh system. Measured from
+  the trixie index (dependency closure, without Recommends): +142 MiB installed on the ISO (51 packages; 16 MiB of it
+  QGnomePlatform), +272 MiB on the Raspberry Pi image (114 packages; it had no GTK 3 or Qt). lord-server gives the apps
+  it starts `QT_QPA_PLATFORMTHEME=gnome` (`server/src/wl/toolkitenv.h`; a value the person set is kept): QGnomePlatform's
+  Adwaita palette follows LordOS's dark mode from the portal and GSettings, live. Qt 5 has no colour scheme and Qt 6.8's
+  own `gnome` and generic themes don't read the portal's, so Qt apps drew light on a dark desktop; without the package
+  Qt falls back to its own `gnome` theme, as before. The audit's harnesses get the same variable (`tkrun.c`). Tests:
+  `server/tests/toolkit_pkgs_test.mjs` (the three lists, the theme and docs/VM-SETUP.md in step), `toolkitenv-test`,
+  `toolkit-audit-test`.
+- **XSETTINGS for X11 apps: GTK 3 on Xwayland follows LordOS's dark mode, title bar buttons, font and icons.** GTK 3 on
+  X11 reads only XSETTINGS, which LordOS didn't serve, so it stayed light (the audit's `gtk3-x11` theme check). The X
+  window manager now owns `_XSETTINGS_S0` with a window of its own and serves `Net/ThemeName`, `Net/IconThemeName`,
+  `Gtk/DecorationLayout` and `Gtk/FontName`, the values the portal gives GTK on Wayland (`portal_gtk_values`), before
+  the first X app is let in and live with a new serial on every change (`server/src/wl/xsettings.h`, `xwm.c`). Test:
+  `build/xsettings-test` decodes the property the way GTK does (every padding, odd and oversized entries, a full buffer).
+- **A "New desktop style" issue form for sharing a community theme** (`.github/ISSUE_TEMPLATE/new-desktop-style.yml`,
+  from the lordos-theme-kit proposals, approved 2026-11-26). It has the sections the kit's `/lordos-theme publish`
+  writes: name and id, description, version, licence and the LordOS release it was made for, screenshots (light, dark,
+  Arabic), a link to the source-only `.zip` and its SHA-256, the source repository, provenance (what inspired it,
+  what was written new, reused code and its licence; never GPL code), the kit's check report, what was tested, and
+  two required confirmations (no personal data; everything may be shared under its licence). It applies the labels
+  `desktop-style` and `community` (to be created in the repository). `docs/THEMES-GUIDE.md` §5 points to it.
+- **`theme_tour_scene`: headless screenshots of any theme, a community one too** (`server/tests/theme_tour_scene/`,
+  lordos-theme-kit's tour, approved 2026-11-26). `tests/app_scene_headless.sh theme_tour_scene OUT <id> [lang] [mode]`
+  runs a theme in `themes/<id>` in a headless lord-server with a private home and keeps three screenshots: the empty
+  desktop, Text Editor in front of Calculator (a focused and an unfocused frame, the app's menus) and Characters (the
+  sidebar, a search field and the selection: the token contract with the apps). It opens only apps that show nothing
+  about the person or the machine; each step logs "done" or "missing", so the script's exit status is 1 when an app
+  didn't open or a screenshot wasn't saved. Checked on Celeste in Arabic, dark (right to left), and Flow.
+- **`minLordOS` in `theme.json`: a theme can say which LordOS release it needs** (lordos-theme-kit proposal, approved
+  2026-11-26; the kit already writes it). `cleanThemeMeta` (`sdk/thememeta.js`) keeps it only as two to six dot-separated
+  numbers of at most five digits ("0.8.9.6.2"; any suffix, text or other type is dropped), and `lordosAtLeast` compares
+  it with this build's version number by number, ignoring a `-beta`/`+build` suffix (an unknown version or a missing
+  field never blocks). On an older LordOS, Settings → Appearance → Desktop style marks the card "Needs LordOS ‹version›",
+  the theme's page shows "Needs LordOS ‹version› or later" instead of Apply and a "Requires" row, and `themes.use`
+  refuses it before anything changes, with a notification that names the release (`themeNeedsNewer`). Five new texts,
+  in all 35 languages. Test: `server/tests/theme_gallery_test.mjs`.
+- **A community theme's own texts are translated, under its namespace `theme-<id>`** (lordos-theme-kit proposal,
+  approved 2026-11-26). A theme's options in `theme.json` may now use keys of its own namespace (`theme-aurora.opt.x`)
+  besides `shell.*`, but never another theme's: `cleanThemeMeta(meta, id)` keeps `theme-<id>.` keys only for that id
+  (an id of at most 26 characters, so the namespace fits `lord.locale.catalog`'s 32), and drops the rest. Its name and
+  description may come from `theme-<id>.theme.name` / `.theme.description` after LordOS's own `shell.theme.<id>.*`.
+  The texts behind those keys are the theme's, so they are shown through `themeText`: one line, control and
+  bidi-override characters removed, cut with "…" at 48 characters for a name or label, 24 for a choice, 160 for a
+  hint and 240 for a description (`THEME_TEXT_MAX`; LordOS's own `shell.*` texts are shown whole). A theme's texts live
+  in `assets/locales/<lang>/theme-<id>.json` (lordos-theme-kit copies the theme's `locales/<lang>.json` there), so
+  `node tools/i18n-check.mjs` checks every language of them like LordOS's own; it now also checks that every label in
+  each `themes/*/theme.json` is an English key and that no option is dropped. lord-server no longer lets a `.lpk`
+  package use an id starting with `theme-` (`lpk_reserved`), so no package can supply a theme's texts. Test:
+  `server/tests/theme_gallery_test.mjs`.
+
+- **Community desktop styles install from a file, with a security piece of their own** (part 2 of the community themes
+  plan, approved by the maintainer on 2026-11-26; docs/THEMES-GUIDE.md "Community themes", docs/THEMES-PLAN.md stage 2).
+  - **Settings → Appearance → Install from a File…** takes a theme's source `.zip` (the one lordos-theme-kit's
+    `/lordos-theme package` makes). A new sandboxed helper, **lord-themec**, reads the archive strictly (no `..`,
+    absolute names, links, devices, duplicates, encryption, Zip64 or oversized entries; images must be the image their
+    name says; text must be UTF-8), runs the kit's static checks and **builds the theme's code itself** with LordOS's
+    own compiler (`tools/themec/themec.js`: JSX and modules, no dependencies). What it refuses is listed with file and
+    line. lord-server installs what it built into `~/.local/share/lordos/themes/<id>/`, through a staging folder, with
+    an install record of its own (the code's SHA-256, the author, the capabilities); `lord.fs` can't write there.
+  - **A one-time confirmation** names the author: "This theme isn't from LordOS…", with what it can't do and what it
+    may read. A theme is run only after it, and only while its code is still what LordOS built.
+  - **A restricted `lord.*`:** the theme runs in a second JavaScript realm with five functions of its own (layout,
+    styling its own nodes, measuring text, the time, the log) and a facade of the SDK; LordOS's code (the SDK, the apps,
+    the system layer) keeps the full API in its realm, which is frozen before the theme's first line. Every native call
+    made while the theme's code is running, or for it (its timers, promises, callbacks, effects, stores, bound
+    functions), is checked in lord-server against its policy: windows, launching apps, and read access to the models
+    its `theme.json` declares in `"capabilities"` (`wifi`, `bluetooth`, `sound`, `battery`, `brightness`, `media`,
+    `notifications`). Never the terminal, files, administrator actions, permission answers, packages, the keyring, the
+    clipboard, or the raw keys of other windows. LordOS's own themes keep the full API.
+  - **The system layer is out of a theme's reach:** notification banners and the privacy pill moved above every layer a
+    theme draws in (`notification` is now 95, above tooltips and drag images; for all themes), prompts stay in the
+    system layer, a community theme can't dismiss banners or run their actions, and with one the privacy pill is always
+    in each display's corner.
+  - **A watchdog:** a community theme that throws at its start, never starts its shell, draws nothing within 6 seconds,
+    has its tree die, stalls the desktop until the watchdog stops it, or ends two sessions in a row is taken off; the
+    previous style comes back, and the theme is marked failed with the error for Report, with Try Again and Remove.
+  - **Ctrl+Alt+Shift+Backspace always restores Flow**, whatever style runs (handled before any JavaScript;
+    Ctrl+Alt+Backspace alone still ends the session).
+
+- **Hands: `computer` saves a full-resolution capture for the person** (`save` on `screenshot` and `zoom`). The agent's
+  image is scaled for the model (1,568 px on its long side), too small to read as QA evidence. With `save` (a bare file
+  name, the same rules as `record`'s; `.png` added when missing) lordos-mcp also asks lord-server for the same capture at
+  its own resolution (`Screenshot` with maxdim `HANDS_SHOT_NATIVE`, 65535: not scaled, a zoom never grown) and writes it
+  as a new `~/Pictures/LordOS QA/<name>.png` (`O_EXCL | O_NOFOLLOW`, 0600, as a recording's export; never over an
+  existing file, never a path). The same capture path blacks out the same areas (protected and password areas,
+  `handsDeny`, prompts): never more of the screen than the agent sees, only more pixels. The result names the path and
+  the size. `build/hands-test` (names, the native size on the bus, the write) and `tests/hands_e2e.py` (a screenshot and
+  a zoom saved, full size, the firewall switches black in the file, no overwrite, no path).
+
+- **Hardware reports: #272 and the graphics card reports #273, #274, #276, #277 and #278 (`docs/HARDWARE-REPORT.md`,
+  updated 2026-11-27).** #272 adds a Dell Inspiron 15 3511 (Core i5-1135G7, Iris Xe on Tiger Lake-LP, 0.8.9-beta),
+  the first Tiger Lake machine: every row works except network, *limits* only because nothing was connected; its
+  brightness keys do nothing (listed as open). Its report joins the catalogue (`web/content/hardware/reports/`, index
+  and `assets/hwreport/snapshot.json` rebuilt: 17 reports, 109 device entries; `hwreport_test.mjs` expects it); the
+  snapshot is signed with the next `lordos-hwdata`. #278 (and #277, the same report twice) is an Intel HD Graphics 520,
+  the first Skylake GPU, smooth and composed on the GPU. #276 is a GTX 1070 on NVIDIA's proprietary driver 580.196.11
+  whose desktop is composed on the GPU with NVIDIA's OpenGL ES, smooth: the first Pascal card and the first report of
+  GPU composition on the proprietary driver. #274 is the first hybrid laptop (Tiger Lake-H UHD draws, a GTX 1650
+  Mobile on 550.163.01 doesn't), and its Monitor → GPU report #273 shows `lord-nvgpu` not finding NVML where Debian's
+  own `libnvidia-ml1` installs it (`/usr/lib/x86_64-linux-gnu/nvidia/current/`; listed as open). Counts now 31
+  physical machines, 14 with a report's data, 4 graphics card reports, 32 people, 19 Intel, 5 AMD and 3 NVIDIA GPUs;
+  the comparison, what works, open problems, untested combinations and thanks follow, and so do the paper (en, es,
+  pt, `docs/PAPER.md`), the own-desktop feature page, the FAQ, `GPU.md`, `SESSIONS.md`, `BENCHMARK.md`,
+  `PAPER-VALIDATION.md` and the draft tested-graphics-cards page (`web/content/hardware/gpus.*.md`).
+
+### Tests
+- **Test fixes from the ws174 runs.** `build/webalive-fake` is made `go-w` after it is linked: under a umask of 0002
+  it was group-writable and `web/webmgr.c` rightly refused it as lord-web, so the suite failed on such machines
+  (`server/mk/webapps.mk`). `tests/hands_e2e.py` picks the first Network row that has a rule switch, skipping an
+  essential system service (a dash and its "System" pill, in any of en, es, pt) instead of the first row. The test-only
+  compiler warnings are gone: a command buffer big enough for its three paths (`tests/pkgapp_test.c`), the Flatpak
+  indexes read on every architecture (`tests/apps_actions_test.c`, the checks stay x86-64 only), and a path buffer
+  sized from the folder's (`tests/vm_test.c`). The Machines bench expects the Light profile's memory for the computer
+  it runs on, as `apps/machines/model.js` `profileSize` gives it (half the RAM, at most 3072 MB, within Machines' own
+  limit), not a fixed 4096 MB (`tools/vm/e2e/machines/flows.py`).
+- **`hands-e2e` no longer assumes this computer's state** (ws171 on a Pi): case 5 takes the first app row of
+  Monitor → Network, whatever it is (it looked for "Machines"), so the handsDeny blackout checks run everywhere; case 9
+  says it skipped when no voice is installed instead of failing.
+- **Tests that need their scratch outside a masked path say so** (ws171 on a Pi): `sandbox-home-mounts-test` and
+  `vm-jail-probe` skip with a clear message when the tree is under /tmp, /var/tmp or /dev/shm (the sandbox mounts its
+  own there), and `vm-qemu-args` when it is inside the home folder (lord-vm's namespace hides it).
+- **Tests skip what can't run on arm64 or without a tool instead of failing** (Raspberry Pi 5, ws171):
+  `vm-whonix-xml`, `vm-group-manage`, `machines-group-manage` and the Machines e2e group flow (Whonix is amd64 only;
+  lord-vm refuses it), `launch-placement-en/ar` without python3-pil. The Machines e2e's Create and Start waits 480 s on
+  arm64 (an SD card copies the image slowly; 120 s elsewhere; `MH_CREATE_S` overrides it).
+- **No `-Wformat-truncation` warnings on arm64** in `rdesk_thumb_test.c`, `vm_test.c` and `vm_jail_probe.c` (larger
+  buffers).
+- **`vmunpack-test` on a 16 KB-page kernel** (Raspberry Pi 5, ws171): the holes' allocation bounds counted 4 KB
+  pages; they use the page size now (`sysconf(_SC_PAGESIZE)`).
+- **Hands**: `build/hands-test` (ASan/UBSan: the policy against a fake host, the prompt per connection, Stop, the panic
+  key, the person's input, the system layer, a covered ref, set-value's and the keys' gate, allowlisted screenshots, a
+  fuzz of every `org.lordos.Hands1` method's arguments, the uid check on a private dbus-daemon, the screenshot's marks
+  failing closed, lordos-mcp's tools, errors, coordinates, GIF and export), `tests/hands_model_test.mjs` (refs stay
+  stable, no password value, no system layer or `handsDeny` node, the blackout per layer, no "verified" claim) and
+  `tests/hands_e2e.py` (`lordos-mcp --headless`: Notes' File → Import… of a fixture file and the note exists; a click
+  and a key aimed at a permission prompt refused; the banner on the display and the person's Stop ending the agent;
+  Enter and a click on a community theme's trust dialog refused).
+- `build/realm-taint-test` (LordOS's QuickJS patches: a theme's code on the stack, its jobs, bound and native
+  functions, the realm of a function), `build/themestore-test` (ASan/UBSan: 10 bad archives, lord-themec on the fixture
+  and on eval, `lord.term.create`, `lord.fs.write`, `new Function`, `globalThis`, another package, a host element, a
+  remote URL, a constructor trick and `import()`; the install, a changed or linked `theme.js`, 7 malformed answers),
+  `tests/themec_test.mjs` (the compiler and 20+ refusals), `fsops-test` (the new deny-list folder) and
+  `tests/community_theme_headless.sh` (`make test-full`): a minimal community theme runs with nothing refused; a probe
+  fixture's every bypass is refused (directly, from `Promise.then`, `queueMicrotask`, `setTimeout`, animation frames,
+  a store subscription, an effect, a ref and a store's `get`; forged host elements, LordOS's raw components and a
+  context's Provider in children and props; a forged app registry; `wm`'s mutators); a theme that throws or never
+  starts is marked failed; an unconfirmed one never runs.
+
+### Fixed
+- **Desktop: Monitor over many windows no longer stalls the GPU path** (QA on the maintainer's PC, ws174: three 4K
+  displays at 200 %, about 18 windows under Monitor; `compositor.log` showed `stall: 0.8–1.6 s paint display` every two
+  seconds and `lord-server` at 100 %, gone with Monitor closed). The opaque-cover skip (what an opaque node painted
+  over the whole damaged region hides is not painted) and the hidden-blur rule (a blurred window under an opaque one
+  doesn't grow the damage) ran only on the CPU path, so on the GPU path each of Monitor's live rectangles (about four
+  a second, 9 to 10 % of a display) painted every window under it again. Both now hold on the GPU path too: what the
+  cover leaves out is only walked to note its app windows and GPU pictures in the frame's list, in paint order
+  (`skip_note_walk`), and only when nothing before the cover is transformed (`cover_notable`); never in a capture or
+  with a dragged window (`server/src/ui/paint.c`). Monitor's own damage was checked headless (Monitor alone: ~4 frames
+  a second, 9 to 10 % of a 1920×1080 display in 6 to 8 rectangles, its live charts) and left as it is. Test:
+  `build/engine-test` `test_gpu_cover` (every frame equal to a full repaint, the same list of app windows, no covered
+  window painted; GPU path 6.2 → 0.55 ms a frame); `test_damage_fuzz`, `test_damage_pipeline` and the drag hashes
+  unchanged. Docs: `docs/MONITOR.md`, `docs/LAYERS.md`.
+- **Machines: an OVA export shows its progress** (VM 116 QA: "0 %" for the whole ~4 minutes). `lord-vm --export`
+  wrote a progress line only after each disk was converted, so a one-disk machine stayed at 0 % until the end. qemu-img's
+  own percentage is now passed on within the disk's share of the job (95 % for a `.lordvm`, 85 % for an OVA, whose
+  checksums and package follow at 92 %) (`exp_tool_progress` in `server/src/vm/lordvm.c`). Test:
+  `tests/vm_storage_test.sh` ("OVA: progress during the conversion").
+- **Machines: the LordOS and Kali cards' "Install without questions" note, and the computer's name after changing
+  cards** (QA on the maintainer's PC, ws174). The note showed the raw keys `machines.un.how.lordos` and
+  `machines.un.how.kali`; it now says where the answers go (LordOS: the small `LORDOSAUTO` disk the installer reads,
+  removed with the ISO once the system is installed; Kali: the installer's own start files, as Debian's), in every
+  language. Going back from Debian to LordOS left the computer's name at `debian-13`: the name made from the machine's
+  name now follows it while it is still the one filled in by itself; a name the person typed stays
+  (`hostnameNext` in `apps/machines/catalog.js`, `apps/machines/assistant.jsx`). Test: `tests/vm_catalog_test.mjs`.
+- **Monitor → Network: "Recently denied" lists what the Denied count counts** (QA on ws174: Denied 5 and 8, and below
+  it "Nothing denied in the last ten minutes"). lord-netperm's Denied counter counts every denied connection, incoming
+  ones and ports an app wasn't let open included, but the list kept only outgoing ones. It now shows every direction
+  (an incoming one by its local port, `← :5353`), the latest of each first, merged with how many
+  (`apps/monitor/deniedmodel.js`, `apps/monitor/Network.jsx`). Test: `tests/monitor_denied_test.mjs`.
+- **Waking from s2idle on virtio-gpu no longer hangs in the flip-stall recovery** (QA on ws174). After the watchdog
+  drops a page flip that never completed (BUG-B), the next frame is a full modeset, and on virtio-gpu that
+  `SETCRTC` blocked in the kernel with the whole desktop. That one modeset (only the one after a dropped flip; the
+  first one after the boot splash and Settings → Displays are unchanged) now runs on a thread of its own, and the
+  frame waits for it at most 250 ms. A real card's modeset answers well within that and goes on exactly as before.
+  Past it, the frame counts as a flip still pending: no watchdog drops it again, the cursor leaves that CRTC alone, the
+  loop looks for the answer every 50 ms and completes the frame when it comes; a failed modeset hands its buffer back
+  and the next frame tries again, on a thread again (`server/src/kms.c`, `kms_recover_poll`, `server/src/main.c`).
+  Checked in the test only; it still needs a suspend and wake on a real PC and on the VM. Test:
+  `build/kms-recover-test` (an answer at once, one held past the bound, a failure, the CPU path, and closing while it
+  runs).
+- **Raspberry Pi: background saves no longer hold the desktop during a copy to the SD card** (QA on ws174: the
+  interface stopped 2–8 s at a time in `lord.fs.write`'s `mkstemp`, and its rename was on the same thread). The
+  writer there was the end-to-end bench's channel (`tools/vm/e2e/driver.js`), which saved every command's answer with
+  the synchronous `lord.fs.write`; it now uses `fs.writeAsync` (fsasync's worker, in order per file). The shell's own
+  saves made in the background, whose memory copy is what's read, moved to `fs.writeAsync` too: Lumo's translated
+  descriptions (`sdk/describe.js`), Sentinela's alerts (`sdk/sentinela.js`), the search's recent use
+  (`sdk/spotlight.js`) and Music's library cache (`apps/player/library.js`), and their folders are made once a
+  session. None of them ran per frame; `lord.fs.write` stays for saves a person asks for and waits on.
+- **Changing Dark, the accent or the fonts no longer holds the desktop while the disk is busy** (QA on ws174:
+  `portal.set` took 120–480 ms under disk IO). The GSettings keyfile that GTK apps read
+  (`~/.config/glib-2.0/settings/keyfile`) was read, written and renamed on the interface's thread. It is now changed
+  on bgsave's worker with a new `bgsave_edit`: the worker reads the file's current text, applies LordOS's keys over
+  it (the apps' own keys stay) and writes it the way settings.json is written; an edit queued while an older one
+  waits replaces it, so a file never goes back to older values (`server/src/bgsave.c`, `server/src/ui/portal.c`).
+  Tests: `build/bgsave-test` (an edit returns while the disk is held, the newest one wins over the file's current
+  text, NULL leaves the file) and `build/portal-gs-test` (an app's key in the keyfile is kept).
+- **Web Apps: a site's SVG icon shows in the list** (QA on ws174: WhatsApp → Refresh icon kept
+  `~/.cache/lordos/web/icons/whatsapp.svg`, a valid picture, but its row stayed blank). lord-server hands lord-media
+  an SVG only from the folders `iconfind_svg_allowed` lists, and a web app's icon folders weren't among them, so the
+  picture was never asked for. `~/.cache/lordos/web/icons/` (the site's icon) and `~/.config/lordos/web/icons/` (the
+  registry's) are now; the file is still opened with `O_NOFOLLOW`, at most 1 MB, and drawn only by lord-media in its
+  sandbox (`server/src/iconfind.c`, `docs/MEDIA.md`). Tests: `build/iconfind-test` (the two folders, and paths beside
+  or out of them refused) and `build/svgrast-test` (a WhatsApp-shaped icon: viewBox only, a filter, a gradient by
+  `url(#id)`, arcs and an even-odd glyph, drawn green with clear corners).
+- **Ctrl+Alt+Shift+Backspace from Classic stays in Flow** (QA on ws174: Flow came up, then Classic again after about
+  5 seconds). lord-server loads Flow without touching `settings.theme`, and Flow's `startShell` then asked for the theme
+  still saved there. When lord-server says this desktop was loaded in place of the chosen one (`lord.themes.fellBack()`:
+  the rescue keys, or a community theme the watchdog took off), the running theme becomes the choice and the other one
+  isn't asked for again; a failed community theme is still explained in a notification. `fellBack()` answers only once,
+  so it is now read in one place for both `startShell` and session restore (`themeFellBack`, `sdk/sessionrestore.jsx`,
+  `sdk/index.js`).
+- **Quick Settings: Dark, Transparency and the accent colour set from a community theme show at once** (QA on ws174:
+  they showed only on the next render). A store tells each subscriber on its own now: one that throws (a native call
+  refused while the theme's code is on the stack) no longer keeps the rest from hearing the change, and the error is
+  logged once (`sdk/store.js`). `agentInput` (`sdk/adminsyncmodel.js`) counts a refused `lord.hands.injecting` as "not
+  injecting", and the terminal's Writing switch (`sdk/writing.jsx`) is skipped and told on the next change when
+  `lord.writing` is refused. The realm rules are unchanged. Test: `tests/store_subscribers_test.mjs`.
+- **Community themes: Lock Screen from a community theme no longer freezes the desktop** (QA on ws174). The theme's
+  `session.lock()` called LordOS's lock straight away, which re-renders the shell while the theme's own code was still
+  on the stack, so removing the theme's nodes was refused and the screen stopped answering. Locking now runs in a job
+  of its own, the way logging out already did (`sdk/themeapi.js`).
+- **Settings → Appearance: Try Again on a theme that couldn't start takes effect at once** (seen on VM 127 while
+  checking BUG-H: Try Again cleared the theme's failure record, but the card kept "Couldn't start" and a disabled
+  Apply until the page was left and opened again). The gallery renders again after it (`galleryRev`).
+- **Notifications: a Linux or Flatpak app's buttons still work from the centre once its banner has gone** (BUG-J
+  validation on VM 127 with ws173: GNOME Clocks from Flathub showed its timer and alarm notifications with its real
+  icon, but the alarm's **Stop** in the notification centre did nothing). A banner whose time was up went with the
+  reason "closed", so lord-server told the app it was dismissed and forgot the portal notification's buttons; it now
+  goes as "expired", which tells the app nothing (the notification is still in the centre). The history also keeps the
+  icon a notification came with (`Icon`), for a centre to show for an app the registry doesn't list (a Flatpak app's
+  group in Flow's and Classic's centre has no icon yet: that change belongs in LordOS-themes, whose pinned snapshot
+  `themes-sync-test` checks). Test: `notify_expiry_scene.mjs`.
+- **Settings → Energy: whole hours read "1 h", not "1 h 0 min"** (seen on VM 127 while checking BUG-B: "Require
+  password after the display turns off" offered "1 h 0 min"). A new `prefs.power.h` text, in every language, for a
+  duration of whole hours (the sleep lists' 1, 2 and 3 h too).
+- **Login screen: no "No users" flash when a locked session comes back from a text console** (QA of 0.8.9.6.2:
+  Ctrl+Alt+F2 then Ctrl+Alt+F1 showed a login screen with no users for a moment before the lock screen). The greeter
+  drew its user area before lord-sessiond's first answer, so its empty list read as "No users"; it now draws nothing
+  there until that answer (`heard`).
+- **Community themes: the person's own wallpaper no longer takes the theme off at start** (BUG-H of the ws171 QA,
+  reproduced on VM 127 with ws173: QA Tiny, the okminimal example, applied from Settings → Appearance died at once with
+  `lord.fs.home refused`, then "a community theme draws with View, Text and Image" headless). `findWallpaper` read
+  `lord.fs.home` and `lord.fs.stat` for an `image:<id>` wallpaper from the theme's own call, which is refused; the
+  headless test had no such wallpaper. The home folder is now read when the SDK loads and whether the picture is
+  there is checked by LordOS's code when the SDK loads and when the chosen pictures change (`warmWallpapers`), the
+  catalog's listing keeps its last good read, and a theme's own `Image` may show exactly those files
+  (`jst_wallpaper_file`: `<home>/.local/share/lordos/wallpapers/<16 hex>[.thumb].jpg`, `/var/lib/lordos/wallpapers/<64
+  hex>.jpg`, in C and in the facade). Tests: `themestore-test` (the names allowed and refused),
+  `community_theme_headless.sh` (a new "clicker" fixture: the person's wallpaper found and drawn, a click and a timer
+  that mount nodes, launcher icons, a window's icon, a `../tokens.js` import, its shortcuts).
+- **Community themes: `PROVENANCE.md` is installed with the theme** (the credits file LordOS-themes and the kit now
+  use): lord-themec's build (`keep`) and lord-server's install list (`ts_valid_name`) kept `THIRD_PARTY.md` but not
+  `PROVENANCE.md`. Tests: `themec_test.mjs`, `themestore-test`.
+- **Status items drawn as pictures follow the bar's colour** (Meridian review: a status item ignored `color`). The
+  Cleaner's item picks its light or dark picture by `<StatusItems color>` when a theme gives one (`lightColor` in
+  `sdk/statusitems.js`), else by the mode as before; tray icons and their initials take the colour too.
+- **lord-themec: a theme's parent import that stays in its folder builds** (Meridian review: `import … from
+  '../tokens.js'` in `components/` was refused as `code.path`, though the kit allows it). The path rule is for
+  pictures; a module's specifier is the resolver's, which already refuses any import that leaves the theme's folder
+  ("points outside the theme"). Tests: `themec_test.mjs` (a parent import inside builds, one leaving it and an image
+  `src="../x.png"` are refused).
+- **Community themes: shortcut tables in the SDK's own form work, and can't shadow the shared keys** (Meridian review:
+  `themeUseShortcuts` kept only entries with `combo`, but the dispatcher reads `keys`, so `keys: [...]` entries such as
+  Alt+Tab were dropped and a `combo` one would have thrown). An entry is now `{ id, keys, run, when, repeat, label,
+  group }` (`combo` still read as one key; at most 64 entries of 8 keys), each key spelled as the SDK does, with ❖, ⌃ or
+  ⌥ (or Esc and F1–F24), and never one of the keys every theme shares (`shortcutInBase` in `sdk/shortcuts.js`: search,
+  lock, the clipboard, media keys…), which a theme's entry would otherwise shadow. Test: `community_theme_headless.sh`
+  ("clicker": a `keys` entry runs from ❖⇧K, a ❖Space entry is dropped).
+- **Community themes: drawing an app's icon no longer takes the theme off** (Meridian review; BUG-H of the ws171 QA had
+  the same cause once a window was open: okminimal's taskbar draws `windowIcon(win)`). LordOS's icon components reached
+  the theme wrapped as tainted functions, so React's host guard found the theme's wrapper as the nearest component of
+  their `Image` and refused it ("a community theme draws with View, Text and Image"). An `Icon`/`…Icon`/`…Glyph` in
+  LordOS's data (`useLauncherApps`, `useDockEntries`) and what `windowIcon` returns are now facade components, drawn
+  with sanitized props as the SDK's exported ones; any other function (an app's `Component`, a menu's `onClick`) still
+  runs tainted. Test: `community_theme_headless.sh` ("clicker": launcher rows with icons, a window's icon).
+- **Community themes: a click that opens something no longer takes the theme off** (Meridian review of 0.8.9.6.2,
+  blocker: every community theme, the kit's template too, was taken off at its first click that mounted new nodes).
+  The theme's `setState` ran inside `lord.themeCall`, so React's render, queued as a microtask then, inherited the
+  theme's taint and its commit of the SDK's own nodes was refused (`lord.createNode`, `removeChild`, `destroy`:
+  "marked failed: Error"). React's `scheduleMicrotask` now uses `lord.hostMicrotask` (`server/src/ui/js_theme.c`, host
+  realm only), which queues the render with `JS_EnqueueTrustedJob` (a QuickJS patch: a job that doesn't inherit the
+  taint, still tainted when its function is bound or native); a function of the theme's realm is refused, and every
+  function of the theme the render reaches still runs through `lord.themeCall`. Tests: `realm-taint-test` (a trusted
+  job queued while the theme's code runs, and inside `lord.themeCall`, runs untainted; one of a bound function stays
+  tainted), `community_theme_headless.sh` ("clicker").
+- **Machines: a machine's menu in the library stays inside the screen's work area** (QA of 0.8.9.6.2: at 1280 px the
+  card's menu was cut and reached over the Dock). The menu is placed in the work area of the display under it
+  (`menuBounds`: under the menu bar, above the Dock) instead of the whole display, and is as wide as its longest
+  label needs in the person's language (`popMenuWidth`, 232 to 380 px). Tests: `vm_model_test` (the work area, a long
+  Spanish label, the menu at the right edge of a 1280 × 800 screen inside on every side).
+- **Machines: "Display again" no longer fails for good after 16 reconnects** (found in review of 0.8.9.6.2: lord-vm
+  allowed 16 display connections per run of the machine in all, `display_n` was never decreased, so after 16
+  reconnects or All Displays changes every new one was refused until the machine restarted). The bound is now on the
+  connections alive at once (16) plus a rate (at most 8 new ones in any 10 s), so a hostile or looping client still
+  can't make QEMU take connection after connection (`server/src/vm/vmdispconn.h`). A connection is alive while the
+  client's end of its socketpair exists: lord-vm keeps that socket's inode and, when the bound is reached, looks for
+  it in its own `/proc/self/net/unix` (opened before lord-vm's own Landlock, read again from the start); when the list
+  can't be read nothing is given back. Tests: `vm-test` (40 reconnects each closing the previous one, 16 alive refusing
+  the 17th, lists naming all, one or none, a near-miss inode, the rate window).
+- **Machines: a LordOS guest too old for apps mode says to update LordOS, not "Needs the tools"** (QA of 0.8.9.6.2:
+  in a LordOS 0.8.9 guest apps mode stayed "Needs the tools" even after the tools disc, because apps mode needs the
+  guest's own lord-server to list its windows, which LordOS has since 0.8.9.5). `lordos-guest` 11 reads the installed
+  `lordos` package's version from dpkg's status file (`ag_dpkg_lordos`, `ag_lordos_older` against `AG_APPS_LORDOS` in
+  `server/src/vm/vmagent.h`; only the version's letters, digits and `.+~-:` are kept) and says `oldlordos` in its hello
+  while the guest has no window endpoint; lord-vm passes it on as `VAC_OLD_LORDOS` and `appsBlocker` returns
+  `oldLordos`. The Apps button, the agent popover's Apps line ("Update LordOS in it") and a note under it say that apps
+  mode needs LordOS 0.8.9.5 or later inside the machine and must be updated there, in every language; a guest app asked
+  for from the launcher stops waiting at once there, as for a guest without apps mode. The Linux tools shipped are now
+  11 (`TOOLS_SHIPPED`), so guests with tools 10 update by themselves. Tests: `vm-test` (the hello word, the version
+  comparison, dpkg stanzas: another package, a removed lordos, a hostile version, no final newline), `vm_model_test`
+  (the blocker, the constants matching the C headers, the popover's line), the guest tests' hello now `lordos-guest 11`.
+  docs/VIRTUALIZATION.md 7.2.
+- **Sentinela: "Investigate with Lumo" can't call a disguised program "low risk"** (QA of 0.8.9.6.2: with Qwen3
+  1.7B, a fake `sshd` running from the home folder was rated "Low risk", against Sentinela's own imitation rule). The
+  rules now set a floor the model can't lower (`investigationFindings`, `applyRiskFloor` in `sdk/sentinelamodel.js`): a
+  system or kernel process name on a program that isn't the system's is at least high risk, a program deleted or
+  replaced while it runs outside the system folders at least medium. The finding is also the second line of what the
+  model reads, and the system text says such a line is LordOS's own and can't be contradicted. A raised answer that
+  suggested nothing suggests End, and Monitor → Get Info shows the rule's sentence under the answer (existing
+  `sentinela.why.*` texts, every language). Tests: `sentinela_investigate_test.mjs` (the model's answer mocked: a fake
+  sshd raised from low to high, a high answer kept, the real `/usr/sbin/sshd` untouched, a kernel name in `/tmp`, a
+  replaced program at medium). docs/SENTINELA.md, "Investigate".
+- **Machines: a Whonix Workstation's window started its Gateway and then waited forever** (ws173 QA on VM 116,
+  `machines start "Whonix Workstation"`: the Gateway ran, the Workstation's window kept saying it was starting, and only a
+  second ▶ started it). Once the Gateway ran, the window asked its start again from a render that still had `starting`
+  set, and the start returned at its first line. That second half now goes on regardless of the stale flag
+  (`begin(opts, again)` in `apps/machines/vmwindow.jsx`). Checked on VM 116: the same command starts the Gateway, then
+  the Workstation in its window, and links them.
+- **Machines: a Whonix member that ran alone for a while never sent on the group's link again** (BUG-N of the ws171
+  QA on VM 116: the Workstation started first and the Gateway from its "Start Gateway" bar, the link came up on both
+  sides, "link: connected … lk1", yet the Workstation's `ip neigh` showed 10.152.152.10 FAILED; reproduced on ws173 with
+  the Gateway first too, when it had run alone about five minutes before the Workstation started). The cause is QEMU's
+  hub: a hub whose only port is the card can't receive, so the card's first frame (an ARP, IPv6 discovery) is queued
+  there and its transmit queue waits for that frame for good; adding the link's port later flushes nothing. The link's
+  hub now has a second port with nothing behind it (`lnkz` in `build_qemu_args`, `server/src/vm/lordvm.c`): while the
+  cable is pulled frames are dropped, as on a real unplugged switch, and the member sends again once the link is made,
+  whichever member started first. Nothing else changes: the port has no backend and reaches nothing. Test:
+  `vm-whonix-xml` checks that each member's link hub has the peerless port. Checked on VM 116: the Workstation alone for ten minutes (`ip neigh` INCOMPLETE), then its "Start Gateway" bar: 10.152.152.10 REACHABLE and Tor's check `IsTor: true`.
+- **The crown menu's update count is made on lord-server's workers** (`lord.pkg.upgradeCountAsync()`, answered through
+  `__lordFsReply` with `{ count }`). Deferring `lord.pkg.upgrades()` off the first render still held the Pi's main
+  thread 648 ms once, 15 s after the start; the worker opens its own copy of the package index and dpkg's status
+  (nothing of the interface's is shared), counts the installed packages with a newer candidate and closes them.
+  `storeUpdates()` uses it when present (`lazyCount` takes a Promise; a failed count keeps the last one) and falls back
+  to `upgrades()` elsewhere. On the Pi (ws173pi3, `docs/MAIN-THREAD.md`): first `__lordTick` 1095 → 100 ms, no
+  `pkg.*` stall left at the start, and the menu shows the count ("1 updates") once the worker answers. Tests:
+  `lazy-count-test` (async answers and failures).
+- **A slow native call's stall line now says who called it.** `lord-server: stall: N ms call <name>` past the stall
+  limit (50 ms, `LORD_STALL_MS`) ends with the caller's JavaScript frames, as the `__lordTick` lines do (`js.c`
+  `js_prof_wrap`, `JS_GetStackText`). The 0.8.9.6.2 QA's Pi start-up stalls named only `fs.recent`, `vm.list` and
+  `pkg.available`; with the frames, `pkg.upgrades` was traced to the menu bar's crown menu in one boot.
+- **The shell's first `__lordTick` stalled about a second on the Raspberry Pi** (ws171 QA: 1095 ms at session start).
+  Two synchronous native calls ran inside it: the Recent files walk (`fs.recent`, 1006 ms; see the Recent widget entry below: the walk now runs on
+  lord-server's workers) and, once that was gone, `lord.pkg.upgrades()` (655 ms on the rebuilt package): the menu
+  bar builds the crown menu on every render and its Store item counted the package updates there, opening the
+  package index and dpkg's status. `storeUpdates()` (`sdk/appcontrol.js`) now gives the last count at once and reads it
+  off the first render: 15 s after the shell starts, then at most once a minute (`sdk/lazycount.js`).
+  `storeUpdatesCount` is a store of it (the Updates widget draws again when it changes) and `storeUpdatesChanged()` asks
+  for a new count. Test: `lazy-count-test`.
+- **`lord.pkg.available()` and `lastUpdate()` opened the whole package index while the theme loaded** (PI stall of the
+  ws171 QA on the Raspberry Pi: 640 ms of `pkg.available` at session start, from `sdk/updates.js`). Both now read only
+  the index's header (its magic and its time) unless the index is already open; opening it (the mmap and apt's
+  preferences applied to all 74 712 records, then dpkg's status) is left to the first query that needs packages.
+  Measured on the Pi: header read well under 1 ms against 70–100 ms cold for the full open on an idle SD card, 640 ms
+  under the session's start-up I/O.
+- **NVIDIA: the texts now match what the reports show** (after #276, a GTX 1070 on NVIDIA's proprietary 580.196.11 on
+  0.8.9.5-beta, whose report says `composition: gpu`). The free drivers (nouveau, NVK) stay the default and NVIDIA's own
+  driver stays the Store's opt-in (Store → For this computer). Settings → Graphics cards no longer lists *Desktop* as
+  simply *Planned*: it is *Experimental*, and on the card that draws the session it shows the session's real
+  composition, *Composed on this card — experimental* or *Composed by the processor* (`nvidiaRoleState` in
+  `sdk/gpureport.js`, `apps/settings/Gpus.jsx`), with a note naming what is known: one report composed on the card
+  (#276), an earlier one composed by the processor (#171, an RTX 3060 on 0.8.8.9, no GL context), and some apps' windows
+  not showing for another person in #276's thread (a GTX 960 and an RTX 3070 Ti on 550.163.01). *AI and compute (CUDA)*
+  stays *Planned*, and its note no longer says installing the driver waits for approval. The Store card's
+  `note.older` no longer says the desktop is untested with the driver. Every UI language updated; the Help article
+  `graphics-cards` (en, es, pt), `docs/NVIDIA-PLAN.md` and the draft `web/content/hardware/gpus.*` ("what works today")
+  say the same. Checked that the Store's suggestion appears for any NVIDIA display device (VGA 0300, 3D 0302, other
+  0380; nouveau or no driver bound) on x86-64: new cases in `tests/suggest_engine_test.mjs`; `nvidiaRoleState` cases in
+  `tests/gpu_report_test.mjs`.
+- **Monitor → GPU: lord-nvgpu didn't find NVML from Debian's own NVIDIA packages** (GitHub #273, a GTX 1650 Mobile on
+  Debian's 550.163.01: "libMissing"). Debian's `libnvidia-ml1` puts `libnvidia-ml.so.1` in
+  `/usr/lib/<arch>-linux-gnu/nvidia/current/`, and the helper searched only the main library folders. That folder
+  (x86-64 and arm64) is now searched after them and accepted as the real file's folder, with the same checks: the
+  folder and each parent root's and not writable by group or others, the real file a root-owned regular file
+  (`LIB_DIRS` in `server/src/monitor/nvgpu_main.c`, `docs/MONITOR.md`). It is already inside the sandbox's read-only
+  library folders. `build/nvgpu-test` passes; reading the card needs a check on a machine with Debian's driver.
+- **Linux apps didn't get the interface language** (GitHub #262 (a): with French chosen in Settings, Brave's save
+  dialog title and menus stayed in English). The desktop's language is settings.json's, but launched apps only got
+  the session's `LANG` (often `C.UTF-8` after an install in English). Now, whenever the SDK sets the interface
+  language (`lord.text.setLanguage`), lord-server puts it in its own environment for the apps it launches and the
+  Terminal's shells: `LANGUAGE` (gettext's spelling: `fr`, `pt_BR:pt`, `zh_CN`, `zh_TW`; read by GTK/gettext, Chromium
+  and Qt apps), and `LC_MESSAGES` only when the session's messages are in another language and only to a generated
+  UTF-8 locale of that language (the session's region first, `es` under `en_US` tries `es_US`, then the language's
+  own, `es_AR`), checked with `newlocale`, so an app never gets a locale it can't load. `LANG` and the other `LC_*`
+  (the region chosen in Settings) are never changed; a new region from Settings is the new base
+  (`server/src/uilangenv.h`, `uilang_apply` in `server/src/ui/js_sys.c`). Apps that D-Bus or systemd start on their
+  own don't inherit lord-server's environment and keep the session's. Tests: `build/uilangenv-test`; checked on a
+  headless lord-server under strace: an app launched with French chosen and `LANG=C.UTF-8` got `LANGUAGE=fr` and
+  `LC_MESSAGES=fr_FR.UTF-8`, with Spanish under `en_US` `LANGUAGE=es` and `LC_MESSAGES=es_AR.UTF-8`.
+- **The system file dialog had no way to make a folder** (GitHub #262 (b): saving a file from a link in Brave, Files'
+  New Folder button was missing). Save and folder dialogs (`sdk/filepicker.jsx`, also the portal's dialog for Linux
+  and Flatpak apps) now have Files' New Folder button in the toolbar: it proposes "untitled folder" (or "… 2", "… 3"
+  when taken), makes the typed name in the folder in view with `lord.fs.mkdir` and opens it. It is off where the
+  dialog can't write and in a Cloud account's folder; `lord.fs` still refuses anything outside the home folder and the
+  user's disks and the protected folders, so nothing new is reachable. Tests: `canMakeFolder` and `freeFolderName` in
+  `tests/filepicker_model_test.mjs` (now also run by `make test`), and New Folder end to end in
+  `tests/backup_pickers_scene.mjs`.
+- **Machines: buttons and the Whonix badge ran out of their space in long languages** (GitHub #266, French). The
+  empty library's three buttons (New Machine, Import a machine, What This Computer Can Run) sat in one row that clipped
+  both ends; they now wrap onto more rows, centred, and the pane scrolls in a short window instead of spilling out
+  (`FirstRun` in `apps/machines/library.jsx`; "Check Again" and "Continue Emulated" wrap too). The assistant's Whonix
+  card badge ("Groupe · 2 machines") was kept on one line past the card's edge; it now takes the room beside the
+  mark and wraps onto a second line, and a card's one-line hint ends with an ellipsis
+  (`apps/machines/assistant.jsx`). Checked with headless screenshots in French and German at 760×500 and 1100×700
+  (`tests/machines_group_headless.sh`'s scene, an empty library and a window that small).
+- **The keyboard's light stayed on while the display was off** (GitHub #270, a MacBookPro12,1: it went off only when
+  the computer slept). lord-server sends the idle stages "off" and "wake" (`server/src/hw/display.c`), but the
+  desktop only acted on lock, sleep, suspend and resume. Now "off" turns every lit `*::kbd_backlight` off and
+  remembers its level, and "wake" puts each one back where it is still off (one somebody set again meanwhile is left
+  alone; a smaller maximum after a driver reload is respected), through the same closed `keyboard-light` admin action
+  as the keyboard-light keys (`keyLightsOff`, `keyLightsBack` in `sdk/idlemodel.js`, `sdk/hardware.jsx`). On a locked
+  session's login screen the light comes back when the session itself wakes. Test: `tests/idle_model_test.mjs`.
+- **Installer: "No disk to install on was found" on a healthy GPT disk with several partitions** (GitHub #280, an HP
+  ProBook 650 G2 with seven partitions). install-disks describes each disk in one LOG line of JSON, and the privileged
+  helper cut every reply line at 1200 bytes (its text at 1024): with four or more partitions the JSON was cut, the
+  installer's `JSON.parse` failed silently and the disk was dropped. It showed up only while a partition was mounted,
+  because then the table's entries are left out and the line was short enough. Reply lines now hold up to
+  `ADMIN_LINE_MAX` (64 KiB, `server/src/admin.h`) on every hop: the helper's own lines, its `A_FORK` children's, lord-netd's
+  and lord-server's reader. A longer text is still cut to one line, and a reader drops a line too long for it whole,
+  up to its newline, instead of reading its tail as a line of its own with a made-up id (`server/src/adminline.h`). A
+  disk whose description would still be longer (far more than 128 partitions' worth) is listed as unusable with
+  `install.diskTooManyParts` instead of vanishing. The installer now checks each disk line's shape
+  (`apps/installer/diskmodel.js`) and says "A disk's description couldn't be read" instead of claiming there is no disk.
+  The other long replies (VPN details, journal entries, SMART) gain the same room. Tests: `build/adminline-test` (a
+  seven-partition disk's line whole through a reader fed in pieces, cutting, a too-long line dropped whole) and
+  `tests/installer_disk_model_test.mjs`.
+- **Machines: on a host with the NVDIMM bus (`/sys/bus/nd`, nfit and libnvdimm loaded) QEMU could be stopped by its
+  seccomp allowlist for `fchdir`** (BUG-L of the ws171 QA on VM 116; libndctl, loaded with QEMU's libpmem, walks
+  that bus). Decided by the maintainer on 2026-11-27: no new system call. QEMU's mount namespace now has an empty,
+  read-only tmpfs over `/sys/bus/nd` (`vm_ns_setup`), so there is nothing to walk. Checked on VM 116 with nfit and
+  libnvdimm loaded: machines (BIOS and UEFI, no display and a window, isolated and shared network) start, and QEMU's
+  mountinfo shows the tmpfs there. Test: `vm-jail-probe` checks it where `/sys/bus/nd` exists.
+- **Machines: an unattended Debian guest got the console's keyboard layout instead of the person's** (ws171 QA on VM
+  116: "latam" from `/etc/default/keyboard` while the desktop types in US). `hostDefaults` and the first-boot
+  answers now take the session's active layout (Settings → Keyboard), and `/etc/default/keyboard` only without one
+  (`host_keymap` in `server/src/ui/js_vm.c`).
+- **Machines: Back from "Install what's missing" lost the half-filled assistant** (ws171 QA on VM 116). The assistant
+  stays mounted under its Requirements page, and Back returns to it as it was left (`apps/machines/library.jsx`).
+- **Machines: ▶ in a Whonix Workstation's window started it alone** (BUG-N of the ws171 QA on VM 116: started before its
+  Gateway, the group's link came up on both sides, "link: connected … lk1", but no traffic passed). ▶ there now starts
+  the Gateway first and the Workstation once the Gateway runs, as the library and the CLI start a group
+  (`gatewayFirst`, `gatewayReady` in `apps/machines/group.js`); a Gateway that doesn't start says so and the
+  Workstation stays off. Why the link carries nothing when the Workstation came first is not found yet (the "Start
+  Gateway" bar of a Workstation already running still takes that path). Test: `vm-group-ui-test`.
+- **The Recent widget and the search walked the whole home folder on the interface's thread** (ws171 QA on VM 116 and the
+  Pi: 250 ms to 1.6 s stalls about every minute on a 37 GB home, and at the start). `lord.fs.recentAsync` walks it on
+  lord-server's workers (`fsasync_submit_fn`, the same `fs_recent`), and `recentCached` (`sdk/fs.js`) gives the
+  widget, the search and the menus the last walk's list at once, with a new walk when it is a minute old and
+  `recentFiles` to draw again when it answers. Files' Recents (a person's click) still asks at once. Test:
+  `fs-recent-cache-test`.
+- **Machines → "Bring an exported machine" refused LordOS's own exports** (BUG-M of the ws171 QA on VM 116).
+  lord-server read the export's `manifest.json` with the reader for LordOS's own root-owned store files, so the
+  person's export never passed. An export now has its own reader, shared by lord-server (`exportInfo`,
+  `importExport`) and lord-vm (`--import-lordvm`): `vmx_manifest_read` (`server/src/vm/vmexport.c`) opens it
+  through the folder's descriptor without following a link or blocking, takes only a regular file of 1 to
+  `VMX_MANIFEST_MAX` bytes whoever owns it, reads it once and parses it strictly; every file it lists is then checked
+  by `vmx_manifest_verify` as before. Tests: `vmexport-test` (`test_read`: a 0664 manifest read; a link, a FIFO, a
+  folder, none, empty, past the cap and broken JSON refused); the export → import round trip stays in
+  `tests/vm_storage_test.sh`.
+- **lord.fs.write froze the desktop 5 to 23 s while Machines copied an image to a Raspberry Pi's SD card** (PI-1 of the
+  ws171 QA; the watchdog's C stacks in `f_fs_write`'s fsync). The file is still written and renamed over the old one
+  before the call returns (ext4's `auto_da_alloc` writes a file renamed over another before the rename commits), and
+  its fsync, with its folder's, now runs on bgsave's worker right after (`bgsave_sync_later`; `bgsave_flush(NULL)`
+  at the end of the session waits for it). Test: `bgsave-test`.
+- **A tree built with umask 0002 left the helpers group-writable, and lord-server refused them** (Raspberry Pi 5,
+  ws171: lord-sql, lord-sftp, lord-web and lord-media refused, `sql-e2e` hung, and Machines' toolbar glyphs, drawn by
+  lord-media, were blank). Every helper's rule now ends with `chmod g-w`, as lord-vm's did, and the `sql-e2e`
+  acceptor gives up after 30 s so a refused helper fails the test instead of hanging it.
+- **`.gitignore`'s `logs/` matched the source folders `apps/logs` and `server/src/logs`** (a sync that applies the
+  ignore rules dropped them): anchored to the top, `/logs/` (the agents' progress logs).
+- **Sentinela's third notification button read "It's…"** (ws171 QA). A notification's buttons now wrap to a second
+  row whole instead of being squeezed and cut (`sdk/notify.js`).
+- **A new desktop widget could land on top of a pinned one** (ws171 QA). The pinned sound wave along the bottom is off
+  the grid, so its cells counted as free; they are now taken when a widget is added or resized (`pinBlocks` in
+  `sdk/widgetgrid.js`). Test: `widget-grid-test`.
+- **The mouse wheel over a list inside a page scrolled the page too** (ws171 QA: Settings → Privacy → Add app). A
+  `ScrollView` that moves takes the wheel; at its end the wheel goes on to the page around it, as in a browser
+  (`sdk/components.jsx`).
+- **A text field's right-click menu near the bottom of the screen was cut** (ws171 QA). The menu was kept inside the
+  whole display and could never go above the field's own top; now it stays inside the work area (clear of the Dock and
+  the bar) and opens upward when there is no room below (`fieldBounds` in `sdk/components.jsx`, `boxAt` in
+  `sdk/contextmenu.jsx`). Test: `window-sheet-scene`.
+- **Store: Remove asked nothing for Flatpak apps and LordOS packages** (ws171 QA). It now asks "Remove {name}?" with
+  Cancel and a red Remove first, in Installed and on a Flatpak app's page, as Debian's removal (its plan) and web apps
+  (their sheet) already did (`ConfirmRemove`, `apps/store/confirmremove.js`; `store.removeAsk`, every language).
+- **"Reopen your windows? LordOS did not shut down properly" after a theme was taken off** (BUG-H of the ws171 QA). A
+  community theme writes session restore's "unclean" marker when it starts, like any desktop; when lord-server's
+  watchdog took it off (or Ctrl+Alt+Shift+Backspace left a theme), the desktop loaded instead read that marker as a
+  crash. lord-server now says so once (`lord.themes.fellBack()`, set by `community_back` and a failed switch in
+  `main.c`), and session restore takes it as the same session going on, as after a theme switch
+  (`sameSession` in `sdk/sessionmodel.js`). Test: `session-model-test`.
+- **The "This theme isn't from LordOS" dialog's Cancel button had no label** (BUG-H of the ws171 QA). `ConfirmDialog`
+  now says Cancel (`shell.dialog.cancel`, every language) when the caller gives no `cancelLabel`. Test:
+  `window-sheet-scene`.
+- **Session restore's autosave still synced settings.json on the interface's thread** (BUG-I of the ws171 QA, GitHub
+  #250 partly open: "stall: call settings.save" of 94 to 145 ms under heavy disk IO, two seconds after each window
+  change). The marker is now written and synced on lord-server's save worker (`lord.settings.save(text, false, true)`:
+  `BGS_FSYNC` and the new `BGS_SYNCDIR`, the folder synced after the rename), so it stays durable without blocking a
+  frame; a later plain save of settings.json replacing it before it is written keeps the sync. Only the session's
+  last word (logout, power, the end of lord-server) is still written before the call returns. Tests: `bgsave-test`
+  (the sync kept through coalescing, the folder synced), `session-model-test` (`markerSave`).
+- **Settings' account card always showed initials** (BUG-K of the ws171 QA). The card at the top of Settings' sidebar
+  now draws the account's picture when one is set, and otherwise its initials on its own color, as Users does
+  (`UserAvatar`); it reads the account again when the Users page is opened or left.
+- **Ctrl+Alt+Shift+Backspace from Classic marked Classic failed for the rest of the session** (BUG-F of the ws171
+  QA: "theme …/classic/theme.bundle.js taken off (restored with Ctrl+Alt+Shift+Backspace)", and Settings refused to
+  apply it again). The rescue key goes back to Flow from any theme, but only a community theme is now marked failed
+  (`community_back` in `server/src/main.c`, `jst_is_user_bundle`); from one of LordOS's own themes the log says it was
+  left, and it can be chosen again at once.
+- **Settings → Appearance → Install from a file failed on every installed system: `lord-themec` wasn't in the
+  package** (BUG-G of the ws171 QA). `tools/iso/mkdeb.sh` never installed `server/build/lord-themec`, which lord-server
+  starts only from next to itself (`ui/js_theme.c`). It is now installed in `/usr/lib/lordos/bin` and required like
+  the other helpers. And `mkdeb.sh` now refuses to build a package when a program `server/Makefile` or
+  `server/mk/*.mk` builds is neither installed nor named as not shipped (tests, development tools, `lord-web` in its
+  own package), so a new helper can't be left out again.
+- **After an s2idle suspend on virtio-gpu the login screen never showed** (BUG-B of the ws171 QA: compositor.log
+  "watchdog: Virtual-1: its page flip has not completed for 2.4 s", and nothing after). The watchdog only logged a page
+  flip the kernel never completed. Now it recovers: the flip is taken as done (`kms_flip_abandon`: the GPU path's
+  buffers released as the event would, or the CPU path's swapped), everything is painted again and the next frame is a
+  full modeset (`SETCRTC`, as the first frame after the boot splash) instead of a page flip. At most three times until
+  one of that display's flips completes again, logged each time, and never while the displays are off after idle (a
+  modeset would light them). A late event for the dropped flip completes nothing. Test: `build/kms-recover-test`.
+  docs/MAIN-THREAD.md.
+- **Cloud: Pause didn't stop an upload already in progress** (BUG-C of the ws171 QA). Pause held only the files waiting
+  in rclone's queue; one already going up went on, and rclone has no rc call that stops a VFS upload. Now Pause stops
+  it the way rclone's VFS does when a file changes while it goes up: lord-server rewrites the file's first byte,
+  unchanged, through the mount, in a thread of its own; rclone cancels the transfer and cleans up after it (the
+  `.partial` file removed, a multipart upload aborted), the file goes back in the queue and is held at once, and on
+  Resume it is checked again (the conflict rule) and goes. The content stays the same; its modification time becomes
+  the moment of the pause. Each upload is stopped at most once every 30 s (`cloud_cancel_due`). Checked against rclone
+  1.75.2 (a 40 MB file at 2 MB/s: canceled, `.partial` gone, requeued under the same id, uploaded whole after Resume).
+  Tests: `cloud-test` (`t_pause`: when to stop, the rewrite keeps the content and follows no link). docs/CLOUD.md.
+- **Settings' sheets stayed drawn over windows opened after them** (BUG-D of the ws171 QA: Settings → AI's model sheet
+  over Thunderbird and the launcher). Settings drew its sheets and file dialogs in the shell's `modal` layer, above
+  every window, at the window's coordinates; while one showed, no Linux app got the keyboard either. A new
+  `<WindowSheet>` (`sdk/layers.js`, with `useWindowSheetArea()`) draws a window's sheet in that window's own overlay
+  host, over its content only, so it stacks, moves and is captured with its window. Every such sheet in Settings moved
+  to it: AI (the model sheet, the OCR try-out's picker, a voice from a file), Personal Voice, Wallpaper (the details
+  sheet, adding a picture), Desktop style (themes from a file), Users (the picture editor), Sharing (importing a key),
+  Network (VPN certificates), Web apps and Flatpak (their confirmations). Test: `window-sheet-scene` (the sheet is in
+  its window's host, never in the modal layer; no app under `apps/` uses `<Layer name="modal">`). docs/LAYERS.md.
+- **Settings → Web apps → Refresh icon answered "webapps.tooMany" after the Store fetched the catalog's icons** (BUG-E of
+  the ws171 QA). On a first login the Store queued icon probes for all 37 catalog apps; each finished probe kept one of
+  lord-server's 8 probe slots for 15 minutes (the time an "Add from an address" probe waits for its Install), so the
+  person's own probe found none. Now an icon fetch's probe is freed as soon as its answer is read
+  (`webmgr_probe_release`), one nobody read for a minute is freed too, the Store's background fetches never take the
+  last two probe slots (`WEB_PROBE_RESERVED`) nor the last icon fetch, and the person's (Add from an address, Refresh
+  icon: `lord.webapps.fetchIcon(app, true)`) may take a finished background probe's slot. Refresh icon starts at once
+  instead of waiting behind the Store's queue (`sdk/webapps.js`). Tests: `webreg-test` (slots), the
+  `webapps-icon-settings-scene` (a manual fetch while the background one runs). docs/WEBAPPS.md.
+- **Flatpak: installing VS Code or Steam from the Store failed while pulling `org.freedesktop.Sdk`** (BUG-A of the ws171
+  QA: "Flatpak no pudo terminar: Instalando runtime/org.freedesktop.Sdk/x86_64/26.08"; the kernel OOM-killed it in
+  `lordos-net-flathub.scope` at 64 MB). `/usr/bin/flatpak` runs in the same scope as the `flathub` network connector,
+  and the connector's 64 MB `memory.max` applied to Flatpak's OSTree pulls too. The scope's limit is now 4096 MB
+  (`NC_FLATHUB_MEM_MAX_MB`, `sec/netconn.h`), written the same by the connector and by every Flatpak command so neither
+  undoes the other; the other connectors keep 64 MB. Still a bound: a runaway `flatpak` is killed in its scope. Test:
+  `netconn-test` (`test_scope_limits`). docs/FLATPAK.md.
+- **Hands: "lord.admin.request refused (an AI agent's input)" for requests the agent never made** (BUG-10b of the ws170
+  QA: three after each agent click in Settings, logged as "other"). Two settings are mirrored machine-wide by closed
+  administrator actions run on every settings change: the browsers' "continue where you left off" (`browser-restore`)
+  and the video optimization (`video-optimize`). After a failed attempt they forgot what was applied, so any later
+  change of any setting (an agent's click in Settings writes settings) ran them again, and lord-server refused them
+  under the agent's input. Now they run once per new choice, a failed one is not tried again for 60 s, and never from an
+  AI agent's input (the person's next change, or the next start, applies it) (`sdk/adminsyncmodel.js`). The refusal
+  line also names the action and where the run came from (above). New `tests/admin_sync_test.mjs`.
+- **Hands: a window's screenshot left out its own open pop-up** (BUG-17 of the ws170 QA: Settings → AI → Voice's open
+  Language list was missing). A window's capture now also paints the menus and pop-ups that are that window's (the shell
+  surfaces marked `handsWin`, below the system band only), as it paints its sheets, and grows to hold a list that hangs
+  past the window's edge (`sdk/handsmodel.js` `unionBox`). Tests: `hands-model-test`, `tests/hands_e2e.py` case 9 (the
+  list in the window's screenshot; `set_value` by the option's label).
+- **Settings → Keyboard: "❖ · F4" read as ❖+F4** (BUG-21 of the ws170 QA: an agent's `super+F4` didn't open Apps). A
+  modifier the list shows by itself, pressed and released alone, now says so: Flow's Apps row is "❖ alone · F4", and
+  the same for ⌥ (the menu bar) and Classic's Start menu (`shell.shortcuts.alone`, every language); and ❖+F4 now opens
+  Apps too in Flow and Celeste (LordOS-themes fix/qa-ws170). An agent's `super+m` right after its click in Settings was
+  checked on a headless desktop: it minimizes. Test: `tests/shortcuts_list_scene.mjs` (Flow, Classic).
+- **Hands: `open_app` didn't find a Linux app by its name in another language** (BUG-23 of the ws170 QA: "Auditoría de
+  toolkits" on an English desktop). The list of Linux apps now carries every `Name[xx]` of each `.desktop` file (each
+  once, whole names, never a variant such as `Name[en@shaw]`; `lord.apps.linux` `names`), and `open_app` matches them
+  as well as the plain `Name`. Test: `apps-actions-test`.
+- **Web apps: a right-click menu stayed on screen after its window closed** (BUG-31 of the ws170 QA). lord-web keeps
+  running in the background when its window closes, so the menu it had asked for (the shell's, in the system layer, with
+  a full-screen catcher) never got its "gone" and outlived a window an AI agent closed: every Hands screenshot was black
+  and every agent input refused until the person closed it. The menu now closes, answering "" to lord-web, when no
+  window of that web app (same app and profile) is left (`sdk/hardware.jsx` WebAppMenu). An agent's Escape still never
+  closes it (the system band is the person's; docs/HANDS.md). Test: `tests/webapp_menu_orphan_scene.mjs`.
+- **Hands: `open_app` found only LordOS apps and answered the wrong window for a Linux app; `set_value` refused a pop-up;
+  `key` refused the keypad; refused admin requests were logged without a name** (BUG-15, BUG-23, BUG-17, BUG-19, BUG-10b
+  of the ws170 QA). `open_app` now finds an app as the launcher's search does: a LordOS app's id or name, a Linux,
+  Flatpak or web app's shown name, its `.desktop` Name in English, `desktop:<id>` or `<id>`, or a word of its name. An
+  app that brings its own window is started as the launcher starts it, and the answer is that window's real id
+  (`linux#149`) with `"ready":true` once it maps (at most 10 s, else `"window":null`). No match says "No app named …"
+  instead of "the window or ref is gone". `set_value` on a pop-up or a segmented control takes an option's value or
+  label: exact, then ignoring case and accents, then the one label it starts; never a disabled one (`sdk/handsmodel.js`
+  `optionIndex`). `key` accepts `KP_0`…`KP_9`, `KP_Add`, `KP_Subtract`, `KP_Multiply`, `KP_Divide`, `KP_Decimal`,
+  `KP_Enter` and `Num_Lock`. A refused administrator request is logged once as `hands: <kind> admin <action> refused
+  (agent|shell|callback)`: the action is named only when it has an action name's shape, else `other`. docs/HANDS.md also
+  explains that the shell's shortcuts work for an agent's keys, and that Flow's Apps row "❖ · F4" means ❖ alone or F4,
+  not ❖+F4 (BUG-21: `super`, `F4` and `super+m` checked on a headless desktop). Tests: `build/hands-test` (keypad
+  chords, a Linux app's window named or none in time, the "no app" text, the log lines) and `hands-model-test`
+  (`matchApp` by `.desktop` Name, id and word; `optionIndex`).
+- **Toolkit audit: `size` failed on Qt 5, Qt 6 and GTK 3 on X11, and `fullscreen` on the plain X11 window, on a real
+  desktop** (BUG-12 and BUG-24 of the ws170 QA: 600x421, 600x406). LordOS's window memory had saved a frame for each
+  harness window in earlier runs (shared between toolkits through the ids `python3`, the script's name and
+  `lordos-toolkit-audit`), and every later run opened at that size. The shell now neither remembers nor restores a place
+  for `lordos-toolkit-audit*` windows (`sdk/shellxmodel.js` `remembersPlace`), and each harness names its window
+  `lordos-toolkit-audit-<toolkit>`. The check is unchanged: a window that asks for 600x400 must get it. Reproduced
+  headless with those saved places (93.8 %); 100 % on all nine rows after. Test: `tests/shellx_model_test.mjs`.
+- **Test bench: "PRIMARY SELECTION: offer came, no text" on a real desktop** (BUG-24 of the ws170 QA). The check took the
+  selection the new device is told at once (another app's) for its own. Both selection checks now read those events
+  first (a roundtrip). Test: `tests/testbench_selection_headless.sh` (a second test bench while another holds the
+  selection; failed before).
+- **GTK 4 apps stayed light on a dark desktop, and the toolkit audit's `theme` check passed anyway** (BUG-29 of the ws170
+  QA). The theme LordOS names in dark mode, `LordOS-dark`, had no `gtk-4.0` folder, so GTK 4 drew its light default.
+  `LordOS` and `LordOS-dark` now have a `gtk-4.0/gtk.css` that imports GTK 4's own light or dark style. The GTK harnesses
+  judge light or dark by the colour the window's text is really drawn with, and `gtk4.py` fails when it differs from the
+  desktop's scheme.
+- **Full screen on several displays: a LordOS window chosen on another display lost the keyboard to the fullscreen
+  window, and Hands reported a fullscreen Linux window at its small own size** (BUG-30 and BUG-30b of the ws170 QA).
+  Choosing a LordOS window now counts by where the pointer was when it was chosen, not where it is at each key (`wl.c`
+  `none_on_fs`, `fsfocus.h` `fsf_none_ptr`). lord-server's "fullscreen" event carries the display's box
+  (`args.fullscreenRect`), and `windows_context` reports it. Tests: `build/fsfocus-test` (four new cases),
+  `tests/shellx_model_test.mjs`.
+- **Moving wallpapers: the frosted surfaces over the video no longer cost the CPU anything per frame** (BUG-14 of the
+  ws170 QA: a 4K wallpaper on three 4K displays with Settings, Files, Notes and the Terminal open averaged 145 % of a
+  core, its main thread about 80 %, because every frame re-blurred and repainted on the CPU each frosted window, the menu
+  bar, the Dock and the widgets, and read the video's rows back from the GPU for them). On a GPU display, a frosted node
+  whose only backdrop is the GPU-drawn moving wallpaper is now blurred by the GPU from the picture's texture with each
+  composed frame (`gpu_draw_frosted`, `wl_paint_frost`, `frost_source`: the picture at 1/4 of its size, one Gaussian of
+  the CPU blur's variance, a rounded mask). The CPU paints only the node's own background and content, once, over the
+  picture's transparent hole, and a new video frame repaints, reads back and uploads nothing. Anything else painted under
+  the node (another window, its shadow, a desktop icon, an app window, a transform), a capture, a turned display or a
+  remote viewer or recording keeps the CPU's blur, as before; those strips refresh at most every 200 ms
+  (`MEDIA_BLUR_MS`, `LORD_MOTION_BLUR_MS`; `LORD_GPU_FROST=0` turns the GPU's glass off). A blurred node with an opaque
+  background is never refreshed, since its blur never shows. Measured: `build/engine-test bench-motion` (one 3840×2160
+  display, the menu bar, the Dock, a widget and two frosted windows, 4.2 Mpx): 31 ms and 92 % of a core per display at
+  30 frames/s before, 0 ms after. `build/motion-bench frost` on an RX 580: within 2.5 levels of the CPU's blur on
+  average, 2.5 ms of GPU and 0.1 ms of CPU for a 4K desktop's boxes. Tests: `engine-test` `test_gpu_frost`,
+  `test_motion_blur_refresh`, `motion-bench frost`. docs/MOVING-WALLPAPERS.md.
+- **Workspaces: a window could cover its display's bar, so the tray of the activity's windows couldn't be seen** (BUG-32
+  of the ws170 QA: with the Terminal and the Calculator on the main display, only each window's own title icons showed,
+  and the bar listing both was under the Terminal). The bar's tray did list both; a window the tiler doesn't place (Free
+  layout, floating, restored or launched there) could sit above the work area, over the bar. The tiler now moves such a
+  window down to the work area, its size kept (`themes/workspaces/tiler.js`). `tests/workspaces_scene.mjs`: two windows
+  tiled on one display (Two halves, One at a time) both in its bar, and a window opened over the bar goes down to the
+  work area.
+- **The clipboard panel and the weather widget's city picker opened on the main display** (BUG-27 of the ws170 QA:
+  Settings → Clipboard → Open panel from Settings on display 2, and "Change city…" of a widget on display 2, both looked
+  as if nothing happened). The clipboard panel (❖V, ❖⇧V and Settings' button, `openClipboardPanel`) now opens on the
+  focused window's display, and the city picker on its widget's display; the main display stays the fallback.
+- **System Information showed dates in the US format in any language** (BUG-25 of the ws170 QA: "Incluida: la prueba de
+  11/27/2026, 07:08:26 AM" in Spanish). The report's toolkit audit, the probe's and the benchmark's times used
+  `toLocaleString()` without a locale; they now go through the SDK's `formatDate` and `formatTime`, which follow the
+  interface's language and region. New `tests/locale_dates_test.mjs` fails on any `toLocale…String()` without a locale
+  in `apps/`, `sdk/` and `themes/` (none left).
+- **Notes: "Show on desktop" put a new note at its default place, behind the window in front and on another display**
+  (MEJORA-3 of the ws170 QA: x=2112 on the main display while Notes was on another). A note now records in its header
+  whether its place is one it had on the desktop (`placed`; a note already on the desktop counts as placed, no migration
+  needed); a new note goes to the Notes window's display, 80 px in and 40 down, 30 px further for each desktop note
+  already there, while one that has been on the desktop and is still on a display keeps its place
+  (`apps/notes/notesmodel.js` `placeOnDesktop`). `notes-model-test`: four cases.
+- **Spelling: Notes underlined the "txt" of an attachment's link** (MEJORA-2 of the ws170 QA: "[📎 nota.txt](nota.txt)").
+  A markdown link's target (`](…)`) and file names with an extension (`nota.txt`, `informe-final.pdf`) are no longer
+  checked; the link's own text still is, and the positions of the rest stay (`sdk/spellmodel.js` `spellText`).
+  `spell-model-test`: three cases. docs/SPELLING.md.
+- **Files: renaming selected the extension too** (MEJORA-1 of the ws170 QA: typing over "archivo-3.txt" removed ".txt"
+  and asked whether to change the extension). F2 and a slow click now select the name up to its last dot, as other desktops and
+  Nautilus do; a folder, a name without a dot and a hidden file (".bashrc") are selected whole
+  (`apps/files/names.js` `renameSelection`; the SDK's `TextInput` takes a first selection, `select: [start, end]`).
+  Tests: `files-names-test` (six cases, code points) and `tests/textinput_select_scene.mjs`.
+- **Hands: `find "Papelera"` didn't find the Dock's Trash** (BUG-11 of the ws169/ws170 QA): the shell's glyph-only
+  buttons had no accessible name. Flow's Dock icons (the app's name, "Apps" for the launcher) and its Trash, Flow's menu
+  bar items (the LordOS logo, Search, Quick settings, Notifications; every item is a button), Workspaces' column (each
+  item, the crown and the expand/collapse toggle) and its bar buttons now carry an `accessibilityLabel` from the existing
+  translations (their role stays "clickable"; the themes come from LordOS-themes, pinned at its branch fix/qa-ws170). New `tests/hands_names_scene.mjs` (Flow and Workspaces, over the
+  theme's real host tree).
+- **Settings' search didn't find a page by its rows** (BUG-18 of the ws170 QA: "Acomodar" and "borde" found nothing,
+  though Desktop & Dock has "Acomodar ventanas en los bordes de la pantalla"). Each section is now also found by the short
+  text its page shows: every row label, choice and short note, 1,356 keys over the 30 sections, listed in
+  `apps/settings/searchkeys.js`, generated from the pages by `tools/gen-settings-search.mjs` (it follows each section's
+  component and the Settings components it draws). `tests/settings_search_test.mjs`: in all 35 languages every one of
+  those texts finds its section by its first word, "acomodar" and "borde" find Desktop & Dock, and the generated file is
+  up to date.
+- **Files → Open with didn't offer LibreOffice installed from Flathub for an `.odt`** (BUG-22 of the ws170 QA). Only
+  exports named exactly after an installed app's id were read, and LibreOffice declares its types in its other exports
+  (`org.libreoffice.LibreOffice.writer.desktop`, `…calc`, …). An app's other exports, named after its id plus a suffix
+  (as Flatpak requires), now lend their `MimeType` to the app's entry (user and system installations; nothing else of
+  them is read, they never become apps of their own, and the file opens in the app by its id). `build/apps-actions-test`:
+  a second export's types reach its app, an export of no installed app adds nothing, a second export's own name is
+  refused for Open with.
+- **Moving wallpapers: a damaged file showed as downloaded and the desktop started it again every 0.6 s for good**
+  (BUG-13 of the ws170 QA: 13 bytes of text, "crystal-crown", under a catalog video's hash). The cause was in root's
+  `wallpaper-login`: choosing the same login video twice made `rename()` act on the same inode and leave the temporary
+  `.login.part` as a hard link to the video, and a still login wallpaper chosen later wrote its name into it with
+  `O_TRUNC`. The temporary name is now always removed, and the still's mark is written only into a new file (`O_EXCL`).
+  No test wrote into the real store (every test uses its own folder under `build/`). Also: `wallpaper-get` keeps an
+  existing file only when its size and SHA-256 are the catalog's (otherwise it fetches it again over it); Settings →
+  Wallpaper counts a moving wallpaper as downloaded only when the variant settings names is in the store at the
+  catalog's size (`motionHere`), and choosing one that isn't fetches it; the desktop plays only such a file. A player
+  that stops is tried again after 0.5, 1, 2 and 4 s, then no more, and a file lord-media can't open
+  (`media.cannotOpen`) is given up after three failures in a row on every display: its still poster shows and a
+  notification says so once (a new download clears it). Tests: `wallpaper-admin-test` (the same login video twice then
+  a still leaves the video whole; a same-size and a short wrong file are fetched again), `wallpaper-gallery-test`
+  (`motionHere`), `motion-model-test` (`retryDelay`, `openFailure`). docs/MOVING-WALLPAPERS.md.
+- **The menu bar's search lost the letters C and T and the Space** (BUG-28 of the ws170 QA: "documento-qa" became
+  "doumeno-qa", "c t ca to" became "ao"). Not the search: Screenshots' area selection had been ended by closing its
+  overlays from outside (an agent's `close_window` on the three `screenshots#overlayN` windows, BUG-26), which left the
+  selection's state behind, and its keys (Space for window mode, C to copy a colour, T for text mode) stayed shortcuts
+  taken before any field. Closing any of its overlays now ends the whole selection, and those keys apply only while its
+  overlays are up. A selection an AI agent's input opened ends by itself after 15 s unless the person takes it (their
+  pointer or a key on it): it is in the system band, which an agent never reaches, Escape included (docs/HANDS.md).
+  With nothing typed, the search now lists the files changed most recently (newest first), as it should (checklist item
+  180). Tests: `tests/screenshots_overlay_close_scene.mjs` (reproduced "ao" before the fix) and
+  `tests/spotlight_keys_scene.mjs` (Flow and Classic: every key reaches the field; the recent files with nothing typed).
+- **Korean: the syllable being composed was lost when Space, Enter or punctuation ended it** (BUG-20 of the ws170 QA;
+  r k Space gave " ", not "가 "). The input method committed the syllable and passed the key on, but both reached the
+  field in the same JavaScript turn, and the field (`TextInput`, `TextArea`) still read its value from its last render:
+  the Space was applied over the old value. lord-server now runs the commit's render (its promise jobs) before the key
+  that ended the syllable (`js_key`), for every field (the SDK's, Notes', Mail's, the editor's).
+  Tests: `ime-test` cases (Space, Shift jamo, a full stop and Enter commit first: "가 빠 아.") and a new scene,
+  `tests/ime_commit_scene.mjs` (a controlled `TextInput` receiving the commit, its jobs, then the key).
+- **Tests: `tests/vm_list_headless.sh` failed now and then on a loaded computer** (TEST-1 of the ws169/ws170 QA): the
+  cold first `lord.vm.list()` (every folder read, the firmware hashed once: 14–32 ms by load) could pass lord-server's
+  20 ms slow-call line and fail the stall check. That one line is now allowed with its own margin (150 ms,
+  `VMLIST_COLD_MS`) only when the scene's own cold read was that slow; any cached list or re-read still fails it.
+- **Package: `/run/reboot-required.pkgs` listed `lordos` once per upgrade** (BUG-16 of the ws170 QA; 28 times on the
+  test machine). The postinst now adds the line only when it is not already there (`grep -qsx lordos`).
+- **Toolkit audit: `gtk3-x11` `size` and `qt6-wayland` `combo` on a real desktop** (BUG-2 of the 0.8.9.6.2 QA: 98.5 %
+  and 98.3 % on the maintainer's three-display desktop; not reproduced on a headless lord-server, where both pass every
+  run). `gtk3.py` and `qt6.py` now wait for the configure to settle before they read the size (every 30 ms, at most
+  600 ms, as `qt5.py` did); `qt6.py`'s combo, when its list doesn't map in 1 s, records what Qt saw (visible, keyboard
+  focus), waits for the keyboard to come back and tries once more, and says in the detail whether it passed on the
+  second try. What still needs the hardware is written down in docs/TOOLKIT-AUDIT.md.
+- **✨ Writing didn't fix "nose" → "no sé"** (BUG-1 of the 0.8.9.6.2 QA: `lumo corregir "nose si vas a venir"` answered
+  "Nose si vas a venir."). The correction's task now names words wrongly written together or apart (in Spanish nose →
+  no sé, aver → a ver, haber → a ver), its Spanish worked example has them, and a short Spanish one goes last, the
+  closest to what the 1.7B model is asked. On the real engine and Qwen3 1.7B (`build/writing-real-check`, now with the
+  slips each case must fix): "nose si vas a venir" → "No sé si vas a venir.", "nose si vas a venir mañana…" → "No sé si
+  vas a venir mañana…", "aver si nos vemos el finde" → "A ver si nos vemos el finde.", every earlier case still
+  passing. `build/llm-engine-test` checks the request's task and examples.
+- **Settings' search didn't find the AI functions** (BUG-4 of the 0.8.9.6.2 QA: "Escritura" said "No results" though
+  ✨ Writing was on in Settings → AI). The AI section had no keywords at all; it is now found by its functions and
+  capabilities as each language names them (✨ Writing, Sentinela, Hands, Brain, Ear, Voice, Vision, Image) and by
+  `settings.keywords.ai` (AI, Lumo, spell checker, correct, translate, summarize, agent…), new in all 35 languages, and
+  accents and case no longer count in the search ("musica" finds "Música"). `apps/settings/searchmodel.js`,
+  `tests/settings_search_test.mjs` (new, in `make test`: every language's catalogs).
+- **Settings → AI said things that weren't true** (BUG-3 of the 0.8.9.6.2 QA): the Hands piece had a ✓ even with Hands
+  off (now only when on, `pieceReady(…, { handsOn })`); "Talk to Lumo" said it needed "the Ear and the Hands (the
+  agent)", but Hands exists: what is missing is the Ear and Lumo's own agent (reworded in all 35 languages); Vision's
+  card said "Models: 35", which are Tesseract's reading languages: it says "Reading languages (OCR): 35" now, and the
+  capabilities' line counts models and reading languages apart; `AI.jsx`'s header no longer says only Sentinela works.
+- **Settings → AI → Where they run ignored the Brain's choice** (BUG-5 of the 0.8.9.6.2 QA: under Processor it kept
+  saying "Brain: on the graphics card (Vulkan, AMD Radeon RX 580 Series)"). The text came from the engine that last ran;
+  with Processor chosen while that engine was on the card it now says "on the processor from its next start (the engine
+  running now is on the graphics card: …)", and an idle engine restarts on the new choice at once, as a change of
+  cores already did (`llm_set_backend`), so the text follows within a second. `tests/ai_store_test.mjs`,
+  `build/llm-engine-test` (an idle engine on the card restarts on the processor with no job).
+- **The local model engine outlived its session** (BUG-6 of the 0.8.9.6.2 QA: a `llama-server -t 2 -ngl 0` of an
+  earlier session still running 9 hours later, its parent gone). lord-llm now sets `PR_SET_PDEATHSIG` (SIGKILL), first
+  and again just before the exec (it stays set across it: llama-server is no set-user-ID program), and checks that its
+  parent is the lord-server `LORD_LLM_PARENT` names (`llm/engine.c` passes its pid): a lord-server already gone starts
+  nothing. `build/llm-engine-test`: a stand-in lord-server starts lord-llm with the fake engine in its sandbox and
+  exits, and the engine must be gone within 3 s; a parent other than the one named is refused (both fail on the old
+  launcher).
+- **Spelling: "cancion" said "No suggestions"** (BUG-7 of the 0.8.9.6.2 QA; "pelicula" did suggest "película").
+  Through the real helper and es_AR every accent case suggests the right word, so the menu's empty answer came from a
+  failed or refused request; the path is now sturdier at each step: a suggestion goes first in the service's queue and a
+  full queue drops its newest check for it instead of refusing the menu (`spellsvc.c`); the SDK asks once more when the
+  queue was full or the helper had failed (`spellSuggest`), and a dropped check is asked again without resting; and
+  lord-spell itself, when a language's Hunspell suggests nothing, offers the word with the one accent it lacks that the
+  dictionary knows (Spanish, Portuguese, French, Italian, Catalan, Galician, German marks), and never the word itself
+  as its own suggestion ("musica" listed "musica"). `build/spell-test`: es_AR's cancion, pelicula, camion, accion,
+  arbol, musica, telefono, corazon, Cancion and CANCION; the fallback alone (a test build whose Hunspell suggests
+  nothing): canción, árbol, pingüino, niño, Canción, and nothing for a word with no accented twin.
+- **Hands: `close_window` answered `closed:false` for a Linux app's window that went a moment later, and `open_app`
+  answered before the app had drawn, so a `find` right after it found nothing** (FIX-2 and FIX-3 of the 0.8.9.6.2 QA).
+  Both now wait over the next frames, never blocking the desktop: `close_window` until the window is gone (at most
+  2.5 s, then `closed:false`), `open_app` until the window's content has nodes and the same count twice in a row (at
+  most 3 s; the answer says `"ready":true` or `false`; a Linux window once its surface is mapped, an isolated app once
+  its content is laid out). Another input waits (Busy); the person's input answers at once with what is there. New
+  shell answers `gone` and `ready` (`sdk/hands.jsx`). `build/hands-test`: gone at once, gone three looks later, never
+  gone (false at the limit), the person's input while waiting, a tree growing then holding, a tree that never comes.
+- **Hands: an agent can download a Machines catalog system** (FIX-1 of the 0.8.9.6.2 QA, approved by the maintainer
+  on 2026-11-26, AGENTS.md): Whonix's and the other catalog cards' downloads were refused as administrator actions under
+  the agent's input. `hands_admin_allowed` now also takes `vm-image-list "<id> <arch>[ <list name>]"`, `vm-image-get
+  "<id> <arch> <file> <hash>"` and `vm-image-cancel ""`, with exactly those shapes (id `[a-z0-9-]`, `amd64`/`arm64`,
+  plain file names, a SHA-256 or SHA-512), the same as the catalog wallpapers: root takes only an entry of the signed
+  catalog, checks its maker's signed list and keeps the image only with its hash; never a URL or a path from JS.
+  `vm-image-get-user` and `vm-image-remove` stay refused. `build/hands-test` (new cases: the real shapes of Debian's
+  and Whonix's downloads, paths, URLs, short hashes, extra words and spaces refused); docs/HANDS.md.
+- **Files with Luna's skin showed wrong modification dates** (BUG-8 of the 0.8.9.6.2 QA: a folder changed on
+  26/11/2026 read "Thu 19 Jul", no year). The skin's item `mtime` is in milliseconds (`lord.fs`), and the skin
+  multiplied it by 1000 again and showed the short weekday style. Its list column and its Details box now show the date
+  as Files' own list does (`formatDate(d, 'numeric')` and the time: "26/11/2026 22:43"); docs/THEMES-GUIDE.md says
+  `mtime` is milliseconds. `tests/appskin_test.mjs`: an item keeps lord.fs's milliseconds, and no theme's skin takes
+  `mtime` for seconds (fails on the old skin).
+- **Hands: the shell's own refreshes were refused as the agent's** (BUG-10 of the 0.8.9.6.2 QA: `hands: claude admin
+  other refused` 237 times in one session, in bursts after each agent click and at the start of a desktop the agent
+  switched to). The security-state guard (`js.c` `prof_call`) refused by time only: everything after the agent's input
+  until the person's own click or key. It now decides by where the JavaScript run came from (`hands.h`
+  `HANDS_ORIGIN_*`): the agent's input, a shell call made for the agent (`open_app`, `set_value`…) and every timer,
+  interval and animation frame those set (the prelude's timers keep the origin of the run that set them,
+  `lord.__origin`/`__originSet`, deleted from `lord` before any bundle runs) are always refused, even after the person's
+  click; the person's input, a theme's start and the timers they set are the shell's and are never refused for the
+  agent's sake; any other native callback keeps the sticky check. `build/hands-test` (`hands_origin_refused`, what a
+  shell call for the agent and an agent's move deliver), `build/timer-order-test` (origins along a chain of timers and
+  a frame; the 400 random scripts still match the old prelude), `tests/hands_e2e.py` step 8 (nothing of the new shell's
+  start refused after the agent's theme switch); docs/HANDS.md.
+- **The desktop drew itself again whenever a window's title changed** (BUG-9 of the 0.8.9.6.2 QA: lord-server at ~69 %
+  CPU with nothing happening, `stall: js __lordTick [shell; react made 0, changed ~4300]` about every second). A
+  terminal running Claude Code spins its title ("◐ ◓ ◑ ◒"); each change updated the windows store, the desktop's `App`
+  rendered again with it, and every window frame, every desktop widget (calendar, network graph, clock face…), every
+  menu bar item and every Dock or taskbar icon rendered again with it: ~700 nodes per title change on one 1080p display,
+  ~4300 on the maintainer's three. It was not the theme switches: an earlier session's log had the same lines. Now the
+  desktops' window frames are `memo` (Flow, Classic, Celeste and Luna, as Workspaces' already was) with their tokens kept
+  (`useMemo`), a maximized window's work area passed as `frameKey` (`windowFrameKey`, new in the SDK and the theme API),
+  the desktop widget layer is `memo` inside `DesktopWidgets`, Flow's menu bars compare their props by value
+  (`sameBarProps`) and the Dock's, Classic's, Celeste's and Luna's bar icons and Luna's sky draw only for their own
+  props. One title change now draws 42 nodes in Flow, 28 to 90 in the others. `tests/idle_rerender_headless.sh` (new,
+  in `make test`): five apps and five widgets in a headless session, a quiet phase then a spinning title in each desktop
+  round Flow → Classic → Celeste → Luna → Workspaces → Flow; at most 120 nodes per title change (687 before) and Flow
+  as quiet after the five switches as at the start.
+- **Hands: the agent's violet cursor never came back after a theme switch the agent clicked** (QA ws168). The new shell's
+  `HandsCursor` registers its nodes again (`lord.hands.cursor`) and re-sends the person's motion (`lord.hands.motion`),
+  but both were on `hands_native_guard`'s refusal list, so under the agent's (sticky) input they were refused
+  ("lord.hands.cursor refused (an AI agent's input)") and the cursor stayed gone, in human mode too. Both are off the
+  list now: lord-server still takes only cursor nodes that are a child of the root at the cursor's layer (99.5) and take
+  no clicks, by id and serial (`handscur.c`); `lord.hands.motion` refuses a change while the agent owns the input but takes
+  the same values again (`hands_motion_allowed`). `HandsCursor` tries the registration (and a refused motion) again each
+  second until lord-server takes it. `build/hands-test` (the guard, `hands_motion_allowed`) and `tests/hands_e2e.py` step 8
+  (the agent clicks Settings → Appearance → Classic → Apply; its cursor shows on its next action; the step fails with
+  the old guard).
+- **Hands: `find` with no match answered a bare "done"**; it now says `No matches for "<query>". Try other words, or
+  read_window for the whole tree.` (the query echoed printable only, no control or direction marks, at most 64 bytes),
+  and `read_app_log` with no line says `No log lines` (`mcp_empty_text`, `build/hands-test`).
+- **Help: a search with no results cut its title in the narrow sidebar** ("No se encontraron" without "artículos."). The
+  `EmptyState` title and hint were shrunk to their own measured width and then broke into one line more than measured,
+  whose last line was cut. They now take the width they have (100 %, the hint at most 360) and center their lines
+  (`sdk/controls.jsx`; checked headless in es, de, pt, fi and ar; `tests/help_skin_scene.mjs`).
+- **Notes: Read → Edit drew one frame with every line broken every few characters** ("# QA / ws16 / 8 / impo / rtad").
+  The editor wrapped at the size `lord.getLayout` gives a node not laid out yet (0 × 0). It now starts at the size of the
+  reading view it replaces and ignores a 0 × 0 answer, looking again on the next frame
+  (`apps/notes/NoteEditor.jsx` `initialSize`; `tests/notes_editor_scene.mjs`, which reproduces the broken rows without
+  the fix).
+- **Settings → Appearance: a theme card's "Author · Version 0.8.9.6.1+ws168" was clipped** ("Versión 0", no ellipsis).
+  The author and the version are now a line each, cut with "…" when too long, as is the theme's name
+  (`apps/settings/ThemeGallery.jsx`).
+- **Hands: an AI agent can download, use and free up catalog wallpapers** (maintainer-approved Hands exception,
+  2026-11-26; AGENTS.md; docs/HANDS.md). Before, `hands_native_guard` refused `lord.admin.request` as a whole to an
+  agent's input, so Settings → Wallpaper's "Download and use" showed "Only you can do this: an AI agent's input never can".
+  lord-server now decides `admin.request` natively in `js.c` `prof_call` (`hands_admin_allowed` in
+  `server/src/hands/hands.c`, fail closed): an agent's input may set off only `wallpaper-get "<id> <variant>"` (also
+  "Download all · 4K/HD", one request per file), `wallpaper-remove "<id> <variant>"` ("Free up space"),
+  `wallpaper-login` with `default`, `still <id>`, `still cat:<id>` or `<id> <variant>`, and LordOS Studio's twin
+  `studio-bg-get "<id> <variant>"`, each with exactly that shape (ids `[a-z0-9-]`, variants `[a-z0-9.]`, one space) and
+  only when both values are already JS strings. They name an entry of the packaged catalog that root reads, never a URL
+  or a path, and root keeps only a file of the catalog's size and SHA-256. `wallpaper-image`, `wallpaper-login-image`
+  (a person's own picture on every account's login screen), `studio-bg-remove` and every other administrator action stay
+  refused. Each request is logged as closed words (`hands: claude admin wallpaper-get ok`, `… admin other refused`).
+  `build/hands-test` covers the allowed shapes and the refusals (a person's own picture, other actions, a name with a
+  prefix or suffix, extra spaces, paths, URLs, a NUL, an over-long argument) and the log line.
+- **Machines: `lord-server: stall: ~27 ms call vm.list` thousands of times a day with no machine running** (in
+  development; approved by the maintainer 2026-11-26; docs/VIRTUALIZATION.md 6.14, "The list's cache" and "The shell and
+  the machines"). Three timers outside the Machines window read the whole library on lord-server's main thread: the
+  launcher's guest apps every 3 s (`apps/machines/guestlaunch.js`), a group's link every 2 s with any group in the
+  library (`cli.js`, `lord.vm.groups()` and `list()`), and the battery and away checks every 15 s (`ties.js`); Sentinela
+  read it at every tick when on. Each read hashed the 3.5 MB UEFI code again for machines whose ids started with
+  colliding characters (`1`/`a`, `2`/`b`: the old firmware cache was keyed by the id's first byte).
+  - **The shell makes no `lord.vm` call while no machine runs, and nothing polls.** lord-server tells it what runs:
+    `__lordVm('state', { active, apps })` when the active machines or the sessions in apps mode change (an inotify watch
+    on the library from the start, where every start and stop renames `run.json` into place; a pidfd per active lord-vm,
+    which sees one that died without writing; apps mode and a session's end through an eventfd), once to every new JS
+    context, and `__lordVm('library')` when the library changed (`server/src/ui/js_vm.c`; `sdk/vmlibrary.js`: `vmState`,
+    `vmAnyActive`, `vmLibraryChanged`). The group link runs only while two machines or more are active, the battery and
+    away checks only while one is, Sentinela's machine rows only then (and once after the last stops), the idle sleep's
+    `lord.vm.awake` and deactivating Machines read nothing while none is, and the session's starts read the list only
+    when some machine chose to start with the session.
+  - **The launcher's guest apps without asking Machines**: the entries are kept in `settings.json`
+    (`guestLauncherKept`, a new key with no migration: read once at the first login that has none; checked again as it is
+    read back, `keptGuestItems`) and shown without the machines that run (`shownGuestItems`). They are read again only when
+    apps mode saved a new list, Configure's "Its apps in the launcher" changed, or the library changed while there are
+    entries.
+  - **`lord.vm.list()` is cached** (`server/src/vm/vmlistcache.c`): kept as JSON while the inotify watch over the library,
+    each machine folder and its `disks/`, and each group says nothing changed (pictures, logs and temporary names
+    ignored), at most 10 s, and dropped as soon as an active machine's lord-vm is gone. The firmware is hashed once per
+    file version (device, inode, size, change time), not once per machine.
+  - Measured (headless lord-server, the real Lord Flow theme, 12 machine folders of which 8 UEFI with colliding ids and a
+    Whonix-like group, nothing running, 90 s idle): before, 81 `vm.list` calls of about 110 ms each (30 from the guest
+    launcher, 45 from the group link, 6 from the battery and away checks; about 78,000 a day) and a stall line for each;
+    now none and no stall line. A list costs 14 ms the first time (the one firmware hash), 0.9 ms after a change and
+    0.21 ms from the cache (median of 200; at most 0.35 ms), which is what the Machines window reads while it is open.
+  - Tests: `build/vmlistcache-test`, `tests/vm_list_headless.sh` (the cache, a change seen through `__lordVm('library')`,
+    a stand-in lord-vm's start and its death seen as state events) and `tests/vm_idle_headless.sh` (no `lord.vm` call and
+    no stall line while idle), both in `make test`; `guest_apps_test.mjs` (`keptGuestItems`, `shownGuestItems`,
+    `sdk/vmlibrary.js`) and `sentinela_notify_scene.mjs` (no machine read until one is active).
+- **Web apps' logs had no time on their lines** (in development; approved by the maintainer 2026-11-26; docs/WEBAPPS.md,
+  "The app's log"). `web/<app>-<profile>.log` now has lord-server's own stamp on every line,
+  `2026-11-26T18:22:03.713-03:00 WARN  lord-web: …`: local time with milliseconds, a level and the subsystem, `webkit` for
+  what WebKit's processes, GLib and GStreamer print. `lordlog_stamp_start` (`server/src/lordlog.c`) makes lord-web's stderr
+  a pipe to a `lord-log` child before any thread starts, only when stderr is that very file; lines are cut at 8 KB, the
+  16 MB cap is kept, the pipe holds 1 MB, and the child drains it until the last writer is gone, so a crash's last lines
+  stay. The Logs app and `lordos-issue` read them like any other LordOS log. Tests: `lordlog-test` (`test_stamp`),
+  `logfile_test.mjs`.
+- **Web apps: how long a page was stuck** (docs/WEBAPPS.md, "When a web app stops answering"): `lord-web: the page responds
+  again after N.N s` (since WebKit said it stopped responding) and `lord-web: the page did not answer for N.N s: its web
+  process restarted` (from the first ping it left unanswered, or WebKit's word if that came first; `webwatch.h`
+  `hung_for`, the watcher's own stall not counted). Tests: `webwatch-test` (`test_hung_for`).
+- **Settings → AI → Hands: the commands had no way to copy them, and `claude mcp add` added lordos-mcp only for one
+  project.** Each command on the page (`claude mcp add -s user lordos-mcp -- lordos-mcp` and `lordos-mcp --headless
+  notes`) is now a `<CommandBlock>` (new in the SDK, `sdk/codeblock.jsx`): monospace, left to right in any language,
+  with a Copy button that puts exactly that text on the clipboard and says "Copied" for 2 s (`shell.code.copy`,
+  `shell.code.copied` in the 35 languages). It only copies; nothing is typed or run. The command now has `-s user`, so
+  it works in every project; docs/HANDS.md, the paper, the site and `lordos-mcp --help` say the same.
+  `tests/settings_ai_scene` checks the button and the exact text on the clipboard.
+- **About LordOS: a long label was cut at its start** ("Pausas de más de 50 ms" showed as "sas de más de 50 ms" in
+  Spanish; found in QA 2026-11-26): the label column was a fixed 118 px, right-aligned and on one line, so a longer
+  label overflowed past the window's edge. The column now takes the width of the longest label, measured in the
+  interface's font (`lord.measureText`), at least 118 px and at most 45 % of the list, and a label longer than that
+  wraps instead of being cut; the same in right to left. `tests/about_labels_scene` (headless lord-server) checks every
+  label in es, de, ar and fi at About's own size and in a narrow window (`make test-full`).
+- **Help: a search with nothing found showed only a line of text** in the sidebar. It now shows the empty state with
+  Lumo confused (`EmptyState mascot="confused"`, docs/LORDOS-BRAND.md "Lumo poses"), in the sidebar where the
+  empty list is, so the article in view stays; no second Lumo while the main pane already shows one (an article that
+  does not exist). `tests/help_skin_scene.mjs` checks it.
+- **Hands: `screenshot target window:<id>` failed ("The action failed.")** for Monitor on its Network tab and Settings on
+  Web apps: the screenshot marked the window's `handsDeny` nodes (the firewall switches, a person-only page) as
+  `protect`, and a window captured alone is refused when anything inside it is protected (`paint_capture_until`). The
+  marks are now their own flag, `hands_black`, and an agent's window capture is refused only when the window itself is
+  protected (a protected node inside is painted as the protected fill). The window's sheets are now in it too.
+- **Hands: `handsDeny` nodes didn't look blacked out** in a display screenshot of Monitor's Network tab: they were
+  painted as the protected fill, a neutral grey (#2e2e2e) in the node's own rounded shape, so a firewall rule switch
+  came out as a grey switch on a dark row. An agent's screenshots now paint every mark solid black over its whole box,
+  in every path (display, window, region), and the menus of a marked Linux window too.
+- **Hands: `computer zoom` refused "outside" over a wallpaper's sheet**: the region had to lie wholly on the desktop, and
+  a window's screenshot reported the window's full box even where it ran off the screen, so points mapped from it fell
+  outside. A window's screenshot now reports the part on the desktop, a region is clipped to the desktop (refused only
+  when nothing of it is there) and, with an allowlist, a region needs only to show some of an allowed window or a
+  surface tied to one (`handsWin`), everything else black, as the screenshot rules say.
+- **A web app's tray icon and notifications kept LordOS's letter tile** after its real icon was fetched (WhatsApp's "W"
+  next to the clock): lord-web read only the registry's icon. It now prefers the site's own icon from
+  `~/.cache/lordos/web/icons/<app>.png` when it starts (a regular PNG of the person's, no link, at most 1 MB). An app
+  already running shows it after Restart or the next login.
+- **Web apps: no camera in a video call** (`server/src/web/webcam.c`, `webcalls.c`, `webengine.c`; in development,
+  reported by the maintainer 2026-11-26, **awaiting his approval**: it adds paths to WebKit's sandbox; `docs/WEBAPPS.md`,
+  "Cameras"). Turning video on in WhatsApp Web said "no camera found" with a Logitech C930e and LordOS Studio's camera
+  plugged in and the camera allowed; the log said `no device was found amongst 0 devices` and `OverconstrainedError`.
+  In WPE WebKit 2.54 the web process lists and opens the camera itself, inside WebKit's bubblewrap sandbox, through
+  GStreamer's v4l2 device provider (WebKit's PipeWire/Camera portal path is compiled out for WPE). The sandbox had every
+  `/dev/video*` node and `/sys` but not udev's database, so libudev counted every camera as not initialised and
+  skipped it. `lord-web` now adds, read-only and before any web process starts, only the database entries of the
+  video4linux nodes (`/run/udev/data/c81:<minor>`, each checked against sysfs and its device node, built from numbers,
+  never a link): no new device access, and which site gets a camera is still only the person's answer. A camera plugged
+  in after the app started appears after it restarts.
+- **The capture indicator shows a camera opened directly** (`server/src/hw/camuse.c`, `camera_scan_holders` in
+  `server/src/media/mstudiohub.c`, `sdk/capturemodel.js`, `sdk/capturestatus.jsx`; same approval; `docs/PRIVACY.md`). A
+  web app's web process opens `/dev/video*` itself, as a Linux app using V4L2 does, so neither passed the PipeWire guard
+  and the indicator never showed them. lord-server now watches the `/dev/video*` nodes with inotify (an open inside
+  WebKit's sandbox counts: the watch is on the inode) and, 300 ms after a change and every 3 s while one is held, lists
+  the session user's processes holding a video4linux device, named by their cgroup: hw event `camera-use`, a camera
+  row (the app's name, or "an unknown program") with no Turn off. lord-server's own helpers stay under their app.
+  Tests: `webua-test` (which nodes count), `studio-hub-test` (the scan, the event), `capture_model_test.mjs` (the rows),
+  and `tests/webcam_check.py` in `make test-full`, on the real engine with WebKit's sandbox on: every capture device
+  listed, each opened for 5 real frames, `camera-use` while held and empty after (`--loopback`: LordOS Studio's camera
+  fed a test pattern, listed and giving frames). Before the fix the same page listed no camera.
+- **Web apps: one that stops answering is started again, and a page that hangs gets a new web process**
+  (`server/src/ui/webalive.c`, `server/src/web/webwatch.c`, `webhang.c`, `webmgr.c`, `webmem.c`, `webmain.c`,
+  `webengine.c`, `server/src/ui/js_webapps.c`, `sdk/webapps.js`, `sdk/hardware.jsx`, `sdk/windowmenu.js`,
+  `apps/settings/WebApps.jsx`; reported by the maintainer 2026-11-26; `docs/WEBAPPS.md`, "When a web app stops
+  answering"). After the web app engine hung, opening WhatsApp from the launcher did nothing. A launch of a running app
+  only sent `Show` to its `lord-web` without waiting for an answer, and a window hidden in the background maps again
+  only with a new frame from the web process: a stuck `lord-web` never handled `Show`, a stuck web process never drew,
+  and nothing noticed, while the profile's lock and lord-server's table kept a new process from starting. Now:
+  - **lord-server pings each `lord-web`** it started (`org.lordos.WebApp1.Ping`, a new method answered from lord-web's
+    main loop) every 15 s, and at once when the person opens an app that already runs (one ping, 5 s). One that
+    doesn't answer (two misses in a row, or the urgent one) is ended and started again, and the shell shows "WhatsApp
+    wasn't responding and was restarted" (the `webapps-restarted` event). At most 3 automatic restarts in 10 minutes
+    per app and profile, unless the person asks for it; an older `lord-web` without `Ping` (`UnknownMethod`) counts as
+    alive; a stall of lord-server itself or a suspend restarts the wait instead of deciding.
+  - **`lord-web` pings its page** (a one-character script in a world of its own) every 15 s, when the window is shown
+    and when WebKit says the page stopped responding (`is-web-process-responsive`, not handled before; the web process's
+    crash, `web-process-terminated`, already was). A page that doesn't answer has its web process ended and the app's
+    page loaded again in a new one, with a notification; it doesn't count as a crash.
+  - **Ending a `lord-web`** now also kills each process that was under it and is still the same process (pid and start
+    time), in case one left its group, waits at most 3 s, and leaves one stuck in the kernel to be reaped later instead
+    of blocking lord-server on `waitpid`. Only processes of lord-server's own table, never a pid from JS; the app's
+    scope (shared by its profiles) is never killed whole.
+  - **By hand, each after a question:** Settings → Web apps → *app* → **Restart** and **Force Quit** for a running
+    profile; Settings → Web apps → **Restart web apps engine** (every running web app); and **Restart…** and **Force
+    Quit…** in a web app window's Window menu (`lord.webapps.restart`, `quit`, `restartAll`).
+  - Log lines in closed words: `webapps: <app>/<profile> did not answer: restarted`, `… left alone`, `… force quit`,
+    `… restarted by the person`; `lord-web: the page did not answer: its web process restarted`.
+  - New texts (`webapps.restarted`, `webapps.restart.*`, `webapps.quit.*`, `webapps.settings.engine*`,
+    `webapps.settings.restartEngine*`, `webruntime.json` `hang.reloaded`) in all 35 languages.
+  - Tests: `build/webwatch-test` (84 checks), `build/webmem-test` (31), `build/webalive-test` under `dbus-run-session`
+    (37: a stand-in `lord-web` that stops answering, `tests/webalive_fake.c`), `build/webhang-check fine|hang|urgent`
+    (a page that hangs, on the real engine, headless) and `tests/webapps_restart_settings_scene.mjs` (11); the
+    portal tests' stubs gained `webalive_*`.
+- **The calls check failed "video/H264: no video frames" on a PC with an AMD GPU: received H.264 does play there, in
+  hardware; the check now plays it as a call does** (`server/tests/webcalls_check.py`; found 2026-11-26 on an RX 580,
+  Mesa VA-API, WPE WebKit `2.54.3-1~lordos13+4.1`). Not a decoder failure. WebKit's GStreamer WebRTC backend asks its
+  registry scanner whether a hardware decoder handles the received codec; when one does (`vah264dec` from
+  gst-plugins-bad's `va` plugin, for H.264 on that GPU), it leaves the track encoded and decodes it only in the
+  pipeline of the `<video>` element that plays it, and until then its `inbound-rtp` stats have no `framesDecoded` or
+  size. The check's loopback never played the received track, so on the PC nothing decoded H.264, while VP8 (no
+  hardware decoder there) was decoded early in software; the build's test chroot has no GPU, so H.264 went to
+  `openh264dec` and passed. Measured with `GST_DEBUG`: `vah264dec` opens `/dev/dri/renderD129` inside WebKit's sandboxed
+  web process, negotiates NV12 320×240 and decodes every frame; lowering its rank (`GST_PLUGIN_FEATURE_RANK=vah264dec:NONE`)
+  made the old check pass, which is how it was traced. Nothing changes in lord-web or WebKit: hardware decode works,
+  and forcing early decoding (`WEBKIT_GST_WEBRTC_FORCE_EARLY_VIDEO_DECODING`) or dropping the VA decoders would decode
+  tracks nobody shows or give up the GPU. The loopback now plays the received video in a `<video>` element and also
+  requires frames shown there (`requestVideoFrameCallback`, `videoWidth`), and it checks VP9 too. On the PC: VP8 64,
+  VP9 64 and H.264 59 frames decoded, 59 shown by `<video>` each at 320×240; the same with `LIBGL_ALWAYS_SOFTWARE=1`
+  (lord-web's shared-memory mode) and with `/dev/dri` hidden (H.264 then through `openh264dec`, as in the chroot).
+- **WhatsApp kept LordOS's letter tile: its own icon is fetched now, and Refresh icon says what happened**
+  (`server/src/web/webprobe.c`, `webmanifest.c`, `webreg.c`, `webmgr.c`, `ui/js_webapps.c`, `sdk/webapps.js`,
+  Settings → Web apps). Found with lord-web's own probe on `https://web.whatsapp.com/` (2026-11-26), three causes:
+  - **No manifest was read.** WhatsApp sends a signed-out probe to its sign-in page (`/login/`), which links no
+    manifest and only a WebP shortcut icon. When a page links none, the probe now looks for it on the page's own origin
+    at `/manifest.webmanifest`, `/manifest.json`, `/site.webmanifest` and `/data/manifest.json` (the answer must stay
+    on that origin and be a manifest object; the rest of the rules are unchanged). The manifest's start address (`/`)
+    and name come with it.
+  - **The icon download was refused.** `--probe-icon` downloaded with WebKit's own identity and request, and
+    WhatsApp's server answered 400. The icon is now opened as a page is, in a view without a window with the Chrome
+    identity (the same as the probe's page), and its answer becomes the download; every hop is checked like the
+    page's (https only, no hop to this computer or a local network), and an answer that isn't 2xx is no icon
+    (`web.probe.load`). The size limit, the temporary folder and the PNG/SVG check are unchanged.
+  - **The wrong icons were chosen.** WhatsApp's manifests label WebP files `image/png` and type their SVG `image/svg`.
+    lord-server now ranks every icon the page offers, the manifest's and the page's own (`<link rel="icon">`,
+    apple-touch-icon) together: PNGs (the largest up to 512 px), then SVGs, then icons that are only `maskable`; a
+    `monochrome`-only icon is never taken; an address ending in another image's extension (`.webp`, `.ico`, `.jpg`, …)
+    is skipped whatever its type says; `image/svg` counts as SVG. `--probe-icon` tries the best three in order until
+    one really is a PNG or an SVG, within the step's one 20 s. WhatsApp now gets its 512 px PNG.
+  - **Refresh icon never failed silently, but never said anything either.** Settings → Web apps → Refresh icon shows a
+    spinner while the probe runs, then "Icon updated from the site" with the new icon, or the reason there is none
+    (`webapps.iconOrigin`, `webapps.noIcon`, the runtime's `web.probe.…` code of the last icon tried, which lord-server
+    now passes on as `iconError`, or `webapps.noRuntime`). Each failure is one `js: [warn] webapps: the site's icon of
+    <app> was not kept: <code>` line in `shell.log` (the app's id and a closed code); lord-server's per-icon line in
+    the compositor log no longer prints the icon's address. One new text, in all 35 languages.
+  - Tests: `tests/web_probe_test.py` serves WhatsApp's pattern from a local origin of its own (a redirect to a sign-in
+    page with no manifest link and a WebP icon, the manifest at `/data/manifest.json` with WebPs labelled PNG, a real
+    PNG and a maskable `image/svg` SVG, strict CSP, COOP, COEP and Document-Isolation-Policy headers, 400 to any
+    request that isn't Chrome's); the lord-web before this fix fails 8 of its checks. `tests/webreg_test.c` checks the
+    ranking and a stand-in runtime that refuses the first icon (the second is kept) or all of them (`iconError`);
+    `tests/webapp_test.c` the merged icon list and `purpose`; `tests/webapps_model_test.mjs` `siteIconError`;
+    `tests/webapps_icon_settings_scene.mjs` Refresh icon (busy, the reason or "Icon updated", one log line per failure,
+    never the page's text).
+- **Web apps: a log line for each notification, and a name for WebKit's own** (in development). lord-web writes
+  `notify: page tag <hash8|none> silent unknown renotify unknown shown|replaced` to the app's log for each notification
+  the page posts (`webpage_notify_line`, in the call log's 60 lines a minute): no title, body, icon or address, and the
+  tag (a chat id, often a phone number) only as 8 hex digits of a hash keyed with a random number picked at start and
+  never written. It tells "the page never posted a notification" from "it got lost on the way", for a messaging web
+  app whose message sound played without a banner (2026-11-26). lord-web also sets GLib's application name to the
+  app's: a service worker's notification (`registration.showNotification`) goes from WebKit straight to
+  `org.freedesktop.Notifications`, not through the view, and carried `[Invalid UTF-8]` as its app name with a GLib
+  critical each time. That path, what it lacks (LordOS's sound rule, the window brought forward on click) and the
+  WebKit patch that would route it through lord-web (a follow-up, not built) are in docs/WEBAPPS.md, "Permissions";
+  the messaging app's message notifications don't use it in WebKit 2.54 (no `Notification.maxActions`). Tests:
+  `webapp-test` (the line's shape, the hash keyed per run, no tag text).
+- **Web apps played no sound of their own without a click first:** a messaging web app's incoming-call ringtone and
+  new-message sound were silent. WebKit's default autoplay policy allows only muted media until the person interacts;
+  lord-web now gives every web app's view `WEBKIT_AUTOPLAY_ALLOW`, as Chrome does for installed apps (`webback_policies`).
+- **A menu, combo list or tooltip opened right after another window of the app closed was closed at once** (Qt 5's
+  combo list "closed at once" and Qt 6's tooltip and popups "did not map in 1 s" in the toolkit audit on a real
+  desktop, reproduced headless). When the window with the keyboard went away, the keyboard came back only when the
+  theme decided, a frame or more later (60 to 130 ms), and Qt closes a popup when the keyboard arrives. lord-server now
+  gives it back in the same loop iteration to the window that had it just before (`focus_back` in `wl.c`), only when it
+  came from a window: from a LordOS window or the shell it waits for the theme, so keys never reach another app
+  meanwhile. A keyboard change also dismisses every menu but the newly focused window's own (`dismiss_popups_but`).
+- **An X app's copy was replaced by an older text, or lost.** Two races between the clipboard bridge and an X app's own
+  copy (the audit's `gtk3-x11` "another text came back" and `gtk4-x11` "no offer"): a Wayland app's selection that was
+  still being read when a newer copy came (an X app's, LordOS's own) landed afterwards and overwrote it, and the X window
+  manager then took the X CLIPBOARD back from the app that had just copied (now a read of a replaced selection is
+  dropped, `clip_sel_gen`); and the window manager took and gave up CLIPBOARD and PRIMARY at CurrentTime when the focus
+  came back (after fullscreen, a second window), which replaced or cleared an X app's copy made a moment before (now at
+  the selection's last-change time from XFixes, which the X server ignores when an app took it since). Test:
+  `tests/focusback_client.c` (run by `make test` through `tests/popup_headless.sh`, which now skips the first start's
+  screens) checks the keyboard, the menu and the late older copy; the last fails on the old compositor.
+- **GTK 4's audit harness ran out of time on a cold cache.** GTK 4 compiles its shaders before its first frame (2.5 to
+  3 s on a software renderer, while lord-server answered in a few ms), and the 4.6 s budget ended before the clipboard
+  check. Its deadline now moves by the first frame's time beyond 1 s, at most 2.4 s, under the 8 s kill.
+- **Toolkit Audit from the launcher closed before its table could be read.** The entry runs in a Terminal window
+  (`Terminal=true`), which closed as soon as `lordos-testbench --toolkits` ended. It now runs
+  `--toolkits --show --wait`: each check shows as it is decided, and the new `--wait` asks "Press Enter to close" (all
+  35 languages) when stdin is a terminal, so scripts and `lordos-issue` never block.
+- **A machine's apps no longer mix with this computer's in the app launcher unless you turn it on** (the maintainer's
+  decision while testing 0.8.9.6.2: a machine that was off filled the launcher with its apps). Since 0.8.9.6 a
+  machine that had listed its apps in apps mode put them in the launcher and search while off, marked with its name.
+  That is now off unless Machines → Configure → "Its apps in the launcher" is turned on for that machine
+  (`showsGuestApps` in `sdk/guestappsmodel.js`: only `launcherApps: true`; a machine with no saved choice shows none). A
+  running machine's apps still show by the clock in apps mode and in its window. Test: `server/tests/guest_apps_test.mjs`.
+- **With a moving wallpaper the desktop's right-click menu never opened** (found testing 0.8.9.6.2). The video is drawn
+  over the still wallpaper, whose node takes the desktop's clicks (its menu, in every theme), and the video's node took
+  them first. The moving picture and its poster are now `pointerEvents: 'none'` (`sdk/motion.jsx`): clicks reach the
+  desktop as with a still wallpaper.
+- **A moving wallpaper on several displays: every display's copy moves, and none spills over another** (found testing
+  0.8.9.6.2 on three 1920×1080 monitors). Settings → Wallpaper → a moving wallpaper for all displays plays one video per
+  file (one hardware decoder, `sdk/motion.jsx`) and each display draws it in its own `<MediaView>`. lord-server's media
+  source remembered only the plain media node it had painted last (`MediaSrc.node`, the rightmost display), so a new
+  frame damaged that display's copy alone: the other displays stayed on an old frame, and wherever something else
+  repainted part of them (the clock, a hover, a window moving) a patch of the current frame was drawn into the old one,
+  the moving picture seeming to spill over the neighbouring monitor. Playback itself was fine (the log showed the
+  frames decoded and shown). A source now keeps every plain node that shows all of it (`view_nodes`, up to 16, beside
+  the crop nodes Machines' apps mode already had), pruned when a node dies, shows another source or only a part of it:
+  a new frame damages each node's own box and nothing outside them, a GPU picture's present covers all of them,
+  `media_cover_node` lets each display's repaint start from its own copy, and the helper scales frames to the largest
+  box shown (the smaller copies are scaled down in lord-server, never a new size asked per paint). With one node, a
+  frame that changed only a part (a machine's clock) still damages only that part. The node bookkeeping moved to
+  `server/src/media/mviews.c`, which engine-test links: the new `test_media_views` puts one player on three displays and
+  checks that each frame damages exactly the three boxes, each display covers its own damage, a partial repaint shows
+  the new frame on all three and equals a full repaint, and retargeted, destroyed and cropped nodes are dropped.
+- **Settings → Wallpaper: a much larger picture, and the whole wallpaper over the window** (asked for while testing
+  0.8.9.6.2). The sheet's picture takes up to 60 % of the window (900 px at most, it was 480), and a click on it ("Click
+  to enlarge") shows the wallpaper whole over the window, uncropped, with its name; the arrows and ← → still step, and a
+  click or Esc closes it. A catalog picture not on this computer is shown from its HD file, downloaded then (the same
+  download as "Download and use", about half a megabyte), since its thumbnail is only 320 px; a moving wallpaper shows
+  its poster. Three new texts in every language.
+- **Settings → Wallpaper: a large preview on hover** (asked for while testing 0.8.9.6.2: the tiles are small). The pointer
+  resting on a tile for 0.4 s shows the wallpaper at 320 x 180 with its name and quality, above the tile (below it near
+  the window's top) and kept inside the window: the file itself once it is on this computer, else the catalog's
+  thumbnail at its own size. It goes away when the pointer leaves or the tile is clicked, and never takes the pointer.
+- **Settings → Wallpaper: the sheet steps to the previous or next wallpaper** (asked for while testing 0.8.9.6.2). Two
+  round arrows on the sheet's picture, and the ← and → keys, show the previous or next wallpaper of what is on screen:
+  the open collection, or the gallery's filtered and searched list; they wrap at the ends, mirror in right to left, and
+  each wallpaper starts again from the page's quality.
+- **Settings → Wallpaper: a clear way back from a collection, and collection cards that fill the page** (found testing
+  0.8.9.6.2). A collection's page had a small "All wallpapers" button that read as a label; it now opens with
+  "‹ Wallpaper › Anime", whose first part goes back, as a browser's breadcrumb does. The mouse's Back and Forward
+  buttons (GitHub #234) now walk a collection page too: Settings' visit history records `section/sub-page`
+  (`apps/settings/subpage.js`), so Back from Anime returns to the gallery's home before it leaves Wallpaper. Esc
+  still goes back. The collection cards had a fixed 170 px width and left an empty band on the right; they now take as
+  many columns of at least 170 px as fit and stretch to share the row (`cardWidth`), their stack of pictures scaled
+  with them.
+- **Settings → Wallpaper's top card overflowed with three displays** (found testing 0.8.9.6.2 on the maintainer's PC with
+  three monitors). The Display choice, a segmented control of every display's model and connector, ran past the card's
+  right edge, and the line saying what each display gets ran past its bottom. With more than two displays the choice
+  is now a pop-up; the plan is one line per display; and the page takes a wider column on wide windows (1180 px, as
+  Cloud's 980), so the gallery uses the window instead of a narrow strip in the middle.
+- **Settings → Wallpaper: "Download and use" downloaded the picture but didn't use it, and showed a lone "0".** The
+  admin helper reports a download's progress as `PROGRESS <n>` lines (`wallpaper-get`, and `studio-bg-get` for LordOS
+  Studio's backgrounds). `sdk/admin.js` took any line that wasn't `LOG` as the request's answer, so the first
+  `PROGRESS 0` rejected it as an error whose text was "0". The file went on downloading on the root side, but the
+  gallery never got to use it, its bar never moved, and pressing the button again used the picture already on disk.
+  A moving wallpaper's or a Studio background's download failed the same way. `PROGRESS` is now a progress line:
+  `onLog` gets `PROGRESS <n>` (what `sdk/motion.jsx` and `sdk/studiobg.js` already parse), and only `OK` or `ERR`
+  settles a request. Found while testing the 0.8.9.6.2 gallery. Test: `server/tests/admin_js_test.mjs`.
+### Added
+- **Web apps: the groundwork for voice and video calls (in development; approved by the maintainer on 2026-11-25).**
+  docs/WEBAPPS.md, "Calls".
+  - **WebRTC in LordOS's WPE WebKit build** `2.54.3-1~lordos13+3` (`tools/pkg/wpewebkit-chroot.sh`, docs/WPEWEBKIT.md):
+    `-DENABLE_WEB_RTC=ON` with WebKit's GStreamer backend (`webrtcbin`, `USE_GSTREAMER_WEBRTC`; librice off, not in
+    Debian 13), MediaStream written out, Build-Depends `libssl-dev` (WebCore links `libcrypto` for SFrame), and
+    `libwpewebkit-2.0-1` Recommends `gstreamer1.0-nice`, `gstreamer1.0-plugins-bad`, `-good` and `-base`. The test
+    checks that the library links `libgstwebrtc-1.0` and runs the call checks below. `lordos-web` depends on
+    `gstreamer1.0-nice`. Built and tested on amd64 on 2026-11-25 (lintian 0 errors; every earlier check passes):
+    `RTCPeerConnection` exists, with Opus, PCMU, PCMA, H.264, VP8 and VP9.
+  - **ICE in WebKit's network process, with librice** (`2.54.3-1~lordos13+4`, approved by the maintainer on
+    2026-11-25): with `+3` ICE ran in the web process, which has no network in WebKit's sandbox, and gathered no
+    candidate. `-DUSE_LIBRICE=ON` moves every ICE socket to WebKit's network process; the web process keeps none.
+    librice isn't in Debian 13, so LordOS builds it: `tools/pkg/build-librice.sh` makes `librice 0.4.3-1~lordos13+1`
+    (`librice0`, `librice-dev`) from upstream's tag and the 291 crates its `Cargo.lock` pins, vendored once
+    (reproducible: the same SHA-256 twice) and pinned in `tools/pkg/librice.sums`, built offline, with cbindgen 0.29.2
+    vendored too (Debian 13's cargo-c writes empty headers for Rust 2024 code), the vendored crates' prebuilt binaries
+    removed, `debian/copyright` generated from each crate's license, and a C test of both libraries; its source package
+    is published next to WebKit's. `build-wpewebkit.sh` takes it with `EXTRA_DEBS`. Checked in the build's test chroot
+    with WebKit's sandbox on: two peer connections in one page connect in 300 to 400 ms with Opus and VP8, and with Opus
+    and H.264, audio and video arriving.
+  - **Against Chrome 158 (headless, fake devices):** when lord-web's engine offers with one transport the call connects in
+    about 200 ms and carries Opus and H.264 640×480 both ways; with a transport per media the audio never connects; when
+    Chrome offers, the answer picks PCMU and nothing reaches Chrome; through a public video meeting server's bridge, ICE
+    connects but DTLS never finishes amid a renegotiation loop. These WebKit GStreamer WebRTC bugs are still open
+    (docs/WEBAPPS.md, "Calls").
+  - **TURN URLs with `?transport=udp|tcp` accepted** (`lordos-turn-transport-query.patch`, `+4`): WebKit's check was
+    inverted and refused every TURN URL with a query, so a video meeting site's `new RTCPeerConnection()` threw
+    `SyntaxError`.
+  - **Document-Isolation-Policy gives cross-origin isolation** (`lordos-document-isolation-policy.patch`,
+    `2.54.3-1~lordos13+4.1`, amd64): WhatsApp Web said "Your browser doesn't support calling" because its page is
+    isolated in Chrome through `Document-Isolation-Policy: isolate-and-require-corp` (with COOP
+    `same-origin-allow-popups` and COEP `require-corp`), which WebKit doesn't implement, so it had no SharedArrayBuffer.
+    A document with DIP `isolate-and-require-corp` or `isolate-and-credentialless`, an enforced COEP `require-corp` and
+    COOP `unsafe-none` or `same-origin-allow-popups` now gets WebKit's own isolation, as if its COOP were `same-origin`:
+    a new browsing context group in a web process of its own, `crossOriginIsolated` true, SharedArrayBuffer in the page
+    and its dedicated workers. Stricter, never looser: cross-origin popups and openers lose `window.opener` (lord-web
+    never makes WebKit popups), subresource COEP/CORP enforcement is unchanged, DIP without COEP `require-corp` (WebKit
+    has no `credentialless`) isolates nothing. `build-wpewebkit.sh` accepts a revision `n.m`. lord-web's call log page
+    line ends with `DIP <word>` (closed words: `none`, `isolate-and-require-corp`, `isolate-and-credentialless`, `other`).
+    `webcalls_check.py --dip` checks a page with the app's exact headers (isolated, SharedArrayBuffer in it and in its
+    worker, a shared buffer written by the worker, a cross-origin script without CORP still blocked) and that COOP
+    `same-origin-allow-popups` + COEP alone, or DIP without COEP, stay not isolated (docs/WPEWEBKIT.md,
+    "Document-Isolation-Policy").
+  - **A service worker's notifications go through lord-web** (`lordos-sw-notifications.patch`,
+    `2.54.3-1~lordos13+4.2`, amd64, maintainer's request of 2026-11-26): `registration.showNotification` (chat and
+    messaging web apps' "persistent" notifications) has no page, so WebKit's GLib port sent it to
+    `org.freedesktop.Notifications` itself: no LordOS sound rule, no `silent`, no window brought forward, no `notify:`
+    line. It now goes to the `show-notification` signal of a view of the worker's network session whose page has the
+    worker's origin (a visible one first), so lord-web's own handling applies, and `webkit_notification_clicked` /
+    `webkit_notification_close` reach the worker as `notificationclick` / `notificationclose`; with no such view, D-Bus
+    as before. A tag replaces only a notification of the same origin. WebKit's `focusFromServiceWorker` is implemented
+    for GLib: a worker's `clients.focus()` (only during a user gesture such as `notificationclick`) emits the view's
+    `lordos-focus-from-service-worker`, on which lord-web brings its window forward (`web_show`; connected only when the
+    signal exists). `clients.openWindow()` is still not implemented (GLib has no `WebsiteDataStoreClient`).
+    `webcalls_check.py --swnotify` (in the WebKit build's test, a session bus of its own with `webcalls-check`'s own
+    notification server; `dbus-daemon` added to the test chroot) checks the view path (title, body, tag, same-tag
+    replace, nothing on D-Bus), the click reaching `notificationclick`, `clients.focus()` and its signal, and the D-Bus
+    fallback with its click; every earlier check passes again. Not published (docs/WPEWEBKIT.md, "Service-worker
+    notifications").
+  - **WebKit's LibWebRTC backend tried, then paused** (`2.54.3-1~lordos13+5`, "option B", approved and paused by the
+    maintainer on 2026-11-26: calls work with `+4.1`; to resume with WebKit 2.56). Not published. Feasible: WPE 2.54.3
+    builds with `USE_LIBWEBRTC` and WebKit's own libwebrtc (with its BoringSSL, libvpx and libaom, linked only inside
+    `libWPEWebKit-2.0.so.1`, none of their symbols exported; ICE and sockets in WebKit's network process, the web process
+    keeps no network). `WEBRTC_BACKEND=libwebrtc tools/pkg/build-wpewebkit.sh 2.54.3-1 5`: the libwebrtc source comes
+    from WebKit's git at the release tag as the source package's `libwebrtc` component
+    (`tools/pkg/wpewebkit-libwebrtc-source.sh`; tag, commit, tree and the reproducible tarball's SHA-256 pinned in
+    `tools/pkg/wpewebkit-libwebrtc.sums`), the packaging changes and `debian/copyright` stanzas are
+    `tools/pkg/wpewebkit-libwebrtc/`, with three patches (libvpx headers on Linux, libvpx's CPU flags per file, VP8 from
+    libwebrtc's own encoder). Against Chrome 158 the `+5` build passed offering with `max-bundle`, answering (`balanced`
+    and `max-bundle`, Opus and VP8 both ways) and TURN relay over UDP and TCP; offering with `balanced` carries media
+    but the engine's `connectionState` stays `connecting`; library 137.1 MB (+9.5 MB). docs/WPEWEBKIT.md, "LibWebRTC".
+    `tests/webcalls_pair.py`: `turn=`/`relay=1` options, the DTLS state in its report, and candidates added only after
+    the remote description.
+  - **SharedArrayBuffer for cross-origin-isolated pages only** (`lordos-sharedarraybuffer-coi.patch` in the same build):
+    WebKit already starts a web process of its own for a page served with COOP `same-origin` and COEP `require-corp`;
+    the patch turns SharedArrayBuffer on in that process only (`JSC_useSharedArrayBuffer`, removed from every other
+    process's environment), as WebKit already did on its other platforms. A messaging web app requires it for calls.
+    lord-web now drops every `JSC_*` variable, so nothing can turn it on for every page.
+  - **Chrome's User-Agent Client Hints and `navigator.userAgentData`** for a profile whose Browser identity is Chrome
+    (`server/src/web/webua.h`, `webua.c`, `webua.js`, `webhints.c`, `webext.c`): `Sec-CH-UA` (Chromium's own brand
+    order and "GREASE" brand for the version, `"Chromium";v="158", "Not.A/Brand";v="24", "Google Chrome";v="158"`),
+    `Sec-CH-UA-Mobile: ?0` and `Sec-CH-UA-Platform: "Linux"` on every request to a secure origin; the high-entropy
+    hints (`-Full-Version-List`, `-Full-Version`, `-Platform-Version`, `-Arch`, `-Bitness`, `-Model`, `-WoW64`,
+    `-Form-Factors`) only after the app's own site asked with `Accept-CH`, kept in the profile's `state.json`
+    (`clientHints`); `navigator.userAgentData` (brands, mobile, platform, `getHighEntropyValues()`, `toJSON()`) and
+    `navigator.vendor` "Google Inc.". All of it, and the User-Agent string, from one table:
+    `WEBPAGE_CHROME_FULL` `158.0.8127.36` next to `WEBPAGE_CHROME_MAJOR` in `webpage.h` (Chrome's major moves from
+    157 to 158; docs/RELEASING.md now bumps the whole version). Values checked against what Chrome 158 on Linux sent and
+    answered. The headers come from `lord-web-ext.so`, a WebKit web process extension that WebKit loads only from
+    `lord-web-ext/` next to lord-web (`/usr/lib/lordos/bin/lord-web-ext/` in `lordos-web`): it only adds those headers.
+    Other identities are unchanged.
+  - **A call log**: lines starting `webcall: ` in the web app's own log (`server/src/web/webcall.h`, `webcall.c`,
+    `webcalls.c`, `webcall.js`): what the page has for calls (crossOriginIsolated, SharedArrayBuffer, Atomics,
+    RTCPeerConnection, getUserMedia), each peer connection with its ICE and connection states, codecs, video size and
+    frame rate, the kinds of ICE candidates in use, errors by name, getUserMedia and getDisplayMedia with the kind of
+    each device in closed words (never its label), the permission answers, WebKit's capture state and the Client Hints
+    the app's own site asked for. Never SDP, candidates, addresses, tokens, phone numbers, device labels or other
+    sites. Always on, at most 60 lines a minute; each field checked in C against a closed list.
+  - Tests: `build/webua-test` (153 checks), `build/webcalls-check` with `tests/webcalls_check.py` (in
+    `make -C server test` and the WPE build's own test).
+
+### Changed
+- **Web apps' Browser identity follows the current browsers** (docs/RELEASING.md step 1, 2026-11-28):
+  `WEBPAGE_CHROME_FULL` is `158.0.8127.88` (Chrome's stable update for Linux; the major stays 158, as does Edge's) and
+  `WEBPAGE_FIREFOX_MAJOR` 161, so the Firefox identity sends `Mozilla/5.0 (X11; Linux <machine>; rv:161.0)
+  Gecko/20100101 Firefox/161.0`. `build/webua-test` and docs/WEBAPPS.md ("Browser identity") quote the new numbers.
+- **Release signing runs on the maintainer's LordOS machine** (docs/RELEASING.md, docs/UPDATES.md,
+  docs/IMMUTABLE.md and the comments of `tools/release/`): the release key, the archive key and the scripts that use
+  them (`sign-code.sh`, `sign-hwsnapshot.sh`, `sign-release.sh`, `apt-repo.sh`, `publish-lists.sh`) are used there with
+  Debian's own tools; the docs no longer name another computer for it.
+- **Files: "Get Info" is now called "Properties"** (GitHub #279: people looked for "Properties" in the right-click
+  menu and didn't recognise "Get Info"). The same entry, in the item's and the folder's context menus and the File
+  menu, opens the same info panel (size, item count, location, dates, permissions, Open with) with the same shortcut,
+  ❖I. Every UI language ("Propiedades", "Propriedades", "Propriétés", …); Help's Files page (en, es, pt). No executable
+  toggle is added.
+- **Moving wallpapers cost a fraction of what they did** (docs/MOVING-WALLPAPERS.md). Measured by the maintainer with
+  0.8.9.6.2 on an i9-10900 with a Radeon RX 580 and three 1920×1080 monitors showing one 1080p moving wallpaper:
+  lord-server ~184 % of a core, lord-media ~58 %. Each frame was read back from the GPU, converted to BGRA on the CPU,
+  copied into every display's canvas, the blurs over it repainted and the whole display uploaded again. Now, while the
+  GPU composes:
+  - **Zero-copy**: lord-media exports the VA-API surface (`vaExportSurfaceHandle`, read-only, separate R8/GR88 layers,
+    or R16/GR1616 for 10 bits) and sends the dmabufs over its own socket (`MM_DMAFRAME`, `MpDma`); lord-server checks
+    them as hostile input (only dmabuf fds, sizes from `lseek`, `mp_dma_check`'s closed rules, the driver's own
+    modifiers, a flood cut off; any refusal sends that player back to the memfd ring for good, logged once) and imports
+    them with `EGL_EXT_image_dma_buf_import`. lord-media holds each frame sent until lord-server acknowledged one two
+    numbers later. No new sandbox rule: the player already had the DRM and dma-buf ioctl classes.
+  - **NV12 instead of BGRA** where zero-copy can't be used (a picture over twice the box a side, a driver that can't export): the decoder's 4:2:0 planes in the same sealed memfd ring (`MF_NV12`, 1.5 bytes a
+    pixel, no RGB conversion in lord-media, never larger than the video), its layout from `mp_ring_layout` on both
+    sides. lord-server converts either on the GPU with the video's matrix (BT.601/709/2020, limited or full range) into
+    one texture that every display's view draws below the UI (`server/src/media/mambient.c`, `gpu_yuv_*` in
+    `gpu.c`): a new frame is a present of the displays that show it, not a repaint. The Dock's and the menu bar's blur
+    still blur the video: only the strips under a blurred node keep the frame's CPU pixels (converted, `nv12.c`, or read
+    back row by row) and are repainted. The CPU path (GPU=0) asks BGRA exactly as before.
+  - **Per-display pause, from the compositor**: each display's view is hidden when the opaque nodes over it cover its
+    whole area together (`paint_node_hidden`, `ui/rectsub.h`), a Linux app is fullscreen on that display
+    (`wl_fullscreen_box`) or the screen is off; a hidden view isn't presented, and the decoder pauses only when no view
+    shows. After 10 s with none (a fullscreen game), lord-media is ended and the loop cache freed, both back at the same
+    place when a view shows. 0.8.9.6.2 paused only when one window covered a whole display, and paused every display for
+    a fullscreen window on one of them.
+  - **The loop cache in GPU memory** (the maintainer's idea): after one whole pass the loop's frames stay on the GPU,
+    packed as NV12 (1.5 bytes a pixel, copied on the GPU, never read back), and the loop plays from there at the clip's
+    own timestamps with lord-media paused. One cache per player for every display; within Settings → Wallpaper → GPU
+    memory for loops (Off, 256 MB, 512 MB, 1 GB by default, 2 GB), at most half the card's VRAM and what's free past a
+    headroom (amdgpu's `mem_info_vram_*` through `gpu_cards_read`), a sixteenth of the RAM (at most 1 GB) on integrated
+    GPUs. Dropped on a size or scale change, a raised frame rate, a lost GPU context, memory pressure or 10 s hidden.
+    A 1080p30 8 s loop takes 705 MB; a 4K one doesn't fit 1 GB and plays as before.
+  - **Settings → Wallpaper → Frame rate** (Video's own, 30 fps, 15 fps; `MM_FPSCAP`: lord-media skips the frames before
+    reading them back) and **On battery** (Pause, the default; Lower frame rate, 15 fps and a pause at 20 % or less;
+    Keep playing), applied as soon as the power source changes. New settings `motionFpsCap`, `motionBattery`,
+    `motionCacheMb` with defaults (new keys, no migration); ten new texts in the 35 languages.
+  Measured on the same PC with `build/motion-bench` (lord-media as lord-server launches it, lord-server's per-frame work
+  on a surfaceless context of the RX 580, a 1080p30 HEVC loop; the machine busy with a WebKit build): lord-media 21.3 %
+  → 6.1 % (NV12) → 1.0 % (zero-copy) → 0.1 % (cache, paused); lord-server's frame work for three displays 19.6 % → 0.8 %
+  → 0.5 % → 0.2 %, at 30 frames a second throughout. The full three-monitor session is still to be measured.
+  Tests: `build/mloop-test` (new, in `make test`: the cache's budget, recording and playback, the pause and stop rule,
+  the cap, covered views, malformed rings and zero-copy descriptions with a 200 000-case fuzz, the NV12 matrices),
+  `build/motion-bench check` (the shaders against the CPU on a real GPU), `server/tests/motion_model_test.mjs` (battery
+  mode, cap, cache setting), `build/engine-test` (damage) and `build/mview-test` unchanged and passing.
+- **Settings → Artificial intelligence is a store around Lumo** (the maintainer's approved design, 0.8.9.6.2). The page
+  was two tabs (Voice and Sentinela); it is now built like the wallpaper gallery (`apps/settings/AI.jsx`, the pure part
+  `sdk/aistore.js`, docs/AI.md). At the top the 3D Lumo (waving when every piece that exists today is installed, asleep
+  while one you could download is missing) and the chain of his five pieces, each ✓ when installed: **Ear** (speech to
+  text) → **Brain** (the language model) → **Voice** (reading aloud) → **Eyes** (text recognition) → **Hands** (doing
+  things with your permission), with "3 of 5 pieces ready" and **Talk to Lumo**, disabled with a "coming soon" line
+  until the Ear and the agent exist. Then a search ("whisper", "Spanish", "4K"…) with the filters All, Installed, Brain,
+  Ear, Voice, Vision and Image, each with its count; **What Lumo can do**: one brain, many functions (Notes, Programs,
+  Log audit, Sentinela, Files, Apps and windows, Machines, Settings, System), each with its level (read only, with your
+  permission, administrator); only **Sentinela** works today: its card says whether it is on and opens its page, the
+  others say "coming soon" (no switches that do nothing). The **capabilities** as cards (models, installed), one row of
+  each, and a page per capability ("‹ Artificial intelligence › Voice"; Esc and the mouse's Back and Forward walk them
+  as Settings sub-pages, `apps/settings/subpage.js`). Every model is a card (its capability's colour and icon, ✓
+  installed or ☁, RECOMMENDED / IN USE / COMING SOON, size, memory, license, the download's progress) with a sheet: its
+  facts, what uses it, **try it** where it really works, and its actions. At the bottom the space the models take
+  (measured on disk), where they run (the Voice's real Auto / CPU / GPU setting; the Brain and Vision on the processor)
+  and the privacy note.
+  - **Brain**: Qwen3 1.7B and 4B and the llama.cpp engine: install (the engine first when missing), remove, use; try it
+    with *Translate with Lumo* when Sentinela is on and the model is the one in use.
+  - **Voice**: a card per language (its standard model and own voice: install standard or HD, remove, listen to the
+    recorded sample, try). Its page keeps everything the Voice tab had: Read aloud, ❖Esc, the player, Live Speech,
+    Process with, Quality, the language's two models and its voices as cards (▶ sample, Try, Use, Download, Remove),
+    the samples' package and your own voices (record, from a file, try, use, remove).
+  - **Vision**: Tesseract (included: Screenshots' "copy the text") and a card per interface language, Debian 13's
+    `tesseract-ocr-<lang>` data (sizes from Debian), installed and removed with the package engine like the voices (only
+    the 35 names in `OCR_LANGS`); try it with *Read a picture…* (lord-media decodes it, the confined lord-ocr reads it).
+  - **Ear** (Whisper Base, Small and Large v3 Turbo via whisper.cpp: 148, 488 and 574 MB) and **Image** (Real-ESRGAN x4
+    and x4 Anime, ~64 and ~17 MB; the x4 model made the 4K wallpapers): **coming soon**, their real facts and no install
+    button; Image's sheet shows a before-and-after crop. They need a new helper, which needs the maintainer's security
+    approval first: no helper, dependency or network path was added.
+  - Links from other apps still work (`{ section: 'ai', page: 'sentinela' }`, the Monitor's AI card); a page may also
+    be `voice`, `brain`, `ear`, `eye` or `img`. The AI section takes the wider column on wide windows, as Wallpaper.
+    131 new texts in the 35 languages (`settings.aiStore.*`); icons in `assets/ai/icons/` (installed by mkdeb.sh).
+  Tests: `server/tests/ai_store_test.mjs` (81 checks: entries from what is installed, Lumo's pieces and pose, filters
+  and counts, the Voice page's cards, Tesseract's languages and packages, space; in `make test`) and the headless scene
+  `server/tests/app_scene_headless.sh settings_ai_scene` (home, Voice, a sheet, Brain, Image, Sentinela, a search; in
+  English and Arabic).
+- **Web apps: Light and Dark per app are back, and now they reach the pages' CSS.** lord-web runs on WPEPlatform (WPE
+  WebKit 2.54) since 0.8.9.6, whose display settings have `WPE_SETTING_DARK_MODE`: lord-web now sets it at start and on
+  every `SetColorScheme` (`webback_set_dark` in `server/src/web/webback_platform.c`, called from `webdark.c`; a no-op
+  on the legacy API). WebKit answers `prefers-color-scheme` with it for CSS `@media` rules as well as `matchMedia`, so a
+  site that picks its theme with CSS follows the app's Appearance. With that, the per-app choice held back since
+  2026-11-15 is on again: `WEBSCHEME_PER_APP` is 1 (`webscheme.h`), Settings → Web Apps → Appearance offers
+  Automatic, Light and Dark (`COLOR_SCHEMES_AVAILABLE`), the note saying they would come with the new engine is gone
+  (`webapps.appearance.later`, removed from the 35 languages), and the web app's app menu has the Appearance submenu
+  again (`webAppearanceItem`). A site with its own theme setting (WhatsApp, for example) still follows that setting.
+  Tests: `build/webapp-test` and `build/webreg-test` with `WEBSCHEME_PER_APP` 1, `tests/webapps_model_test.mjs`.
+
+### Fixed
+- **Machines stopped with "Machines ran into a problem" after choosing Whonix (Tor) and pressing Continue.** The new
+  machine assistant (apps/machines/assistant.jsx) returned the Whonix group's pages (`GroupFlow`), and the migrate page,
+  before its `useFilesDrop` hook, so React saw fewer hooks than in the previous render (React error #300) and the app's
+  boundary took over the window. The hook is now above both early returns. A file dropped on the migrate path would have
+  stopped it the same way. A sweep of apps, themes and the SDK with React's rules-of-hooks lint found one more hook after
+  an early return, in Settings → Wallpaper (only reached by a theme with no wallpapers); it is moved as well.
+
 ### Changed
 - **Lumo is now the 3D Lumo, in the OS and on lordos.org.** The flat, outlined vector mascot is replaced everywhere by
   the 3D Lumo approved by the maintainer: soft rendered fur and cloth, the white and lavender fox of the LordOS 0.8.8.9
@@ -41,7 +1862,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     Raspberry Pi page, the Imager guide, About and the 404 page. On the /language/ page the 3D Lumo waves with an open
     paw that cannot hold a stick, so the small Argentine flag now stands planted on the embassy's steps at the side Lumo
     waves to, swaying gently (still off with reduced motion).
-  - **The desktop Imager** (`desktop/imager`) draws the same renders, 128 px with the 256 px one for
+  - **The desktop Imager** (`desktop/imager`, the one for other computers) draws the same renders, 128 px with the 256 px one for
     2x screens (`srcset`).
   - **Alt text:** "Lumo asleep on a laptop" no longer matches the picture (the 3D Lumo sleeps curled up, with no laptop):
     it is "Lumo curled up asleep" now, in all 35 languages.
@@ -59,6 +1880,487 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     first-login tour, Help's empty state, Calendar, the installer and About, checks that each Lumo is drawn with the render
     `lumoSource` picks (`lumo-wave-128.png` at 120 px, `lumo-confused-128.png` at 112, `lumo-avatar-small-32.png` at 24)
     and keeps the screenshots.
+
+### Added
+- **Style packs and app skins: a theme can bring its own icons, pointers, sounds and font, and redraw parts of an app**
+  (part 4 of the community-themes plan, approved by the maintainer on 2026-11-26, for every native app starting with
+  Files; docs/THEMES-GUIDE.md "Style packs and app skins").
+  - *Level 1, a style pack* (`registerStylePack`, `sdk/appskins.jsx`, rules in `sdk/appskinmodel.js`): app icons by app
+    id, file-type icons by kind and toolbar icons by our names (a component drawn with nodes, or a PNG or SVG in the
+    theme's `assets/`); pointer colours (fill and outline of every shape: `lord.input.pointerScheme`,
+    `cursor_set_scheme` in `server/src/cursor.c`); a sound scheme for startup, the default notification sound, errors
+    and emptying the Trash, as up to 8 plain notes each that lord-server synthesizes like its own sounds
+    (`lord.sound.scheme`, `snd_set_scheme` in `server/src/sound/snd.c`; the startup tune plays once per session, not
+    after a theme switch); and an installed font by family name for `fontFamily: 'theme'` (`lord.fonts.useForTheme`,
+    `text_set_theme_font` in `server/src/ui/text.c`). A theme brings no audio file, cursor image or font file for
+    lord-server to parse.
+  - A community theme (part 2's restricted API) may register a style pack's data too (pointer colours, tunes, an
+    installed font, image icons) through its facade; `lord.input.pointerScheme`, `lord.sound.scheme` and
+    `lord.fonts.useForTheme` are on the restricted API's allowlist (`js_theme.c`). Component icons and app skins stay
+    an official theme's.
+  - *Richer tokens* for every app's shared controls: `toolbarBg`, `buttonBg`, `bevel` and `stateBorders` (a border per
+    state) in `Button`, `Toolbar` and `ToolbarButton`; `ToolbarButton` takes `iconName` for a pack's icon.
+  - *Level 2, app skins* (`registerAppSkins`, `<SkinRegion>`): an app names the regions a theme may draw and hands the
+    theme's component a frozen view model with its actions as functions; the app does every action with its own checks,
+    and a skin that throws gives the region back to the app. **Files** has six: `toolbar`, `addressBar`, `sidebar`,
+    `itemView`, `statusBar` and `contextMenu` (`apps/files/skinmodel.js`: the items, the selection, the folder, the
+    places, the status, and 30 actions from Back to Empty Trash; a typed address goes through `addressPath` and Files'
+    own check that the folder is there). **Settings** has two: `sidebar` and `home`, a page of categories before a
+    section is open (`apps/settings/skinmodel.js`); each section's page stays Settings' own.
+    The **Terminal** has three: `tabBar`, `statusBar` and `contextMenu` (`apps/terminal/skinmodel.js`); a skin asks
+    only for a closed list of the Terminal's commands, and the panes and what is typed into them are never a skin's.
+    The **Text Editor** has four: `toolbar`, `tabBar`, `statusBar` and `contextMenu` (`apps/editor/skinmodel.js`); the
+    model never carries the document's text.
+    The **Store** has two: `sidebar` and `toolbar` (`apps/store/skinmodel.js`); a skin chooses a page, goes back, searches
+    and refreshes, and every install stays the Store's.
+    Most other apps use two shared shapes (`commandBar` and `listPane` in `sdk/appskinmodel.js`): a command bar of the app's
+    own commands and a list pane of its places or items, and a header (`SkinHeader`) for an app with no bar of its own;
+    Luna draws them once (`skins/common.jsx`). Apps with them:
+    **Notes** (`sidebar`, `toolbar`; the list carries titles and dates, never a note's text); **Calculator**
+    (`display`, `keypad`; `press` takes only a key of its keypad); **Photos** (`sidebar`, `toolbar`); **Player**
+    (`sidebar`, `toolbar`, `transport`); **Monitor** (`toolbar`: its tabs); **Clock** (`toolbar`); **Screenshots**
+    (`toolbar`: the capture bar; it floats outside the theme's tree, so a skin makes its own tokens); **Disks**
+    (`sidebar`); **About** (`banner`); **Help** (`sidebar`); **Characters** (`toolbar`, `sidebar`); **Fonts**
+    (`sidebar`); **Logs** (`sidebar`, `toolbar`); **System Information** (`toolbar`); **Backups** (`toolbar`); **PDF
+    Viewer** (`toolbar`); **Force Quit** (`list`); **About App** (`banner`); **Scanner** (`header`); **Voice
+    Recorder** (`header`); **Camera** (`header`); **LordOS Imager** (`header`); **Install LordOS** (`header`);
+    **Databases** (`header`); **Machines** (`header`); **Cleaner** (`header`); **LordOS Studio** (`header`);
+    **Remote Desk** (`header`).
+  - **Settings → Appearance → From this style**: a switch for each part the style in use brings (Icons, Pointer colors,
+    Sounds, Font, App layouts; `settings.themeParts`), so someone can keep a theme's frames and use LordOS's icons.
+  - **Luna** (`themes/luna`), the demo: a tribute to the desktops of 2001 with glossy blue title bars with
+    rounded tops, a green start button with our own crescent moon mark on a blue taskbar, quick launch and a button per
+    window, a two-column start menu of that era (the person's picture and name in a blue header, pinned apps and "All
+    apps ▸" in a white column, Documents, Pictures, Music, the computer, the network, Settings, Help and Search in a
+    light-blue one, and Log Out and Shut Down… in the footer, LordOS's own session actions), an original sky when no picture is chosen, light and dark; its pack has our own folder, page and round-arrow
+    icons, white pointers with a black outline, four short tunes and DejaVu Sans; and Files is that era's explorer
+    (Back/Forward/Up, Search, Views, an address bar with Go, the task pane with "File and Folder Tasks", "Other Places"
+    and "Details", icons or details, a plain status bar and context menu), and Settings a control panel of that era (a
+    task pane and four categories, each with its sections as links). All of its art is drawn by us.
+  - Themes no longer carry "Lord" in their names (the maintainer's rule of 2026-11-26): the demo is just **Luna**.
+    Its `theme.json` names its author, Federico Pereira, with two new optional fields, `email` and `organization` (IPERFEX),
+    checked by `sdk/thememeta.js` (one plain address of at most 120 characters; one line of at most 60) and shown as
+    rows on the theme's page in Settings → Appearance (`settings.style.email`, `settings.style.organization`; tests in
+    `server/tests/theme_gallery_test.mjs`).
+  - New texts in the 35 languages (`files.skin.*`, `settings.themeParts.*`, `settings.skin.*`, `shell.theme.luna.*`,
+    `shell.luna.start`). Tests: `server/tests/appskin_test.mjs` (76 checks), `server/tests/files_skin_scene.mjs`
+    (Files with every region a stub: 31 checks), `server/tests/settings_skin_scene.mjs` (Settings with both regions
+    stubbed: 17 checks), `server/tests/terminal_skin_scene.mjs` (the Terminal: 14 checks), `server/tests/editor_skin_scene.mjs` (the
+    Text Editor: 16 checks), `server/tests/store_skin_scene.mjs` (the Store: 11 checks; all six in `make test`) and `server/tests/luna_scene` (screenshots,
+    `app_scene_headless.sh luna_scene OUT luna en light|dark`; it runs with a demo account and computer name, and
+    checks that the real ones appear nowhere on screen).
+- **Settings → Wallpaper is a gallery, with three new collections of still pictures: Abstract, Epic and Anime.** The
+  approved redesign (apps/settings/WallpaperGallery.jsx) reorganises the page; nothing it had goes away.
+  - *What shows now*, at the top: a large picture with its name, collection and license, and three controls: **For**
+    (Desktop / Login screen), **Display** (All / each display, when there are several; the per-display rules of
+    `sdk/wallpapermodel.js` as before) and **Quality** (Auto / HD / 4K). Auto downloads a picture's 4K file only for a
+    display wider than 1920 or taller than 1080 device pixels and the HD file for the others, decided per display;
+    the line under it says what each display gets ("4K on DP-1 (3840 × 2160), HD on HDMI-A-1 (1920 × 1080)"). The
+    choice is the new setting `wallpaperQuality` (`auto` by default; a new key, no migration).
+  - *A search and five filters with their counts*: All, On this computer, Pictures, Moving and My photos. The search
+    folds accents and matches every word against the name, the id and the collection's name in your language.
+  - *Collections first*: with no search and the All filter, each collection is a card (a stack of three thumbnails,
+    its count, NEW on Abstract, Epic and Anime), then one row of each collection with "See all N". A collection's page
+    has its description, how many are on this computer, **Download all · HD** and **· 4K** (the bytes still to fetch)
+    and **Use as slideshow** where the theme has a slideshow (Workspaces; two pictures or more on this computer).
+  - *Every tile says its state*: a cloud (it downloads when chosen), a check (on this computer), 4K or HD, a play mark
+    when it moves, and a download's progress as a bar along its bottom edge. Moving wallpapers stay dimmed without a
+    compatible GPU, as before.
+  - *A sheet per wallpaper*: a large picture, its collection and credits (the new pictures: made with AI for LordOS,
+    CC0), the quality options with the catalog's real sizes ("4K · 3840 × 2160 · 1.2 MB"), and **Use on desktop**
+    (Download and use when it isn't here), **Login screen**, **Only <display>** with several displays, and **Remove
+    download** when this account doesn't use it.
+  - *At the bottom*: the space the downloaded wallpapers take, with **Free up space…**, which deletes the catalog's
+    files on this computer that this account doesn't use (the desktop, any display, the login screen, the moving
+    wallpapers, random's videos, and a running slideshow's collection all stay); the thumbnails' size (the same
+    `wallpaperThumbs` setting); the slideshow; and the moving wallpapers' options (speed, random, an added video, back
+    to a still picture, credits).
+  - 68 new texts in all 35 languages. `server/tests/app_scene_headless.sh settings_wallpaper_scene` drives the page
+    headless and keeps screenshots of the cards, a collection, a sheet, a search and the rows (Arabic too).
+- **Still pictures in the wallpapers catalog.** `assets/wallpapers/motion.json` (installed as
+  `/usr/share/backgrounds/lordos/motion.json`) keeps its structure and gains still pictures: items in the sections
+  `abstract`, `epic` and `anime` whose variants have codec `jpeg` (`1080.jpeg`, 1920 × 1080, and `2160.jpeg`, 3840 ×
+  2160). This release ships the 50 Epic pictures and their 320 × 180 thumbnails in `assets/wallpapers/motion/`; the
+  code doesn't depend on the count. A chosen picture is saved as `cat:<catalog id>` in `wallpaper`, a display's entry
+  of `wallpapers`, `loginWallpaper` or the slideshow, and `findWallpaper` (sdk/wallpapers.js) resolves it to the files
+  on this computer, so every theme (Flow, Classic, Workspaces, Celeste), the login screen and the
+  slideshow show it with no change of their own; each display draws the file that covers it, or the one Quality
+  names. A picture whose files are gone shows the theme's default (the login screen: its own). The pure logic is
+  `sdk/wallpapergallery.js`, tested by `server/tests/wallpaper_gallery_test.mjs` (75 checks, the shipped catalog
+  included).
+- **Built-in pictures in HD and 4K: a catalog twin.** A catalog still item with the same id as a built-in wallpaper
+  (`assets/wallpapers/index.json`) is that built-in's 4K, not a second wallpaper: Cyberpunk City HD's 17 pictures get
+  theirs (`section: "cyberpunk"`, upscaled to 3840 × 2160). The gallery shows one tile per picture in the built-in
+  collection, with ✓ (its HD file is built in: offline, nothing to download) and the 4K badge; its sheet lists "HD · 1920
+  × 1080 · included, works offline" and "4K · 3840 × 2160 · <size>", and the collection's page offers "Download all ·
+  4K". Choosing it keeps the plain built-in id in the settings (Workspaces' default panorama and existing settings
+  are unchanged); choosing it for a display above 1920 × 1080 (Auto) or with 4K downloads the twin's 4K file first.
+  `findWallpaper` adds that file to the built-in's variants once it is on disk (`withTwin`, sdk/wallpapergallery.js),
+  so every theme, the login screen and the slideshow use the 4K on a display that needs it and the built-in HD
+  everywhere else, and while the 4K isn't on this computer: never a missing picture. Quality HD keeps the built-in
+  file only. Free up space never removes a twin the desktop, any display, the login screen, a running slideshow or the
+  theme's default (setting unset) shows. Nothing names Cyberpunk: any built-in collection whose ids get twins behaves
+  the same. A built-in that already ships its own 4K file (Panorama, Neon Road Entrance) keeps it and needs no download.
+  Tests in `wallpaper_gallery_test.mjs` (twins merged, Auto falling back, 4K and HD, Download all, Free up space; 97
+  checks), screenshots in `settings_wallpaper_scene`; one new text in all 35 languages.
+- **`wallpaper-get` keeps a still picture as `/var/lib/lordos/wallpapers/<sha256>.jpg`.** The extension comes from the
+  catalog's codec, read as root, never from the caller: `hevc` and `h264` are kept as `.mp4`, `jpeg` as `.jpg`; any
+  other codec, or a variant whose file isn't of that kind, is no entry. A variant's `file` must now be a relative
+  `[a-z0-9._/-]` name with no `..`, `//` or leading dot or slash, and its size a whole number. `wallpaper-remove`
+  deletes either kind. `wallpaper-login` never links a picture as the login video, and takes a catalog picture as
+  `still cat:<id>` (kept in `login-still`, like a built-in one). The checks that were there stay (catalog entries
+  only, the project's GitHub base, size and SHA-256, the download as `nobody` in the Store's scope); no new action,
+  helper, dependency or network path. Tests: `wallpaper-find-test` gains the `jpeg` cases and the refusals, and the new
+  `build/wallpaper-admin-test` runs the actions with a fake download (a `.jpg` and an `.mp4`, refused arguments never
+  fetch, a wrong hash or a 404 is never kept, remove, `still cat:<id>`, and every entry of the shipped catalog).
+  `sdk/motion.jsx` ignores `jpeg` variants: the moving wallpapers are the catalog's video items only.
+
+- **Notes sees new notes at once, the widget catalog can put an existing note on the desktop, and File → Import…**
+  (apps/notes, in development).
+  - *New notes made outside the app.* Until now `~/Notes` was read once, at login, so a note written by another program
+    (an assistant writing `~/Notes/<slug>/nota.md` with `desktop: true`, a sync tool, the terminal) appeared only at the
+    next login. Notes now watches `~/Notes` with the new read-only `lord.fs.watch` (one watch; a note folder made or
+    deleted fires it) and reads the folder again on each coalesced change, with no window open and no timer: a desktop
+    note written elsewhere shows on the desktop within a second, and in the list. A file written inside a note's folder
+    doesn't change `~/Notes`, so a few folders are watched too: one made in the last 10 minutes that has no `nota.md`
+    yet (at most 3: the program is about to write it) and the notes shown on the desktop (at most 4, most recently
+    updated first), so an edit made elsewhere to a desktop note comes in too; at most 8 of the session's 16 watches. The
+    Notes window reads the folder again when it opens and each time it gets the focus (the fallback for any other note,
+    and for a cloud or network `~/Notes`, which `lord.fs.watch` refuses). A read is cheap: a `nota.md` whose size and
+    time didn't change isn't read again, and at most 4000 notes are read (`MAX_NOTES`; `MAX_NOTE` and the folder-name
+    and link checks are unchanged). The fresh read is merged with the notes in memory (`apps/notes/notesmodel.js`
+    `mergeScan`): a note with a change not saved yet, or whose save failed, keeps what is in memory until a save
+    succeeds (before, a failed save was simply logged); any other note is what the disk says (an edit made elsewhere comes in,
+    a deleted folder goes, from the desktop too); new notes go first, newest first, and the others keep their place and
+    their objects, so nothing redraws when nothing changed. A change in a note's folder in the second after Notes saved
+    that note is its own save and isn't read again, so there is no loop.
+  - *Pick a note for the desktop.* "Sticky note" in Add widget (every theme with the catalog: Flow,
+    Workspaces, Celeste) now opens a list in the same panel, under a ‹ Back row: "New Note" (what it did before) and every
+    note, with its colour, title and date, most recently updated first, a search over title and text (no accents, no
+    case; every word), and "on the desktop" on the ones already there; arrows and Enter work. The folder is read again
+    when the list opens. A note picked goes on the desktop where the widget is being added (that display and activity),
+    moved inside the display's work area, with its text and size; one already on the desktop moves there. The catalog
+    gains a generic hook for this: a kind registered with `registerWidgetKind` may give a `Chooser` component, shown in
+    the panel after its card (`sdk/widgetpicker.jsx`); the other kinds are unchanged.
+  - *Show on desktop finds a display.* File → On desktop and ··· → On desktop now put a note whose saved place is off
+    every current display (a monitor unplugged, a note from another computer) on the display the Notes window is on,
+    80 px in from its work area; a note whose header bar can be seen on a display keeps its place.
+  - *Import.* File → Import… (after New Note) opens the system file dialog for `.md`, `.markdown` and `.txt`, one or
+    several files; each one becomes a new note in a new folder, so an import never writes over a note. The file is
+    untrusted text: a Notes header in it gives only its title and colour (never its place, `desktop`, dates or folder),
+    another program's front matter stays in the text whole, a title is cleaned like any title (no control or direction
+    override characters), CRLF and a BOM are read as plain lines, and a file larger than `MAX_NOTE`, with a NUL byte, a
+    link or a folder isn't read; nothing the text names is copied (its images and links point into the new note's own
+    empty folder). Markdown and text files dropped from Files on the notes list are imported the same way (and dropped
+    anywhere on the window when no note is open); other files, and any file dropped on an open note, are still its
+    attachments.
+  - *Round checklists.* In the reading view (the window and the desktop notes) a checklist item is now a round check,
+    like a phone's notes app: a 21 px ring when open; when done, filled with the note colour's tint (a deep tone of the
+    paper colour, readable with a white ✓ on every paper colour, in light and dark mode) and the text left readable (no
+    longer dimmed to 60 %, not struck through); a 28 px target centred on the item's first line; right to left, the
+    circle is at the start. `<Markdown taskStyle="round" taskTint>` in `sdk/markdown.jsx`; other apps keep the square
+    box. A checklist button in the toolbar (a ring with a tick, beside the colours) makes the caret's line or the
+    selected lines `- [ ] ` (or plain again), as ❖⇧9 does, opening the editor first from the reading view; with nothing
+    selected the caret now stays a caret at the end of the line (it selected the line, so the next key replaced it).
+    The editor is plain markdown text, so the circles are ticked in the reading view.
+  - *Editing is fluid, and wrapped rows no longer overlap.* Every key used to put a new list in the store: the whole
+    window and every desktop note drew again, the desktop widgets were published again, and the editor wrapped the
+    whole note again, measuring each character alone, and drew every row anew (on a 300-line note the longest
+    main-thread run while typing was 41–68 ms, and the caret's blink alone 58 ms). Now the editor keeps the text itself
+    (`store.js` `editBody`): the text goes into the store and is saved 500 ms after typing stops, when the editor closes
+    or another note is chosen, or on `flushAll`; the widgets are published only when the desktop's notes change; only
+    the edited line is wrapped again (a per-line cache) and each row is a memoized component; the caret and selection are
+    drawn over the rows. In the headless scene the longest run while typing is now 9–12 ms (the key's own handling 5–11
+    ms instead of 26–44 ms). A row is measured the way it is drawn (`apps/notes/wrapmodel.js`): the row's whole string,
+    bold for headings, so CJK and emoji runs (whose spaces are drawn narrower), a tab (drawn as four spaces, before as a
+    box but measured as four spaces), a CR from CRLF line ends (not drawn) and accents no longer make the caret drift
+    off the letters or a row wider than the editor, which was drawn over the next row; a cut never splits a character.
+  - *Saves off the interface's thread.* A note is saved with the new `lord.fs.writeAsync` (`server/src/fsasync.c`
+    `FSA_WRITE`, `sdk/fs.js` `writeAsync`): `lord.fs.write`'s own resolution and checks (made again on the worker), a
+    temporary file next to it, fsync and rename, so a slow disk never holds typing (as #250 did for settings). Writes to
+    one file land in the order asked (a later one waits for an older one on a worker) and `lord.fs.write` waits for one
+    still on a worker, so a save at logout never lands before an older one; Notes keeps one save in flight per note. A
+    failed save keeps the note not saved (the folder's reads keep what is in memory) and is tried again in 5 s. Isolated
+    apps have no `writeAsync` (the broker has no operation for it) and the SDK writes at once there.
+  - Tests: `server/tests/notes_wrap_test.mjs` (32 checks: long lines, leading spaces, tabs, a CR, CJK, emoji, combining
+    accents and bold headings with a fake measure that shapes like the engine; every row fits, the rows cover the text,
+    no character split, a click at the caret's x gives the caret's offset, one changed line of 300 wrapped again);
+    `build/fsasync-test` gains `writeAsync` (written whole, in order, the refusals, `lord.fs.write`'s wait for a held
+    write); `notes_store_test.mjs` gains typing (no store change or widget publish per key, the text saved once typing
+    stops, a slow disk landing the newest text last, a failed save keeping the note until `flushAll`); new headless
+    scenes `notes_pick_scene` (a note written elsewhere on the desktop in about 50 ms, the catalog's pick, round
+    checklists ticked with a click, the checklist button, On desktop for a note off every display) and
+    `notes_edit_scene` (a 300-line note in Edit mode: no two rows overlap, none wider than the editor, and the
+    main-thread time per key).
+  - Tests: `server/tests/notes_model_test.mjs` (59 checks: the header round trip for titles with a colon, quotes,
+    `true`, `123`, a leading space or a line break; titles without bidi or control characters; the merge; the pick list;
+    the placement on one or two displays; import) and new cases in `notes_store_test.mjs` over a real temporary home (a
+    folder made elsewhere and its `nota.md` written after it, read through the watches; an edit made elsewhere; a change
+    not saved yet and a failed save winning over the disk; Notes' own save not read again; a folder deleted elsewhere
+    leaving the desktop; import of a header, a `.txt`, the same file twice, a link and other types). The title and
+    combining-mark patterns in Notes use `\u` escapes instead of literal invisible characters. New texts in all 35
+    languages.
+- **`lord.fs.watch` / `lord.fs.unwatch` and `lord.fs.stat`'s `protected` flag** (in development; designed for the desktop
+  icons, `docs/drafts/DESKTOP-ICONS.md` 5.1, decision D13; in this release Notes uses it to see new notes at once). Read-only: `lord.fs.watch(folder, fn)` returns an id and calls
+  `fn({ changed: true, overflow, gone })` when the folder changes, at most once every 150 ms per watch (the first change
+  after a quiet time at once, the rest coalesced into one call), with no file names: the caller lists the folder again
+  with `listAsync`. `overflow` says something may have been missed (the kernel's queue overflowed, or the folder itself
+  was deleted, moved or unmounted) and `gone` that the watch no longer sees the folder; the kernel's watch is dropped
+  then, so a moved folder isn't followed elsewhere. One inotify fd in lord-server's poll loop (`server/src/fswatch.c`),
+  one non-recursive watch per folder (`IN_ONLYDIR | IN_DONT_FOLLOW | IN_EXCL_UNLINK`), two watches of one folder share
+  the kernel's watch. The folder is resolved like a read (never `/proc`, `/sys`, `/dev`, `/run`), must be a folder
+  (`fs.notFolder`), and is refused on a cloud, network or other FUSE mount, from the mount table and the file system's
+  magic number (`fs.watchRemote`: inotify doesn't see the server's changes); a folder swapped between the check and the
+  watch is refused. At most 16 per session (`fs.tooManyWatches`); every watch ends with the theme's context. Isolated
+  apps don't get it: the broker has no operation for it and their `lord.fs.watch` throws `sys.unsupported`.
+  `lord.fs.stat` gains `protected`: the path is, or lies in, a folder `lord.fs` never writes (`fsops_protected`), links
+  followed, so the desktop icons (when they come) show nothing for a Desktop folder that points at `~/.config/autostart`. `sdk/fs.js` gains
+  `watch(path, fn)` (returns a stop function) and `useWatch(path, fn)`. Tests: `build/fswatch-test` (create, delete,
+  renames within, into and out of the folder, attributes, a 200-file burst as one call, the 150 ms coalescing and the
+  poll timeout, non-recursive, a queue overflow telling every watch, a folder deleted or moved and replaced by a link,
+  the 16-watch limit, shared watches, `/proc`, a file, a link to a file, a missing path, FUSE and CIFS mounts, clearing),
+  a broker case and `tests/fs_watch_sdk_test.mjs`. 3 new error strings in all 35 languages.
+- **"Copy details" when an app stops at its own window.** The notice "<app> ran into a problem" now shows the error and
+  has a button that copies a short report for a GitHub issue: the app, the LordOS version, the error, the first lines of
+  its stack and React's component stack. Home folder paths are shortened to `~`, so the report carries no user name.
+  `sdk/crashreport.js`, tested by `server/tests/crashreport_test.mjs`; the three new texts are in every language.
+
+- **An X11 window that asked for fullscreen before its first frame stayed at its own size** (found by the toolkit
+  audit, docs/TOOLKIT-AUDIT.md). The window manager wrote `_NET_WM_STATE_FULLSCREEN` but never resized the window:
+  `enter_fullscreen()` (server/src/wl/wl.c) set the display's size in `conf_w`/`conf_h`, the first commit then mapped
+  the surface and overwrote them with the window's own size, and the next `x_configure()` sent that size to X while the
+  window stayed presented fullscreen (`wl_paint()` skips the fullscreen surface, so nothing corrected it). The theme
+  wasn't told either: `fullscreen` was emitted only for a mapped surface and the map event didn't carry the state. Now
+  a window whose first frame comes while it is fullscreen keeps the display's size (`map_fullscreen()`: a configure is
+  sent again if that frame is another size), the theme gets the window at its normal size, the one it comes back to
+  (an X window's own size when it was attached, kept in `own_w`/`own_h` because nothing had configured it yet), with
+  `"fullscreen": true` in the map event and a `fullscreen` event right after it, and leaving fullscreen gives it that
+  size back. A commit of another size while a window is fullscreen is no longer taken for a resize of its own
+  (`geometry`) and no longer overwrites the fullscreen size; that covers an `xdg_toplevel.set_fullscreen` sent before
+  the first commit too. After a live theme switch a fullscreen window is announced as fullscreen again
+  (`wl_remap_all`).
+- **Classic and Workspaces shrank Linux windows by their menu strip's 26 px.** Both give every Linux window
+  a menu strip (its Edit menu with Speech, `sdk/voice.js` `useMenusWithSpeech`, on by default), but `sdk/wayland.js`
+  sized the frame with `windowChrome().h` only, never `.menu`: on map, on the app's own resize and for a window the app
+  restored. So the app got 26 px less than it asked for, every fullscreen exit took 26 px more (400, 374, 348 on the
+  X11 harness) and window memory kept the smaller size. The frame is now the content plus the borders, the title bar
+  and, when the window shows a strip, the strip: `chromeInset(chrome, csd, strip)` in `sdk/shellxmodel.js`, with
+  `strip` from the new `menusWithSpeech(wid, menus, win)` in `sdk/voice.js` (what `useMenusWithSpeech` shows, read
+  once), on map, on `geometry`, for a restored window and for a window following a drag (xdg-toplevel-drag). Celeste,
+  which draws the same strip, now declares it in its chrome (`menu: MENU_H`), and the on-screen keyboard counts a
+  Linux window's strip when it places itself under the caret (`sdk/osk.js`). Places window memory already saved
+  smaller are kept as they are: a saved frame is the outer frame and can't be told apart from a size the person chose,
+  so no per-user migration; with the fix they no longer shrink.
+- The desktop froze for a moment after every window move and every copy on computers with a spinning hard disk
+  (#250: an HP ProBook 440 G3 with a Core i3-6100U and a SATA HDD logged 80–650 ms in `call settings.save` and
+  56–360 ms in `call clipboard.saveStore`, the window drag dropping to 13–18 FPS). Both calls wrote their file on
+  lord-server's only thread: a new file renamed over `settings.json` (on ext4 the rename of a replaced file waits for the
+  journal, `auto_da_alloc`) and, for the clipboard's `history.json` and `snippets.json`, an `fsync`. A new worker,
+  `server/src/bgsave.c`, now writes them: the call copies the text and returns, one file is written at a time, a save
+  that comes while an older one of the same file is still queued replaces it (each is the whole file, so the file never
+  goes back to older content), and the result is still a whole new file renamed over the old one (the clipboard's still
+  0600 from a `mkstemp` name and synced). `lord.settings.load`, a durable `lord.settings.save` (session restore's
+  marker, still written and synced before it returns), a theme switch and the end of the session wait for what is
+  queued first. A write that fails on the worker is logged (`lord-server: … not saved: …`); `saveStore` still throws for
+  a bad name, size or folder. With every slot taken, or without a thread, a save is written on the caller's thread as
+  before. No new permission: the paths are lord-server's own, never one JS names.
+
+### Tests
+- `build/x11-conformance-client wm` (tools/wl-conformance.mjs): `fullscreen_before_map`, a window with
+  `_NET_WM_STATE_FULLSCREEN` set before its map is 1280x800 and stays so, `fullscreen_before_map_remove`, out of
+  fullscreen it is 320x240 again, and the driver's `fullscreen_before_map_reaches_theme`, the theme got the window at
+  its own size with `"fullscreen": true` and a `fullscreen` event. The first and the last failed before the fix
+  (320x240; not told). `server/tests/shellx_model_test.mjs`: `chromeInset` with and without a strip, for a window with
+  its own frame and in Flow, the content's size kept over three resizes, and a restored frame with the strip.
+- `build/bgsave-test` (in `make -C server test`): with a test hook standing in for a slow disk, a save returns at once
+  while a write is held, saves made meanwhile collapse into the newest, `bgsave_flush` waits for it, a durable write
+  after a queued one wins, the clipboard's files are 0600 with nothing left behind (also when the write fails), and a
+  ninth file with every slot taken is written on the caller's thread.
+- Brave, Chromium and Vulkan apps no longer close one after another, and refuse to open again until the next login,
+  when lord-server reaches its limit of open files (#251). Each app's GPU buffer (a dmabuf, one file per plane), each
+  explicit-sync wait, each Wayland connection and each helper's socket is an open file of lord-server, and the session
+  started with the usual soft limit of 1024. Past it the kernel silently drops the files apps send: libwayland then
+  disconnected the next app that sent one (`file descriptor expected ... import_timeline`, Brave and MailCraft in the
+  report) and Xwayland's child could not open `/dev/null` (exit 126, "xwm: read failed"), while LordOS's own apps went
+  on. lord-server now raises its own soft limit towards the hard one, at most 65536 (`src/nofile.c`, as other
+  compositors do). The apps, Xwayland and terminal shells it starts get the usual 1024 back (`nofile_restore()`), so
+  programs that use `select()` keep the limit they expect; it is lowered in the child only after the child closed
+  lord-server's files and just before `execve`, because at `fork()` the child still holds all of them: with more than
+  1024 open, every number under 1024 is taken and Xwayland's child could not have opened `/dev/null` (the same exit 126).
+  LordOS's own helpers keep the raised one. No privilege is involved: a process may raise its soft limit up to its hard
+  one. When libwayland reports a missing file, the log now adds how many files are open of how many allowed (at most
+  once every 10 s), so a report shows whether the limit was the cause. New test `build/nofile-test` (in `make test`):
+  at the limit a file sent over a socket arrives without its descriptor, after the raise it arrives; with more than
+  1024 open, a child lowered before its clean-up can't open `/dev/null` and one lowered after it has 1024 and room under
+  it; the limit is never raised by the child's call; the count is right. Checked on a headless `lord-server-test`:
+  lord-server at 65536; with the limit lowered at run time Chromium was disconnected with `create_pool` "file
+  descriptor expected" and Xwayland failed with "xwm: read failed", as in the report.
+- **Screenshots with several displays (GitHub #252)** (`apps/screenshots/index.jsx`, `geometry.js`, `editor.jsx`,
+  `sdk/media.js`). With two external displays and the laptop's lid closed:
+  - Print Screen (❖⇧3) saves a file per display, but the floating thumbnail was a single window on the main display, so
+    the last capture (the other display's) replaced the main one's, and the clipboard kept whichever display lord-server
+    listed first (its outputs are in connector order). The main display is now captured first, so its picture is the one
+    copied, and each display's capture has its own thumbnail in that display's corner.
+  - The markup editor was centred on the whole logical space, so with two displays side by side it sat across both. It,
+    the thumbnail, the timer's countdown, the recording badge and the Other Location… window are now placed inside one
+    display's work area (`workAreaOf`, which leaves out the menu bar and Dock in every theme): the editor on the display
+    the capture was taken of, the others on the main one. The editor opened from Photos or Quick Preview
+    (`media.openMarkup`) goes on the display under the pointer.
+  - The editor's toolbar wraps onto a second row whenever its items don't fit, not only in a small window: in French,
+    Save a Copy and Save ran past the edge of the 1000 px editor.
+  - Tests: `server/tests/screenshots_model_test.mjs` (the reporter's layout, main display listed second; a main display
+    away from the space's origin with a 200 % display above and to the left; every frame inside its display),
+    `screenshots_displays_scene.mjs` (new, in `make test`: the app itself over the whole SDK on both layouts and mirrored
+    displays: Print Screen grabs the main display first and copies its picture, one thumbnail per display inside it, the
+    editor inside the main display with Save to: Markup editor and inside the other display from that display's
+    thumbnail; 16 of its 20 checks fail without the fix) and `screenshots_newcapture_scene.mjs` (the toolbar wraps at
+    1000 px).
+### Added
+- **`lordos-testbench --toolkits [--json] [--only id,...]`** (docs/TOOLKIT-AUDIT.md): an installed command that
+  scores how well the Linux GUI toolkits work on LordOS's compositor, on the person's own machine, without the
+  repository.
+  - **What runs:** nine combinations, one after the other: GTK 3 and GTK 4 (`GDK_BACKEND=wayland` and `x11`),
+    Qt 5 and Qt 6 (`QT_QPA_PLATFORM=wayland` and `xcb`), and a plain X11 window under Xwayland. Each is a small
+    Python 3 harness, now installed in `/usr/lib/lordos/toolkit-audit/` (`gtk3.py`, `gtk4.py`, `qt5.py`,
+    `qt6.py`, `x11.py`).
+  - **No new dependency:** LordOS depends on no toolkit and no binding. A quick import probe runs first, and a
+    toolkit whose bindings aren't already installed (python3-gi with Gtk 3.0/4.0, PyQt5, PyQt6) shows "not
+    installed". Nothing is ever installed. `x11.py` speaks the X11 core protocol itself with Python's standard
+    library: no libX11, python3-xlib or xprop.
+  - **How a harness runs:** as the person, in its own process group, with a clean environment. That environment
+    has the session's display, the backend variable, `WAYLAND_DEBUG=1` and the C locale, and nothing else from the
+    caller (no `LD_PRELOAD`, no `PYTHONPATH`). It also gets `GSETTINGS_BACKEND=keyfile`, as every app lord-server
+    starts does: without it GTK 3 read dconf's defaults and failed the theme check in dark mode. A harness exits by
+    itself within 5 s; at 8 s its whole group is killed. It never runs as root, and only from a folder and file
+    that are no links and that nobody else can write (root's in `/usr/lib/lordos/toolkit-audit`); the import probe's
+    process group is killed before it is reaped.
+  - **What is measured, with no test hooks:**
+    - each harness's own checks: map, size against 600x400, scale, the colour scheme read, the backend really
+      used, decorations, time to the first frame, a menu and a combo list that map, a tooltip, a clipboard round
+      trip, drag and drop, typed text, and fullscreen on and off;
+    - from the `WAYLAND_DEBUG` log, which of the 48 globals in LordOS's protocol table it bound, and at which
+      version. A protocol error is attributed to the global its object came from;
+    - fatal Wayland, EGL, Vulkan and Qt platform-plugin errors in stderr.
+  - **The score:** the same shape as `tools/wl-conformance.mjs`. Map, size, backend, first frame and decorations
+    weigh 2; menu, combo, clipboard and drag and drop weigh 3; the rest weigh 1. On Wayland, each global bound is
+    one more check. Skipped checks aren't counted. A crash, a timeout or a fatal error gives that combination
+    0 %. The global score is the mean of the combinations that ran.
+  - **The output:**
+    - a table with each combination's score and its failed checks, and the recommended variable (e.g.
+      `GDK_BACKEND=x11`) when a toolkit's Wayland run is 20 points or more under its X11 run;
+    - a toolkit x protocol matrix;
+    - `--json`.
+  - **The saved result:** the last one is saved to `~/.cache/lordos/toolkit-audit.json` (0600) for `lordos-issue`
+    and the hardware report.
+  - **Privacy:** results carry only toolkit names and versions, the backend, numbers and check ids. Never the
+    harness's free text, the log, a path or a window title.
+  - **Texts and tests:** the texts are in every language (`toolkitaudit.json`). `build/toolkit-audit-test` covers
+    the scoring, the log and line parsers with hostile output (oversized lines, bad JSON, control characters),
+    and real runs of fake harnesses (fixed JSON, a protocol error, a crash, a hang killed with its child).
+  - **Checked:** against a private headless lord-server, with the GTK typelibs unpacked locally. GTK 3 scored 100 % on both backends and GTK 4 98.0 % on
+    Wayland and 95.8 % on X11 (the theme check, without a session bus). Plain X11 scored 92.5 %: fullscreen
+    didn't return to 600x400. Qt 5 and Qt 6 weren't installed on that machine.
+  - **Checked in a real session** on VM 127 (Flow, dark mode): 97.5 % over all nine combinations. GTK 4 100 %
+    on both backends, GTK 3 95.2 % / 95.8 %, Qt 5 97.2 % / 95.8 %, Qt 6 97.7 % / 96.2 %, plain X11 100 %; no crash,
+    timeout or protocol error. What fails is the dark theme where the toolkit can't follow it (GTK 3 on X11, Qt) and
+    a size LordOS's window memory restored. The scores and the two compositor and shell bugs the runs found are in
+    docs/TOOLKIT-AUDIT.md, "Measured".
+  - **The harnesses, after those runs:** Qt 6 waits for the keyboard to come back to its window before opening the
+    combo list and the tooltip (Qt closes a popup opened in between), as the Qt 5 harness did; the theme check now
+    asks the same of every toolkit, that the scheme it draws with is the portal's (Qt 5 passed by reading the
+    portal itself).
+- **The toolkit audit reaches the hardware report, `lordos-issue` and `tools/wl-conformance.mjs`**
+  (docs/TOOLKIT-AUDIT.md, docs/HARDWARE-REPORT.md "Toolkits").
+  - **System Information → Report → Share on GitHub** has a new box, **Include framework compatibility** (off by
+    default, never remembered). Ticked, it uses the audit saved in the last day, or opens `lordos-testbench
+    --toolkits` in a Terminal window through its own launcher entry (`lordos-toolkit-audit.desktop`, so the app runs
+    no command) and waits for the new result. The report then carries an optional `toolkits` section: combination
+    ids, statuses, versions, scores, the failed and skipped check ids and the protocol counts. No free text, paths
+    or titles: `apps/sysinfo/toolkits.js` builds it from known ids and numbers only, and the schema
+    (`hwreport.schema.json`, `$defs/toolkits`) drops anything outside its lists. The report stays format 1; without
+    the tick the key is absent, exactly as before. The summary that goes into the issue's link gets a `toolkits`
+    row.
+  - **The workflow's checks** (`tools/hwreport`): the schema accepts only the 9 combinations, the 6 statuses, the
+    fatal words, the 14 shared check ids and `global.<interface>` for the 48 globals of the protocol table (a test
+    keeps that list equal to `expected_globals.h`), versions of `[0-9A-Za-z.+~-]`, scores of 0 to 100 and an
+    optional `detail` of at most 80 printable ASCII characters without `/`, which the privacy scan also reads. Two
+    new plausibility flags: `toolkits-date` (from the future) and `toolkit-score` (a score that isn't its
+    points). The issue comment gets a "Toolkits" row.
+  - **Labels:** `toolkit:<combination>-fail` (9 new labels, 42 in all) when a combination crashed or scored under
+    80 %. `ALL_LABELS` and docs/RELEASING.md's loop list them; the 9 must be created before the release.
+  - **The signed snapshot** stays `lordos-hwsnapshot` version 1. lord-server's reader (`hwsnap.c`) now accepts an
+    optional `toolkits` field (per combination and LordOS version: reports, failures, mean score), checked as
+    strictly as the devices; any other extra field is still refused. `tools/hwreport/catalog.mjs` writes it only
+    with `--toolkits`: the readers of 0.8.9.6.1 and older refuse a sixth field, and `lordos-hwdata` reaches them
+    between releases. Tests prove the default snapshot is still the exact shape those readers accept.
+  - **lordos.org/hardware** shows each machine's toolkit scores when its report has them (en, es, pt).
+  - **`lordos-issue`** adds a short summary of the last audit to its "Wayland and X11" section, from the new
+    `lordos-testbench --toolkits --last`: the saved file is read without following links, at most 256 KiB, parsed
+    strictly and printed only when every value is a known id, status, version or number; otherwise one
+    "unreadable" line.
+  - **`tools/wl-conformance.mjs`** runs `build/lordos-testbench --toolkits --json` with this tree's harnesses
+    against its headless lord-server, with a private cache folder, and reports a `toolkits` section with the same
+    scoring (`--no-toolkits` skips it). The 48 globals' scores don't change.
+  - **Packaging:** the harnesses are now installed 0644 (they are run as `python3 -I <file>`, never executed).
+  - **Texts** in every language (8 new `sysinfo.share.*` keys; the launcher entry's name and comment in all 35).
+  - **Tests:** `build/toolkit-audit-test` (`--last` with hand-edited files: another tool, unknown ids, a version
+    with shell characters, a path as a fatal word or check id, a link instead of the file), `build/hwsnap-test`
+    (the optional field and 12 malformed ones; the old 5-field reader against the shipped snapshot), and
+    `tests/hwreport_test.mjs` (the section, a hand-edited audit, the schema, labels, the comment, the snapshot
+    summary, the site's HTML).
+- **The toolkit audit's visible mode: watch the tests happen** (docs/TOOLKIT-AUDIT.md, "Show mode"), asked for by the
+  maintainer, in development (the latest release is 0.8.9.6.1-beta).
+  - **The harnesses' show mode** (`--show`, or `LORDOS_TOOLKIT_AUDIT_SHOW=1`; `gtk3.py`, `gtk4.py`, `qt5.py`,
+    `qt6.py`, `x11.py`). The same checks and the same JSON line, slowed down so a person can follow them: the menu,
+    the combo list and the tooltip stay open about 0.9 s, the text is typed one character at a time (60 to 70 ms
+    apart), the clipboard and drag steps stay on screen, fullscreen is held on and then off. A label on the window
+    names the current step by its check id (`menu`, `clipboard`, ...: a fixed id, never translated; `x11.py` draws
+    it with its own 5x7 bitmap font, no X font). The harness finishes within 15 s (14.6 s budget) instead of 5 s;
+    the hold comes after each decision, so no check's result changes. Before its JSON line a harness in show mode
+    prints one progress line per step and per check: `#lordos-ta step <id>` and `#lordos-ta check <id>
+    pass|fail|skip`.
+  - **`lordos-testbench --toolkits --show`** runs it from a terminal, each check printed as ✓, ✗ or - when it is
+    decided; the harness is killed at **20 s** in show mode (8 s otherwise). The orchestrator passes the fixed word
+    `--show` as the harness's last argument; nothing else changes in how a harness runs (fixed paths, no shell, never
+    as root, the clean environment, its own process group).
+  - **The progress lines are untrusted and parsed strictly** (`tk_progress_parse`/`tk_progress_feed`,
+    `server/src/testbench/toolkits.c`): exactly `#lordos-ta`, one of the two words, one of the 14 shared check ids
+    and, for a check, `pass`, `fail` or `skip`, single spaces, under 96 bytes; anything else (another id, a
+    `global.*` name, upper case, control characters, extra words, a longer line, even one whose end looks right) is
+    ignored whole, never shown. At most 512 lines per run are taken, and only indexes are kept. The final result
+    still comes from the JSON line alone, read and scored as before.
+  - **The Test Bench's Frameworks screen** (`lordos-testbench --frameworks [--only ...]`, or **F** / the new
+    **F: FRAMEWORKS** button on the test card; `server/src/testbench/fwscreen.c`). The nine combinations as a list,
+    each one waiting (a ring), running (highlighted, a spinner and its seconds), done (✓ and its score, ✗ and the
+    reason, or `not-installed`), with its 14 checks ticking ✓, ✗ or - as the harness reports them and the current
+    step's cell blinking. At the end each row shows the final result (exactly the JSON's), the global score sits at
+    the top, and a details box shows what failed: the failed and skipped check ids with the harness's checked detail
+    text, a crash's signal, the globals bound and failed, the recommended variable (`-> GDK_BACKEND=x11`), or the
+    packages a missing toolkit needs. Up/Down or a click picks the row, **R** runs it again, **Esc** goes back to the
+    card. The run is `tk_audit` in a thread of its own with the same folder, `python3`, deadlines and environment as
+    `--toolkits --show`; it refuses to run as root, kills the running harness's group when the window closes or a
+    signal arrives, and saves the result to `~/.cache/lordos/toolkit-audit.json` (0600) as `--toolkits` does. The
+    screen asks for 820x600 so a harness's 600x400 window can open beside it; where either opens is the
+    compositor's choice (a Wayland client can't place its window), so in Flow the harness's window opens over the
+    middle of it. Like the rest of the bench it draws with its own 5x7 font (now with lower case), so it shows only
+    fixed ids, numbers, symbols and a few English words.
+  - **System Information → Report → Share on GitHub → Include framework compatibility → Watch the tests** (off by
+    default): runs the audit again, fresh result or not, in the Test Bench's Frameworks screen instead of a Terminal
+    window, through `lord.apps.launchAction('lordos-testbench', 'frameworks')`: a new desktop action of
+    `lordos-testbench.desktop` (`Exec=/usr/bin/lordos-testbench --frameworks`; no new way to run a program), which the
+    Dock's menu also lists. It waits up to 5 minutes for the new saved result, then includes it as before.
+  - **Texts:** 3 new `sysinfo.share.toolkits.*` keys and the action's name in all 35 languages; `--show` in
+    `toolkitaudit.json`'s usage line.
+  - **Tests:** `build/toolkit-audit-test` parses progress lines (31 hostile or odd ones refused, chunked input, an
+    overlong line whose end looks valid, a flood capped at 512, a 1 MiB line without a newline) and runs nine fake
+    show-mode harnesses through the Frameworks screen to the end, headless: hostile lines among the real ones change
+    no tick, the screen ends exactly as the report (crash, not installed, failed checks, the global score), it is
+    drawn mid-run and at the end (`TK_SHOT_DIR=dir` keeps the pictures), a harness without `--show` refuses, and the
+    abort flag kills a hanging harness's group at once. `tools/toolkit-audit/x11_test.py` runs `x11.py --show`
+    against Xvfb: only well-formed progress lines, one check line per id, slowed down but under 15 s, and the same
+    results as the fast run. Checked against a headless `build/lord-server-test` with Flow: `--toolkits` and
+    `--toolkits --show` gave the same `x11-xwayland` results, and the Frameworks screen ran the whole list beside the
+    X11 harness's window.
 
 ### Documentation
 - The paper (en, es, pt) and `docs/PAPER-VALIDATION.md`: since 0.8.9.6.1 the arm64 `lordos-web` package is built against
@@ -13387,7 +15689,8 @@ we published. See [docs/SIGNING.md](docs/SIGNING.md).
 
 Never published; superseded by 0.8.0-beta.
 
-[Unreleased]: https://github.com/lordbasex/LordOS/compare/v0.8.9.6.1-beta...HEAD
+[Unreleased]: https://github.com/lordbasex/LordOS/compare/v0.8.9.6.2-beta...HEAD
+[0.8.9.6.2-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.9.6.1-beta...v0.8.9.6.2-beta
 [0.8.9.6.1-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.9.6-beta...v0.8.9.6.1-beta
 [0.8.9.6-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.9.5-beta...v0.8.9.6-beta
 [0.8.9.5-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.9.4-beta...v0.8.9.5-beta

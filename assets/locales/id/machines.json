@@ -712,6 +712,7 @@
   "agent.toolsAutoFailed": "Pembaruan otomatis tidak berhasil ({have} → {want}).",
   "agent.toolsUpdateBtn": "Perbarui",
   "agent.st.needsTools": "Perlu alatnya",
+  "agent.st.oldLordos": "Perbarui LordOS di dalamnya",
   "agent.st.needsXclip": "Perlu xclip",
   "agent.toolsInstalled": "Alat LordOS terpasang dan berjalan di mesin; alat ini mulai lagi setiap kali masuk.",
   "agent.timesync": "Atur Jam",
@@ -880,6 +881,8 @@
   "un.how.preseed": "Jawaban dimasukkan ke berkas awal milik penginstal, kata sandi Anda hanya sebagai hash, dan dihapus setelah sistem terpasang.",
   "un.how.autoinstall": "Jawaban disimpan di disk kecil yang dibaca penginstal, kata sandi Anda hanya sebagai hash, dan disk dilepas setelah sistem terpasang.",
   "un.how.kickstart": "Jawaban disimpan di disk kecil yang dibaca penginstal, kata sandi Anda hanya sebagai hash, dan disk dilepas setelah sistem terpasang.",
+  "un.how.kali": "Jawaban dimasukkan ke berkas awal milik penginstal, kata sandi Anda hanya sebagai hash, dan dihapus setelah sistem terpasang.",
+  "un.how.lordos": "Jawaban disimpan di disk kecil yang dibaca penginstal, kata sandi Anda hanya sebagai hash, dan disk dilepas setelah sistem terpasang.",
   "un.image": "Dipasang dari {file}, juga diperiksa terhadap daftar bertanda tangan pembuatnya",
   "un.review": "Tanpa pertanyaan: akun {user} di {host}",
   "un.reviewOff": "Anda menjawab pertanyaan penginstal",
@@ -1100,6 +1103,7 @@
   "apps.menu": "Aplikasi",
   "apps.needsAgent": "Mode aplikasi memerlukan agen mesin yang terhubung",
   "win.appsNeedsTools": "Mode aplikasi memerlukan LordOS atau Windows di mesin, dengan alat LordOS",
+  "win.appsOldLordos": "Mode aplikasi memerlukan LordOS {version} atau lebih baru di dalam mesin. Perbarui LordOS di mesin; alat LordOS saja tidak cukup.",
   "apps.noApps": "Mesin belum mendaftarkan aplikasinya",
   "apps.gone": "Jendela ini ditutup di dalam mesin",
   "apps.dropTitle": "Lepaskan untuk memberikan file ini ke jendela ini di mesin",
@@ -2027,5 +2031,7 @@
   "req.row.answers": "Jawaban instalasi",
   "req.use.answers": "Dibuat oleh Machines sendiri: tidak ada yang perlu dipasang",
   "req.st.download": "Saat membuat",
-  "req.st.builtin": "Bawaan"
+  "req.st.builtin": "Bawaan",
+  "cfg.closeOnStop": "Tutup jendela saat mesin berhenti",
+  "cfg.closeOnStopNote": "Setelah dimatikan atau Matikan. Jika berhenti karena masalah, jendela tetap terbuka untuk menunjukkan apa yang terjadi."
 }

@@ -167,6 +167,7 @@
     "other": "{count} päivitettävää"
   },
   "remove": "Poista",
+  "removeAsk": "Poistetaanko {name}?",
   "rescue.ask": "Mikään tämän tietokoneen tili ei ole järjestelmänvalvoja. Jos tiedät rootin salasanan, voit tehdä tästä tilistä järjestelmänvalvojan. Muutos tulee voimaan vasta tietokoneen uudelleenkäynnistyksen jälkeen.",
   "rescue.button": "Tee minusta järjestelmänvalvoja",
   "rescue.noSudo": "Mikään tämän tietokoneen tili ei ole järjestelmänvalvoja, eikä sudo-pakettia ole asennettu. Suorita rootina apt install sudo ja yritä sitten uudelleen täällä.",
@@ -233,7 +234,7 @@
   },
   "suggest.nvidiaDriver.detail": "Nyt käytössä on nouveau, LordOS:n mukana tuleva vapaa ajuri. Valmistajan ajuri ({packages}) antaa yleensä paremman 3D-suorituskyvyn ja virranhallinnan.",
   "suggest.nvidiaDriver.note.nouveau": "Kunnes asennat sen, vapaa nouveau-ajuri pysyy käytössä; paketin poistaminen palaa siihen.",
-  "suggest.nvidiaDriver.note.older": "Tämä ajuriversio ei tue noin vuotta 2014 vanhempia näytönohjaimia; pidä niissä vapaa ajuri. LordOS-työpöytää ei ole vielä testattu tällä ajurilla.",
+  "suggest.nvidiaDriver.note.older": "Noin vuotta 2014 vanhempia kortteja tämä ajuriversio ei tue; pidä niissä vapaa ajuri. LordOSin työpöytä tällä ajurilla on kokeellinen: yksi yhteisön raportti näyttää sen koostettuna kortilla (GTX 1070 ja ajuri 580); aiemmassa suoritin koosti sen.",
   "suggest.nvidiaDriver.note.secureBoot": "Ajuri käännetään ytimellesi tällä tietokoneella (DKMS) ja uudelleen jokaisen ydinpäivityksen jälkeen. Kun Secure Boot on päällä, sinun on rekisteröitävä sen allekirjoitusavain seuraavalla uudelleenkäynnistyksellä, muuten ajuri ei lataudu.",
   "suggest.nvidiaDriver.title": "Suljettu näytönohjaimen ajuri",
   "suggest.nvidiaDriver.unavailable": "Valmistajan ajuri tarvitsee Debianin contrib- ja non-free-osat, eivätkä molemmat ole käytössä tämän tietokoneen pakettilähteissä. Vapaa ajuri, nouveau, toimii edelleen.",

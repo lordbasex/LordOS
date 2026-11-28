@@ -712,6 +712,7 @@
   "agent.toolsAutoFailed": "L'aggiornamento automatico non ha funzionato ({have} → {want}).",
   "agent.toolsUpdateBtn": "Aggiorna",
   "agent.st.needsTools": "Servono gli strumenti",
+  "agent.st.oldLordos": "Aggiorna LordOS al suo interno",
   "agent.st.needsXclip": "Serve xclip",
   "agent.toolsInstalled": "Gli strumenti di LordOS sono installati e in esecuzione nella macchina; ripartono a ogni accesso.",
   "agent.timesync": "Regola l’ora",
@@ -880,6 +881,8 @@
   "un.how.preseed": "Le risposte vanno nei file di avvio dell’installer, la tua password solo come hash, e vengono eliminate una volta installato il sistema.",
   "un.how.autoinstall": "Le risposte vanno su un piccolo disco che l’installer legge, la tua password solo come hash, e il disco viene tolto una volta installato il sistema.",
   "un.how.kickstart": "Le risposte vanno su un piccolo disco che l’installer legge, la tua password solo come hash, e il disco viene tolto una volta installato il sistema.",
+  "un.how.kali": "Le risposte vanno nei file di avvio dell’installer, la tua password solo come hash, e vengono eliminate una volta installato il sistema.",
+  "un.how.lordos": "Le risposte vanno su un piccolo disco che l’installer legge, la tua password solo come hash, e il disco viene tolto una volta installato il sistema.",
   "un.image": "Si installa da {file}, verificata anche con l’elenco firmato di chi la produce",
   "un.review": "Senza domande: account {user} su {host}",
   "un.reviewOff": "Rispondi tu alle domande dell’installer",
@@ -1100,6 +1103,7 @@
   "apps.menu": "Applicazioni",
   "apps.needsAgent": "La modalità app richiede l'agente della macchina, connesso",
   "win.appsNeedsTools": "La modalità app richiede LordOS o Windows nella macchina, con gli strumenti di LordOS",
+  "win.appsOldLordos": "La modalità app richiede LordOS {version} o successivo nella macchina. Aggiorna LordOS nella macchina; gli strumenti di LordOS da soli non bastano.",
   "apps.noApps": "La macchina non ha ancora elencato le sue app",
   "apps.gone": "Questa finestra è stata chiusa nella macchina",
   "apps.dropTitle": "Rilascia per dare questi file a questa finestra della macchina",
@@ -2027,5 +2031,7 @@
   "req.row.answers": "Risposte di installazione",
   "req.use.answers": "Create da Machines: niente da installare",
   "req.st.download": "Alla creazione",
-  "req.st.builtin": "Incluso"
+  "req.st.builtin": "Incluso",
+  "cfg.closeOnStop": "Chiudi la finestra quando la macchina si ferma",
+  "cfg.closeOnStopNote": "Dopo uno spegnimento o Spegni. Se si ferma per un problema, la finestra resta aperta per mostrare cosa è successo."
 }

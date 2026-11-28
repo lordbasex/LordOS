@@ -79,6 +79,72 @@ static int op_takes_files(const char *op) {
     return !strcmp(op, "send") || !strcmp(op, "draft") || !strcmp(op, "contact-save") || !strcmp(op, "contact-import") || !strcmp(op, "ev-import");
 }
 
+/* ---- Hands: what of the accounts file an AI agent's input may change (security scan 0.8.9.6.2, F3) ----
+ * A click on Mail's certificate Trust (or Add Account, Edit Details, Remove) is the person's decision: an agent's input
+ * that trusts an attacker's certificate hands the mail password to whoever sits in the middle. While the agent owns the
+ * input, "save" goes only when it changes the display fields below (fail closed: any other change is refused). */
+static const char *const CFG_TOP_OK[] = { "notify", "mailPaused", "davPaused" };
+static const char *const CFG_ACCT_OK[] = { "name", "fullName", "signature", "color", "collapsed", "folded", "sentSaved" };
+static int in_list(const char *k, const char *const *l, size_t n) {
+    for (size_t i = 0; i < n; i++) if (!strcmp(k, l[i])) return 1;
+    return 0;
+}
+static int jv_equal(const JVal *a, const JVal *b, int depth) {
+    if (!a || !b) return a == b;
+    if (a->type != b->type || depth > 40) return 0;
+    switch (a->type) {
+    case J_NULL: return 1;
+    case J_BOOL: case J_NUM: return a->num == b->num;
+    case J_STR: return a->len == b->len && !memcmp(a->str, b->str, a->len);
+    case J_ARR: {
+        if (a->len != b->len) return 0;
+        for (const JVal *x = a->kid, *y = b->kid; x || y; x = x->next, y = y->next) if (!x || !y || !jv_equal(x, y, depth + 1)) return 0;
+        return 1;
+    }
+    case J_OBJ:
+        if (a->len != b->len) return 0;
+        for (const JVal *x = a->kid; x; x = x->next) if (!jv_equal(x, json_get(b, x->key), depth + 1)) return 0;
+        return 1;
+    }
+    return 0;
+}
+/* every key of a or b not in ok[] has the same value in both */
+static int same_but(const JVal *a, const JVal *b, const char *const *ok, size_t n, const char *skip) {
+    for (int pass = 0; pass < 2; pass++)
+        for (const JVal *x = (pass ? b : a)->kid; x; x = x->next) {
+            if ((skip && !strcmp(x->key, skip)) || in_list(x->key, ok, n)) continue;
+            if (!jv_equal(json_get(a, x->key), json_get(b, x->key), 0)) return 0;
+        }
+    return 1;
+}
+static const JVal *acct_by_id(const JVal *arr, const char *id) {
+    for (const JVal *a = arr ? arr->kid : NULL; a; a = a->next) { const char *s = json_str(a, "id"); if (s && !strcmp(s, id)) return a; }
+    return NULL;
+}
+int brokermail_cfg_guarded(const char *old, size_t ol, const char *nw, size_t nl) {
+    static const char empty[] = "{\"accounts\":[]}";
+    if (!old || !ol) { old = empty; ol = sizeof empty - 1; }
+    JDoc o, n;
+    if (!nw || json_parse(nw, nl, &n, NULL, 0)) return 1;
+    if (json_parse(old, ol, &o, NULL, 0)) { json_free(&n); return 1; }
+    int guarded = 1;
+    const JVal *oa = json_get(o.root, "accounts"), *na = json_get(n.root, "accounts");
+    if (o.root->type != J_OBJ || n.root->type != J_OBJ || (oa && oa->type != J_ARR) || (na && na->type != J_ARR)) goto out;
+    if (!same_but(o.root, n.root, CFG_TOP_OK, sizeof CFG_TOP_OK / sizeof CFG_TOP_OK[0], "accounts")) goto out;
+    if ((oa ? oa->len : 0) != (na ? na->len : 0)) goto out;              /* an account added or removed */
+    for (const JVal *a = na ? na->kid : NULL; a; a = a->next) {
+        const char *id = a->type == J_OBJ ? json_str(a, "id") : NULL;
+        const JVal *was = id ? acct_by_id(oa, id) : NULL;
+        if (!was || was->type != J_OBJ || acct_by_id(na, id) != a) goto out;   /* new, or an id twice */
+        if (!same_but(was, a, CFG_ACCT_OK, sizeof CFG_ACCT_OK / sizeof CFG_ACCT_OK[0], NULL)) goto out;
+    }
+    guarded = 0;
+out:
+    json_free(&o);
+    json_free(&n);
+    return guarded;
+}
+
 static void reply(int fd, uint32_t reqid, int st, const char *s) { brokersrv_reply(fd, reqid, st, s, s ? (uint32_t)strlen(s) : 0, -1); }
 static void reply_code(int fd, uint32_t reqid, const char *code) { reply(fd, reqid, BST_ERROR, code); }
 
@@ -223,6 +289,22 @@ void brokermail_handle(int conn, int fd, uint32_t reqid, const char *app, char *
         return;
     }
     if (!strcmp(verb, "save")) {
+        /* Hands: an agent's input never trusts a certificate, adds, removes or re-points an account (F3) */
+        if (brokersrv_hands_owns()) {
+            size_t n = 0;
+            int f = open(mail_config_path(), O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+            char *b = f >= 0 ? read_all(f, MAIL_CONFIG_MAX, &n) : NULL;
+            if (f >= 0) close(f);
+            int g = (f >= 0 && !b) || brokermail_cfg_guarded(b, n, rest, rl);
+            free(b);
+            if (g) {
+                fprintf(stderr, "broker: %s: an accounts change refused (an AI agent's input, Hands)\n", app);
+                char line[96];
+                lerr_set(line, sizeof line, "hands.refused", NULL);
+                reply_code(fd, reqid, line);
+                return;
+            }
+        }
         int r = rl ? mail_save_config(rest, rl) : 1;
         if (!r) { reply(fd, reqid, BST_OK, NULL); return; }
         char line[PATH_MAX + 64];

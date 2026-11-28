@@ -14,6 +14,7 @@
 #include <sys/prctl.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
+#include <sys/sysmacros.h>
 #include <sys/syscall.h>
 #include <unistd.h>
 
@@ -25,13 +26,51 @@
 #endif
 
 /* the engine's arguments: the model through its descriptor, the socket in the runtime folder (the working directory),
- * two threads, a 4096-token context, one request at a time, no web interface, no GPU, no prompt cache in RAM, no
- * network for downloads, no thinking (the answer is a short JSON) */
-const char *const LLMJAIL_ARGV[] = {
-    "llama-server", "-m", "/proc/self/fd/3", "--host", "engine.sock", "-t", "2", "-tb", "2", "--threads-http", "2",
-    "-c", "4096", "-np", "1", "--no-webui", "--no-slots", "-ngl", "0", "-dev", "none", "-cram", "0", "--offline",
-    "--reasoning", "off", "--no-warmup", NULL,
-};
+ * the processor's threads (-t and -tb: the "2" here is replaced by the person's count, llmjail_argv), two HTTP
+ * threads, a 4096-token context, one request at a time, no web interface, no prompt cache in RAM, no network for
+ * downloads, no thinking (the answer is a short JSON); then where it computes: the processor only (no GPU), or the first
+ * Vulkan or CUDA device with the layers that fit in its free memory (-ngl auto: llama.cpp's --fit, on by default, keeps
+ * a 1 GB margin and leaves the rest of the layers on the processor) */
+#define LJ_COMMON "llama-server", "-m", "/proc/self/fd/3", "--host", "engine.sock", "-t", "2", "-tb", "2", "--threads-http", "2", \
+                  "-c", "4096", "-np", "1", "--no-webui", "--no-slots", "-cram", "0", "--offline", "--reasoning", "off", "--no-warmup"
+static const char *const argv_cpu[] = { LJ_COMMON, "-ngl", "0", "-dev", "none", NULL };
+/* -lv 4: the log names the device used and the layers put on it (engine.c reads those two lines) */
+static const char *const argv_vulkan[] = { LJ_COMMON, "-ngl", "auto", "-dev", "Vulkan0", "-lv", "4", NULL };
+static const char *const argv_cuda[] = { LJ_COMMON, "-ngl", "auto", "-dev", "CUDA0", "-lv", "4", NULL };
+const char *const *const LLMJAIL_ARGVS[3] = { argv_cpu, argv_vulkan, argv_cuda };
+
+int llmjail_threads_parse(const char *s, int cpus) {
+    if (!s || !*s || strlen(s) > 3) return -1;
+    int n = 0;
+    for (const char *p = s; *p; p++) {
+        if (*p < '0' || *p > '9') return -1;
+        n = n * 10 + (*p - '0');
+    }
+    if (s[0] == '0' || n < 1 || n > cpus || n > LLMJAIL_THREADS_MAX) return -1;
+    return n;
+}
+
+int llmjail_argv(int backend, int threads, char *buf, size_t bufn, const char **out, size_t max) {
+    if (backend < 0 || backend > LLMJAIL_CUDA || threads < 1 || threads > LLMJAIL_THREADS_MAX || bufn < 4) return -1;
+    snprintf(buf, bufn, "%d", threads);
+    const char *const *a = LLMJAIL_ARGVS[backend];
+    size_t n = 0;
+    for (size_t i = 0; a[i]; i++) {
+        if (n + 1 >= max) return -1;
+        /* the value after -t and -tb (never --threads-http's) */
+        out[n++] = i > 0 && (!strcmp(a[i - 1], "-t") || !strcmp(a[i - 1], "-tb")) ? buf : a[i];
+    }
+    out[n] = NULL;
+    return 0;
+}
+
+int llmjail_backend(const char *word) {
+    if (!word) return -1;
+    if (!strcmp(word, "cpu")) return LLMJAIL_CPU;
+    if (!strcmp(word, "vulkan")) return LLMJAIL_VULKAN;
+    if (!strcmp(word, "cuda")) return LLMJAIL_CUDA;
+    return -1;
+}
 
 /* ---- 1. namespaces ---- */
 
@@ -86,10 +125,52 @@ static int add_path(int rs, const char *path, uint64_t allow, int file) {
     struct stat st;
     /* a file takes only file rights */
     if (file || (!fstat(fd, &st) && !S_ISDIR(st.st_mode)))
-        allow &= LANDLOCK_ACCESS_FS_EXECUTE | LANDLOCK_ACCESS_FS_READ_FILE | LANDLOCK_ACCESS_FS_WRITE_FILE | LANDLOCK_ACCESS_FS_TRUNCATE;
+        allow &= LANDLOCK_ACCESS_FS_EXECUTE | LANDLOCK_ACCESS_FS_READ_FILE | LANDLOCK_ACCESS_FS_WRITE_FILE | LANDLOCK_ACCESS_FS_TRUNCATE |
+                 LANDLOCK_ACCESS_FS_IOCTL_DEV;
     int r = add_fd(rs, fd, allow);
     close(fd);
     return r;
+}
+
+/* (0.8.9.6.2) a GPU device node: a character device, opened read and write with its ioctls (the driver's own
+ * interface: DRM for a render node, NVIDIA's for /dev/nvidia*); refused when the path isn't one (a link to something
+ * else is followed by open and checked here) */
+static void add_dev(int rs, const char *path, unsigned maj) {
+    int fd = open(path, O_PATH | O_CLOEXEC);
+    if (fd < 0) return;
+    struct stat st;
+    if (!fstat(fd, &st) && S_ISCHR(st.st_mode) && (!maj || major(st.st_rdev) == maj))
+        add_fd(rs, fd, LANDLOCK_ACCESS_FS_READ_FILE | LANDLOCK_ACCESS_FS_WRITE_FILE | LANDLOCK_ACCESS_FS_IOCTL_DEV);
+    close(fd);
+}
+
+/* what a GPU backend reads to find its card: the PCI and DRM parts of /sys */
+static void add_gpu_sys(int rs) {
+    const uint64_t RD = LANDLOCK_ACCESS_FS_READ_FILE | LANDLOCK_ACCESS_FS_READ_DIR;
+    static const char *const sys[] = { "/sys/dev/char", "/sys/devices", "/sys/bus/pci", "/sys/class/drm", NULL };
+    for (const char *const *p = sys; *p; p++) add_path(rs, *p, RD, 0);
+}
+
+static void add_gpu(int rs, int backend) {
+    const uint64_t RD = LANDLOCK_ACCESS_FS_READ_FILE | LANDLOCK_ACCESS_FS_READ_DIR;
+    char p[48];
+    if (backend == LLMJAIL_VULKAN) {
+        /* the render nodes only (DRM's major 226, minors 128-191): never /dev/dri/card*, the display lord-server drives.
+         * Listing /dev/dri shows names, it opens nothing; the ICD files are in /usr (readable) or /etc/vulkan */
+        for (int i = 128; i < 192; i++) { snprintf(p, sizeof p, "/dev/dri/renderD%d", i); add_dev(rs, p, 226); }
+        add_path(rs, "/dev/dri", LANDLOCK_ACCESS_FS_READ_DIR, 0);
+        add_path(rs, "/etc/vulkan", RD, 0);
+        add_gpu_sys(rs);
+    } else if (backend == LLMJAIL_CUDA) {
+        /* NVIDIA's compute nodes (major 195, and nvidia-uvm's own, given by the kernel at load: checked as a char
+         * device only); no /dev/nvidia-modeset (the display) */
+        add_dev(rs, "/dev/nvidiactl", 195);
+        for (int i = 0; i < 16; i++) { snprintf(p, sizeof p, "/dev/nvidia%d", i); add_dev(rs, p, 195); }
+        add_dev(rs, "/dev/nvidia-uvm", 0);
+        add_dev(rs, "/dev/nvidia-uvm-tools", 0);
+        add_path(rs, "/proc/driver/nvidia", RD, 0);
+        add_gpu_sys(rs);
+    }
 }
 
 static int landlock(const LlmJailCfg *cfg, int *mask) {
@@ -134,6 +215,9 @@ static int landlock(const LlmJailCfg *cfg, int *mask) {
 #endif
     bad |= add_fd(rs, cfg->model_fd, LANDLOCK_ACCESS_FS_READ_FILE) ? 1 : 0;
     bad |= add_fd(rs, cfg->dir_fd, LANDLOCK_ACCESS_FS_MAKE_SOCK | LANDLOCK_ACCESS_FS_REMOVE_FILE) ? 1 : 0;
+    /* the GPU's devices only for the backend lord-server chose; best effort: without them the engine can't use the
+     * card, fails to start on it, and lord-server starts it again on the processor */
+    add_gpu(rs, cfg->backend);
     if (bad) { close(rs); return -1; }
     if (syscall(SYS_landlock_restrict_self, rs, 0U)) { close(rs); return -1; }
     close(rs);

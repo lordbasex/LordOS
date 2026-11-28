@@ -18,7 +18,7 @@ O gerenciador de arquivos.
 - **Abas** (❖T) e **novas janelas** (❖N).
 - **Visualização rápida:** Espaço mostra a imagem, o texto, o PDF ou o vídeo sem abrir; as setas
   passam para o próximo.
-- **Obter informações** (❖I): tamanho, local, datas, permissões e “Abrir com”.
+- **Propriedades** (❖I): tamanho, local, datas, permissões e “Abrir com”.
 
 ## Trabalhar com arquivos
 

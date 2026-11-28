@@ -1,5 +1,5 @@
 // model/launches.js — where the windows of an app launched from a display go (plain functions, tested with node:
-// server/tests/workspaces_model_test.mjs). Lord Workspaces' "+ Add window", a display's quick launch ("most used on this
+// server/tests/workspaces_model_test.mjs). Workspaces' "+ Add window", a display's quick launch ("most used on this
 // screen"), its pinned apps and its usual apps each launch on one display of one activity; the app's windows must land
 // there, in that activity's layout, wherever the app itself would put them.
 //

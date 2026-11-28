@@ -712,6 +712,7 @@
   "agent.toolsAutoFailed": "자동 업데이트가 되지 않았습니다({have} → {want}).",
   "agent.toolsUpdateBtn": "업데이트",
   "agent.st.needsTools": "도구 필요",
+  "agent.st.oldLordos": "안의 LordOS 업데이트",
   "agent.st.needsXclip": "xclip 필요",
   "agent.toolsInstalled": "LordOS 도구가 머신에 설치되어 실행 중입니다. 로그인할 때마다 다시 시작됩니다.",
   "agent.timesync": "시계 맞추기",
@@ -880,6 +881,8 @@
   "un.how.preseed": "답변은 설치 프로그램의 시작 파일에 들어가고 비밀번호는 해시로만 저장되며, 시스템이 설치되면 삭제됩니다.",
   "un.how.autoinstall": "답변은 설치 프로그램이 읽는 작은 디스크에 들어가고 비밀번호는 해시로만 저장되며, 시스템이 설치되면 디스크가 제거됩니다.",
   "un.how.kickstart": "답변은 설치 프로그램이 읽는 작은 디스크에 들어가고 비밀번호는 해시로만 저장되며, 시스템이 설치되면 디스크가 제거됩니다.",
+  "un.how.kali": "답변은 설치 프로그램의 시작 파일에 들어가고 비밀번호는 해시로만 저장되며, 시스템이 설치되면 삭제됩니다.",
+  "un.how.lordos": "답변은 설치 프로그램이 읽는 작은 디스크에 들어가고 비밀번호는 해시로만 저장되며, 시스템이 설치되면 디스크가 제거됩니다.",
   "un.image": "{file}에서 설치하며, 제작사의 서명된 목록과도 대조합니다",
   "un.review": "질문 없이: {host}의 {user} 계정",
   "un.reviewOff": "설치 프로그램의 질문에 직접 답합니다",
@@ -1100,6 +1103,7 @@
   "apps.menu": "응용 프로그램",
   "apps.needsAgent": "앱 모드에는 연결된 머신 에이전트가 필요합니다",
   "win.appsNeedsTools": "앱 모드에는 LordOS 도구가 설치된 LordOS 또는 Windows가 머신에 필요합니다",
+  "win.appsOldLordos": "앱 모드에는 머신 안에 LordOS {version} 이상이 필요합니다. 머신 안의 LordOS를 업데이트하세요. LordOS 도구만으로는 안 됩니다.",
   "apps.noApps": "머신이 아직 앱 목록을 보내지 않았습니다",
   "apps.gone": "이 창은 머신에서 닫혔습니다",
   "apps.dropTitle": "놓아서 이 파일을 머신의 이 창에 전달",
@@ -2027,5 +2031,7 @@
   "req.row.answers": "설치 응답",
   "req.use.answers": "Machines가 직접 만듭니다. 설치할 것이 없습니다",
   "req.st.download": "만들 때",
-  "req.st.builtin": "내장"
+  "req.st.builtin": "내장",
+  "cfg.closeOnStop": "머신이 멈추면 창 닫기",
+  "cfg.closeOnStopNote": "종료하거나 전원 끄기 후. 문제로 멈추면 무슨 일이 있었는지 보여 주도록 창이 열린 채로 있습니다."
 }

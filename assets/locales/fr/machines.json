@@ -712,6 +712,7 @@
   "agent.toolsAutoFailed": "La mise à jour automatique n'a pas fonctionné ({have} → {want}).",
   "agent.toolsUpdateBtn": "Mettre à jour",
   "agent.st.needsTools": "Nécessite les outils",
+  "agent.st.oldLordos": "Mettez à jour LordOS dedans",
   "agent.st.needsXclip": "Nécessite xclip",
   "agent.toolsInstalled": "Les outils LordOS sont installés et fonctionnent dans la machine ; ils redémarrent à chaque ouverture de session.",
   "agent.timesync": "Remettre l’heure",
@@ -880,6 +881,8 @@
   "un.how.preseed": "Les réponses vont dans les fichiers de démarrage de l’installateur, votre mot de passe seulement sous forme d’empreinte, et elles sont supprimées une fois le système installé.",
   "un.how.autoinstall": "Les réponses vont sur un petit disque que lit l’installateur, votre mot de passe seulement sous forme d’empreinte, et le disque est retiré une fois le système installé.",
   "un.how.kickstart": "Les réponses vont sur un petit disque que lit l’installateur, votre mot de passe seulement sous forme d’empreinte, et le disque est retiré une fois le système installé.",
+  "un.how.kali": "Les réponses vont dans les fichiers de démarrage de l’installateur, votre mot de passe seulement sous forme d’empreinte, et elles sont supprimées une fois le système installé.",
+  "un.how.lordos": "Les réponses vont sur un petit disque que lit l’installateur, votre mot de passe seulement sous forme d’empreinte, et le disque est retiré une fois le système installé.",
   "un.image": "S’installe depuis {file}, vérifiée aussi avec la liste signée de son éditeur",
   "un.review": "Sans questions : compte {user} sur {host}",
   "un.reviewOff": "Vous répondez aux questions de l’installateur",
@@ -1100,6 +1103,7 @@
   "apps.menu": "Applications",
   "apps.needsAgent": "Le mode applications nécessite l'agent de la machine, connecté",
   "win.appsNeedsTools": "Le mode applications nécessite LordOS ou Windows dans la machine, avec ses outils LordOS",
+  "win.appsOldLordos": "Le mode applications nécessite LordOS {version} ou plus récent dans la machine. Mettez à jour LordOS dans la machine ; les outils LordOS seuls ne suffisent pas.",
   "apps.noApps": "La machine n'a pas encore listé ses applications",
   "apps.gone": "Cette fenêtre s'est fermée dans la machine",
   "apps.dropTitle": "Déposez pour donner ces fichiers à cette fenêtre de la machine",
@@ -2027,5 +2031,7 @@
   "req.row.answers": "Réponses d'installation",
   "req.use.answers": "Faites par Machines : rien à installer",
   "req.st.download": "À la création",
-  "req.st.builtin": "Intégré"
+  "req.st.builtin": "Intégré",
+  "cfg.closeOnStop": "Fermer la fenêtre quand la machine s’arrête",
+  "cfg.closeOnStopNote": "Après un arrêt ou Éteindre. Si elle s’arrête à cause d’un problème, la fenêtre reste ouverte pour montrer ce qui s’est passé."
 }

@@ -92,13 +92,14 @@ export function notify({ app = '', title = '', body = '', actions = [], defaultA
   const n = { id, app, label: String(label), Icon: typeof icon === 'function' ? icon : null, title: String(title), body: String(body), actions: Array.isArray(actions) ? actions.slice(0, 3) : [],
     defaultAction: defaultAction && typeof defaultAction.run === 'function' ? defaultAction : null,
     sticky: !!sticky || ap.style === 'alert', time: Date.now(), onClose };
-  notifyHistory.set((l) => [{ id, app: n.app, label: n.label, title: n.title, body: n.body, time: n.time, actions: n.actions }, ...l].slice(0, HISTORY));
+  notifyHistory.set((l) => [{ id, app: n.app, label: n.label, Icon: n.Icon, title: n.title, body: n.body, time: n.time, actions: n.actions }, ...l].slice(0, HISTORY));
   // Do Not Disturb or "no banner": kept in the history only, without a sound
   if (dndActive() || ap.style === 'none') return id;
   notifications.set((l) => [n, ...l].slice(0, MAX_SHOWN));
   const tone = toneOf(ap.sound);
   if (withSound && tone) sound.play(tone);
-  if (!n.sticky) timers.set(id, setTimeout(() => dismissNotification(id), Math.max(1500, timeout)));
+  // its time is up: the banner goes, the notification stays in the centre with its buttons ('expired', not 'closed')
+  if (!n.sticky) timers.set(id, setTimeout(() => dismissNotification(id, 'expired'), Math.max(1500, timeout)));
   return id;
 }
 
@@ -148,11 +149,12 @@ function Banner({ n, th }) {
       onClick: (e) => { e.stopPropagation(); dismissNotification(n.id); },
       style: { width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: hover ? th.control : 'transparent' },
     }, h(Text, { style: { fontSize: 11, color: th.textDim } }, '×'))),
-  n.actions.length ? h(View, { style: { flexDirection: 'row', gap: 8, justifyContent: 'flex-end' } },
+  // three buttons (Sentinela's) don't fit one row of the banner: they wrap whole instead of cutting a label ("It's…")
+  n.actions.length ? h(View, { style: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'flex-end' } },
     ...n.actions.map((a, i) => h(View, {
       key: a.id || i, onClick: (e) => { e.stopPropagation(); runAction(n, a); },
-      style: { height: 26, paddingHorizontal: 12, borderRadius: 7, justifyContent: 'center', backgroundColor: a.primary ? th.accent : th.control },
-    }, h(Text, { style: { fontSize: 12, fontWeight: 600, color: a.primary ? '#fff' : th.text } }, a.label)))) : null);
+      style: { height: 26, flexShrink: 0, paddingHorizontal: 12, borderRadius: 7, justifyContent: 'center', backgroundColor: a.primary ? th.accent : th.control },
+    }, h(Text, { style: { fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap', color: a.primary ? '#fff' : th.text } }, a.label)))) : null);
 }
 
 export function NotificationBanner() {

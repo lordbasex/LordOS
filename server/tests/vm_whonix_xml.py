@@ -126,6 +126,10 @@ if user:
 else:
     (ok if not pm else bad)("no passt for the workstation (its only card is the link)")
 (ok if [i for i in ifs if i.get("type") == "udp"] and "hubid=" in q and "lnk0" in q else bad)("interface udp 127.0.0.1 → the private link's card (a socketpair, never UDP on loopback: 19.3)")
+# BUG-N (QA 0.8.9.6.2): the link's hub has a port with no peer besides the card's, so a member started before the other
+# never sends into a hub that can't receive (QEMU would queue that frame and stop the card's transmit queue for good)
+hubs = {m.group(1): m.group(2) for m in re.finditer(r"hubport,id=(lnk0|lnkz),hubid=(\d+)(,|$| )", q)}
+(ok if "lnk0" in hubs and hubs.get("lnkz") == hubs["lnk0"] and not re.search(r"hubport,id=lnkz,[^ ]*netdev=", q) else bad)(f"the link's hub has a peerless port (lnkz) beside the card's: {hubs}")
 # deliberate differences: no agent channel, no SPICE, no serial for the guest's console beyond lord-vm's own
 (ok if not has_dev("virtio-serial-pci") and "spicevmc" not in q and "-spice" not in args else bad)("virtio-serial + spicevmc channel → none (19.5: no host-to-guest channel)")
 snd = root.find("devices/sound")

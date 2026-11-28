@@ -4,9 +4,9 @@ import Reconciler from 'react-reconciler';
 import { ConcurrentRoot, DefaultEventPriority, NoEventPriority } from 'react-reconciler/constants';
 import { createContext, useEffect, useState } from 'react';
 import { flatten, normalize, applyStyle } from './style.js';
-import { register, unregister, ops, wrapTick, currentPriority, addListener, setKeyFilter, setKeyFocus, setModGrab } from './events.js';
+import { register, unregister, ops, wrapTick, currentPriority, addListener, setKeyFilter, setKeyFocus, setModGrab, instanceOf } from './events.js';
 
-export { addListener, setKeyFilter, setKeyFocus, setModGrab };
+export { addListener, setKeyFilter, setKeyFocus, setModGrab, instanceOf };
 export { setLayout, getLayout, layouts, modifiers, capsLock } from './keymap.js';
 export const View = 'view';
 export const Text = 'text';
@@ -119,6 +119,8 @@ function applyProps(inst, prev, next) {
   if (next.wave && JSON.stringify(prev.wave) !== JSON.stringify(next.wave)) lord.setProp(inst.id, 'wave', next.wave);
   // protected: the node (and what's inside) comes out black in screenshots, recordings and remote desktop
   if (!!prev.protected !== !!next.protected) lord.setProp(inst.id, 'protected', !!next.protected);
+  // handsDeny: an AI agent never reads, clicks or sees it (Settings → AI → Hands, the theme-trust sheet; docs/HANDS.md)
+  if (!!prev.handsDeny !== !!next.handsDeny) lord.setProp(inst.id, 'handsDeny', !!next.handsDeny);
   // <Image pixels={{ width, height, data }} />: RGBA canvas (a new object for each frame)
   if (prev.pixels !== next.pixels && next.pixels) lord.setProp(inst.id, 'pixels', next.pixels);
 }
@@ -152,6 +154,17 @@ const treeLinks = () => ({ host: null, first: null, last: null, prev: null, next
 // Priority of the update in progress (React 19 sets it and queries it here).
 let updatePriority = NoEventPriority;
 
+// ---- community themes (sdk/themeapi.js, docs/THEMES-GUIDE.md "Community themes") ----
+// THEME_OWNED, as the value of the prop lordThemeOwned, marks the props of a node a community theme's View, Text or Image made: lord-server then lets the
+// theme restyle that node, and no other (lord.themeOwn, server/src/ui/js_theme.c). The host guard is called before
+// every host node is made, with React's fiber: the facade refuses a node the theme's own function rendered itself.
+// Neither exists for LordOS's own themes.
+export const THEME_OWNED = Symbol('lordos.themeOwned');
+let hostGuard = null;
+export function setHostGuard(fn) { if (!hostGuard) hostGuard = fn; }
+let rootError = null;
+export function setRootErrorHandler(fn) { if (!rootError) rootError = fn; }
+
 // react-reconciler 0.34 host interface (React 19), mutation mode like React Native.
 const host = {
   rendererPackageName: '@lordos/runtime',
@@ -164,10 +177,15 @@ const host = {
   scheduleTimeout: (fn, ms) => setTimeout(fn, ms),
   cancelTimeout: (id) => clearTimeout(id),
   supportsMicrotasks: true,
-  scheduleMicrotask: (fn) => queueMicrotask(fn),
+  // under a community theme, React's render after a state update the theme made is queued untainted (lord.hostMicrotask,
+  // server/src/ui/js_theme.c): it is LordOS's code, and a tainted job would have its own nodes' commit refused
+  // (true only when it queued it: a test's stand-in lord answers nothing, and the render is queued as usual)
+  scheduleMicrotask: (fn) => { if (!(typeof lord.hostMicrotask === 'function' && lord.hostMicrotask(fn) === true)) queueMicrotask(fn); },
 
-  createInstance(type, props) {
+  createInstance(type, props, _root, _ctx, fiber) {
+    if (hostGuard) hostGuard(type, props, fiber);
     const inst = { id: lord.createNode(type), type, props, style: {}, parent: null, ...treeLinks() };
+    if (hostGuard && props.lordThemeOwned === THEME_OWNED) lord.themeOwn(inst.id);
     register(inst);
     ops.created++;
     ops.last = inst;
@@ -175,7 +193,7 @@ const host = {
     return inst;
   },
   createTextInstance(text) {
-    const inst = { id: lord.createNode('raw'), type: 'raw', props: {}, style: {}, parent: null, ...treeLinks() };
+    const inst = { id: lord.createNode('raw'), type: 'raw', props: {}, style: {}, parent: null, text, ...treeLinks() };
     lord.setText(inst.id, text);
     return inst;
   },
@@ -193,13 +211,13 @@ const host = {
   finalizeInitialChildren: () => false,
   // React 19: no prepareUpdate; commitUpdate receives the type and the old and new props
   commitUpdate(inst, _type, prev, next) { applyProps(inst, prev, next); inst.props = next; ops.updated++; ops.total++; ops.last = inst; },
-  commitTextUpdate(inst, _old, text) { lord.setText(inst.id, text); ops.updated++; },
+  commitTextUpdate(inst, _old, text) { inst.text = text; lord.setText(inst.id, text); ops.updated++; },
   resetTextContent() {},
   shouldSetTextContent: () => false,
   hideInstance(inst) { inst.hidden = true; lord.setStyle(inst.id, 'display', 'none'); },
   unhideInstance(inst) { inst.hidden = false; lord.setStyle(inst.id, 'display', inst.style.display ?? 'flex'); },
-  hideTextInstance(inst) { lord.setText(inst.id, ''); },
-  unhideTextInstance(inst, text) { lord.setText(inst.id, text); },
+  hideTextInstance(inst) { inst.hidden = true; lord.setText(inst.id, ''); },
+  unhideTextInstance(inst, text) { inst.hidden = false; inst.text = text; lord.setText(inst.id, text); },
 
   getRootHostContext: () => ({}),
   getChildHostContext: (ctx) => ctx,
@@ -305,6 +323,23 @@ export function layerContainer(z) {
   }
   return c;
 }
+// A node tree out of React's sight, straight on the root at zIndex z (not a layer: no content count, never in
+// hostRoots, so Hands' reader never sees it): Hands' agent cursor (sdk/handscursor.js), which lord-server moves from C.
+// make(el) builds it: el(type, style, parent) → id. Returns the root's id, 0 before render.
+export function overlayTree(z, style, make) {
+  if (!rootNode) return 0;
+  const el = (type, st, parent) => {
+    const id = lord.createNode(type);
+    applyStyle(id, {}, normalize(st || {}));
+    if (parent) lord.appendChild(parent, id);
+    return id;
+  };
+  const root = el('view', { ...style, position: 'absolute', pointerEvents: 'none', zIndex: z });
+  make(el, root);
+  lord.appendChild(rootNode, root);
+  return root;
+}
+
 // ---- the keyboard focus ring (sdk/focus.js) ----
 // A node of its own, out of React's sight, appended to the focused one: a 2 px line of `color` 1 px outside its box,
 // with its corners rounded to follow the node's own (inside the box of a node that clips what it holds, a ScrollView).
@@ -330,6 +365,15 @@ export function createPortal(children, container, key = null) {
   return reconciler.createPortal(children, container, null, key);
 }
 
+// The host tree as React made it, for Hands' reader (sdk/handsmodel.js, docs/HANDS.md): the theme's root and each layer
+// with its zIndex, back to front. Each container's children are first/next (link above); a text instance keeps its text.
+let rootContainer = null;
+export function hostRoots() {
+  const out = rootContainer ? [{ z: 0, node: rootContainer }] : [];
+  for (const z of [...layerNodes.keys()].sort((a, b) => a - b)) out.push({ z, node: layerNodes.get(z) });
+  return out;
+}
+
 export function render(element) {
   wrapTick();
   const rootId = lord.createNode('view');
@@ -338,7 +382,11 @@ export function render(element) {
   lord.setStyle(rootId, 'height', screen.height);
   lord.setRoot(rootId);
   const container = { id: rootId, isContainer: true, ...treeLinks() };
-  const report = (kind) => (e) => console.error(`react (${kind}):`, e?.message ? `${e.message}\n${e.stack || ''}` : e);
+  rootContainer = container;
+  const report = (kind) => (e) => {
+    console.error(`react (${kind}):`, e?.message ? `${e.message}\n${e.stack || ''}` : e);
+    if (kind === 'error' && rootError) rootError(e);
+  };
   // React 19: uncaught errors, errors caught by a boundary, and recoverable ones, separately
   const root = reconciler.createContainer(container, ConcurrentRoot, null, false, null, 'lord',
     report('error'), report('capturado'), report('recuperable'), null);

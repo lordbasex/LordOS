@@ -98,7 +98,7 @@ for (const lang of locales) {
   const store = JSON.parse(fs.readFileSync(file, 'utf8'));
   const kinds = [...new Set(catalog.apps.map((a) => a.kind))];
   eq(`catalog: every kind has a label in ${lang}`, kinds.filter((k) => !store[`ai.kind.${k}`]), []);
-  const sections = [...new Set(catalog.apps.map((a) => a.section || 'ai'))];
+  const sections = [...new Set(catalog.apps.map((a) => a.section || 'ai'))].filter((s) => s !== 'addon');      // never a page
   eq(`catalog: every section has a page title in ${lang}`, sections.filter((s) => !store[`page.${s}`]), []);
 }
 // (0.8.8.9) a catalog app's Debian categories (its page in Store → Games…), the packages installed with it, and

@@ -1,4 +1,4 @@
-// Search: Lord Workspaces' panel over the desktop (the overlay layer, so a Linux app doesn't keep the keyboard), on the
+// Search: Workspaces' panel over the desktop (the overlay layer, so a Linux app doesn't keep the keyboard), on the
 // display under the pointer. ❖Space, Ctrl+Space or ❖ alone open it; typing starts at the first character; ↑/↓ choose,
 // Enter opens, Esc closes. It is LordOS's own search (sdk/spotlight.js searchEverything: apps, files, Settings, notes,
 // the calculator, Help…) plus two sections this theme registers: Activities and Open windows (index.jsx). With nothing

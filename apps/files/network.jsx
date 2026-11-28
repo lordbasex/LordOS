@@ -153,8 +153,8 @@ export function ConnectSheet({ ask, onClose, onMounted }) {
         ) : (
           <FormFields>
             {ask.share ? <Text style={{ fontSize: typeScale.body, color: t.text, textAlign: 'start' }}>{ask.share}</Text> : null}
-            {needName ? field(tr(nfs ? 'files.net.exportPath' : 'files.net.shareName'), <TextInput value={share} onChange={setShare} autoFocus placeholder={nfs ? '/srv/data' : ''} onSubmit={() => signIn(false)} onCancel={onClose} />) : null}
-            {!nfs && field(tr('files.net.user'), <TextInput value={user} onChange={setUser} autoFocus={!needName} onSubmit={() => signIn(false)} onCancel={onClose} />)}
+            {needName ? field(tr(nfs ? 'files.net.exportPath' : 'files.net.shareName'), <TextInput spellCheck={false} value={share} onChange={setShare} autoFocus placeholder={nfs ? '/srv/data' : ''} onSubmit={() => signIn(false)} onCancel={onClose} />) : null}
+            {!nfs && field(tr('files.net.user'), <TextInput spellCheck={false} value={user} onChange={setUser} autoFocus={!needName} onSubmit={() => signIn(false)} onCancel={onClose} />)}
             {!nfs && field(tr('files.net.password'), (
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.s }}>
                 <View style={{ flex: 1, minWidth: 0 }}><TextInput secure value={password} onChange={setPassword} onSubmit={() => signIn(false)} onCancel={onClose} /></View>
@@ -221,7 +221,7 @@ export function RemoteSheet({ ask, onClose, onMounted, onStore, onTerminal }) {
             onDone={() => { const p = offer.path; setOffer(null); setPassword(''); onMounted(p); }} />
         ) : <>
         <FormFields>
-        {field(tr('files.net.user'), <TextInput value={user} onChange={setUser} autoFocus onSubmit={go} onCancel={onClose} />)}
+        {field(tr('files.net.user'), <TextInput spellCheck={false} value={user} onChange={setUser} autoFocus onSubmit={go} onCancel={onClose} />)}
         {field(tr('files.net.password'), (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.s }}>
             <View style={{ flex: 1, minWidth: 0 }}><TextInput secure value={password} onChange={setPassword} onSubmit={go} onCancel={onClose} /></View>

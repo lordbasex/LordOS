@@ -10,7 +10,7 @@
 // bar's whole height, so the pointer pushed against the top of the display is on it (Fitts's law; #190: the 22 px
 // items, centered in the 28 px bar, left the top 3 px of the display on the bar itself, where a click did nothing).
 import { View, Text, useStore, sharedTicker, barDisplays, activeBarId, pinBar, wm, getApp, session, useMenusWithSpeech, t as tr, appName, formatDate, formatTime, keyboard, useSettings, direction, screen, windowAppName, LordOSGlyph, spotlight, PrivacyIndicators, StatusItems, help, menuClock, appMenuItems, recentItems, storeUpdates, windowMenuItems, menuBarPrefs, addMenuBarKeys, barIndex, barHover, webHelpItems } from '@lordos/sdk';
-import { useState, useRef, useEffect } from 'react';
+import { memo, useState, useRef, useEffect } from 'react';
 import { Menu } from './Menu.jsx';
 
 // Date and time with the region's format (sdk/i18n.js),
@@ -23,10 +23,11 @@ const itemAt = (ref) => { try { const [x, , w] = lord.getLayout(ref.current.id);
 
 // The item is as tall as the bar (alignSelf: stretch), its highlight the 22 px pill inside. onEnter: the pointer came
 // onto it (a menu title switches the open menu there).
-function BarItem({ t, children, onClick, active, anchorRef, onEnter }) {
+// label: its accessible name when it shows a glyph only (Hands' find and read_window; ws170 QA BUG-11)
+function BarItem({ t, children, onClick, active, anchorRef, onEnter, label }) {
   const [hover, setHover] = useState(false);
   return (
-    <View ref={anchorRef} onClick={onClick} onMouseEnter={() => { setHover(true); onEnter?.(); }} onMouseLeave={() => setHover(false)}
+    <View ref={anchorRef} onClick={onClick} accessibilityLabel={label || undefined} onMouseEnter={() => { setHover(true); onEnter?.(); }} onMouseLeave={() => setHover(false)}
       style={{ alignSelf: 'stretch', justifyContent: 'center' }}>
       <View style={{ height: 22, paddingHorizontal: 9, borderRadius: 5, justifyContent: 'center', flexDirection: 'row', alignItems: 'center',
         backgroundColor: active || hover ? t.menuHover : 'transparent' }}>
@@ -148,7 +149,7 @@ export function MenuBar({ t, height, focused, onLaunchpad, onControlCenter, cont
         position: 'absolute', left: area.x, top: area.y, width: area.w, height, flexDirection: 'row', alignItems: 'center',
         paddingHorizontal: 8, backgroundColor: t.menuBg, backdropFilter: `blur(${t.blur}px)`,
       }}>
-        <BarItem t={t} active={open?.name === 'logo'} anchorRef={refs.logo} onClick={() => toggle('logo', refs.logo)} onEnter={() => slide('logo', refs.logo)}>
+        <BarItem t={t} label="LordOS" active={open?.name === 'logo'} anchorRef={refs.logo} onClick={() => toggle('logo', refs.logo)} onEnter={() => slide('logo', refs.logo)}>
           <LordOSGlyph size={16} color={t.menuText} />
         </BarItem>
         <BarItem t={t} active={open?.name === 'app'} anchorRef={refs.app} onClick={() => toggle('app', refs.app)} onEnter={() => slide('app', refs.app)}><Label t={t} bold dim={dim}>{app ? (app.builtin ? windowAppName(wm.get(focused)) : appName(app)) : 'LordOS'}</Label></BarItem>
@@ -170,9 +171,9 @@ export function MenuBar({ t, height, focused, onLaunchpad, onControlCenter, cont
         ) : null}
         <StatusItems color={t.menuText} />
         <PrivacyIndicators />
-        <BarItem t={t} onClick={() => spotlight.toggle(area)}><Label t={t}>⌕</Label></BarItem>
-        <BarItem t={t} active={controlCenter} anchorRef={refs.cc} onClick={() => onControlCenter(itemAt(refs.cc))}><ControlGlyph t={t} /></BarItem>
-        {bar.bell ? <BarItem t={t} active={clockPanel} anchorRef={refs.bell} onClick={() => onClock(itemAt(refs.bell))}><BellGlyph color={t.menuText} dot={unread ? t.accent : null} /></BarItem> : null}
+        <BarItem t={t} label={tr('shell.shortcuts.search')} onClick={() => spotlight.toggle(area)}><Label t={t}>⌕</Label></BarItem>
+        <BarItem t={t} label={tr('shell.shortcuts.quickSettings')} active={controlCenter} anchorRef={refs.cc} onClick={() => onControlCenter(itemAt(refs.cc))}><ControlGlyph t={t} /></BarItem>
+        {bar.bell ? <BarItem t={t} label={tr('shell.shortcuts.notifications')} active={clockPanel} anchorRef={refs.bell} onClick={() => onClock(itemAt(refs.bell))}><BellGlyph color={t.menuText} dot={unread ? t.accent : null} /></BarItem> : null}
         <BarItem t={t} active={clockPanel} anchorRef={refs.clock} onClick={() => onClock(itemAt(refs.clock))}><Label t={t}>{clock}</Label></BarItem>
       </View>
       {cur && <Menu key={open.name} x={open.x} y={area.y + height + 2} items={cur.items} onClose={close} anchor={anchor} width={260} keys={!!open.keys} onStep={step} />}
@@ -184,7 +185,7 @@ export function MenuBar({ t, height, focused, onLaunchpad, onControlCenter, cont
 // screenDisplays(); every: menuBarEveryDisplay(settings); mirror: screen.mirror. control / clock: the display id
 // whose Control Center / clock panel is open. onControlCenter(display, at) and onClock(display, at) open them there.
 // Adding or removing a monitor re-renders the shell (startShell's screen revision): its bar comes and goes with it.
-export function MenuBars({ t, height, displays, every, mirror, focused, focusRect, control, clock, unread, onClock, onControlCenter, onLaunchpad }) {
+function MenuBarsOf({ t, height, displays, every, mirror, focused, focusRect, control, clock, unread, onClock, onControlCenter, onLaunchpad }) {
   const [pin, setPin] = useState(null);       // the dimmed bar the user clicked (sdk/menubarmodel.js pinBar)
   const bars = barDisplays(displays, every, mirror);
   const focus = focused ? { id: focused, rect: focusRect || null } : null;
@@ -196,3 +197,20 @@ export function MenuBars({ t, height, displays, every, mirror, focused, focusRec
       onClock={(at) => onClock(d, at)} onControlCenter={(at) => onControlCenter(d, at)} onLaunchpad={onLaunchpad} />
   ));
 }
+
+// The bars draw again for what they show, never because the desktop around them did (a window's title changing, a
+// timer): handlers count as the same (the shell's only call its state setters), the displays and the focused window's
+// frame by value; focusName (the focused window's app name, the bar's bold item) is compared only to draw again for it.
+const sameRect = (a, b) => a === b || (!!a && !!b && a.x === b.x && a.y === b.y && a.w === b.w && a.h === b.h);
+const sameDisplays = (a, b) => a === b || (Array.isArray(a) && Array.isArray(b) && a.length === b.length
+  && a.every((d, i) => JSON.stringify(d) === JSON.stringify(b[i])));
+export function sameBarProps(a, b) {
+  const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
+  for (const k of keys) {
+    const x = a[k], y = b[k];
+    if (typeof x === 'function' && typeof y === 'function') continue;
+    if (k === 'focusRect' ? !sameRect(x, y) : k === 'displays' ? !sameDisplays(x, y) : !Object.is(x, y)) return false;
+  }
+  return true;
+}
+export const MenuBars = memo(MenuBarsOf, sameBarProps);

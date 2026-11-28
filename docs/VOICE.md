@@ -196,8 +196,11 @@ Every place with text has **Speech** (`sdk/voice.js`, `speechMenu`):
 - **Edit → Speech** (Text Editor, Terminal; Notes in View) and the **right-click** menu (Text Editor, Terminal, Notes):
   *Start Speaking*, *Stop Speaking*, *Save as Audio…* Start Speaking reads the selection, or the whole text when
   nothing is selected (Text Editor, Notes). The right-click menu is the SDK's (`sdk/contextmenu.jsx`, with submenus).
-- **A Linux app** (Firefox, foot…) gets an **Edit** menu with Speech in the menu bar (Lord Classic: in its window's
+- **A Linux app** (Firefox, foot…) gets an **Edit** menu with Speech in the menu bar (Classic: in its window's
   menu strip), as its own menus aren't the desktop's (`useMenusWithSpeech`). It reads the app's **primary selection**.
+- **A web app** (`lord-web`, in development) is such a Linux app: it makes the page's selection the primary selection
+  (never a password field's), so Edit → Speech, ❖Esc and its right-click menu's Speech ▸ read it the same way
+  (`docs/WEBAPPS.md`, "Editing"). With nothing selected there is nothing to read: the page's whole text is not read.
 - **❖Esc** reads what the window in front has selected; pressed again while reading, it stops (`sdk/shortcuts.js`).
 - **The player** (`sdk/voiceplayer.jsx`): a small pill with the voice's wave, ↻ read again, ⏸/▶ pause and go on,
   ■ stop (it stays, to read again), ✕ stop and close. Drag it by its grip anywhere, to any display: the next reading
@@ -279,6 +282,11 @@ comma, in German the em dash too; in French `:` to a comma, and in French and Ge
 sentence, keeping 50 ms.
 
 ## Settings → AI → Voice
+
+(0.8.9.6.2) The Voice page is now the **Voice capability** of the AI store ([AI.md](AI.md)): the store shows one card
+per language (its standard model and own voice: install standard or HD, remove, listen to the recorded sample, try),
+and the capability's page ("‹ Artificial intelligence › Voice") holds everything below, the models and voices as cards
+with a sheet each. Nothing was taken away.
 
 `apps/settings/AI.jsx`: Read aloud, ❖Esc, the player, Live Speech, Process with (Automatic / Processor / Graphics card)
 and Quality (Automatic: HD when installed / Standard / HD), then per language the two models (Download with a progress

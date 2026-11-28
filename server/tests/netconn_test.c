@@ -131,9 +131,20 @@ static void test_connector_start(void) {
     CHECK(WIFEXITED(st) && WEXITSTATUS(st) == 2);                   /* fd 3 isn't a channel */
 }
 
+/* QA 0.8.9.6.2: flatpak (fpakrun.c) shares lordos-net-flathub.scope; 64 MB OOM-killed a runtime pull */
+static void test_scope_limits(void) {
+    CHECK(netconn_scope_mem_max_mb("flathub") == NC_FLATHUB_MEM_MAX_MB);
+    CHECK(NC_FLATHUB_MEM_MAX_MB >= 2048 && NC_FLATHUB_MEM_MAX_MB <= 65536);     /* bounded, and within lord-sessiond's range */
+    CHECK(netconn_scope_mem_max_mb("mail") == NC_MEM_MAX_MB);
+    CHECK(netconn_scope_mem_max_mb("lists") == NC_MEM_MAX_MB);
+    CHECK(netconn_scope_mem_max_mb("nope") == NC_MEM_MAX_MB);
+    CHECK(netconn_scope_mem_max_mb(NULL) == NC_MEM_MAX_MB);
+}
+
 int main(int argc, char **argv) {
     if (argc > 1 && !strcmp(argv[1], "--net-connector")) return netconn_main(argc, argv);
     test_requests();
+    test_scope_limits();
     test_connector_start();
     unsetenv("LORDOS_SESSIOND");
     test_sockets(0);

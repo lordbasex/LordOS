@@ -234,6 +234,7 @@
   "fs.moveRemoveFailed": "Kopierat, men originalet kunde inte tas bort: {errno}",
   "fs.noTrash": "Det finns ingen papperskorg för den platsen",
   "fs.notFile": "Det är inte en fil",
+  "fs.notFolder": "Det är inte en mapp",
   "fs.notInTrash": "Det ligger inte i papperskorgen",
   "fs.notRegular": "Det är inte en vanlig fil (är det en länk?)",
   "fs.openFailed": "Kunde inte öppna filen: {errno}",
@@ -243,11 +244,13 @@
   "fs.systemFolder": "Filer visar inte systemets interna mappar (/proc, /sys, /dev och /run)",
   "fs.tooLarge": "Filen är för stor (max. {max})",
   "fs.tooManyCopies": "För många kopieringar pågår; försök igen när en är klar",
+  "fs.tooManyWatches": "För många mappar bevakas (max {max})",
   "fs.trashBadOrigin": "Den ursprungliga platsen är inte giltig",
   "fs.trashEntryFailed": "Kunde inte skapa posten i papperskorgen",
   "fs.trashOriginGone": "Den ursprungliga mappen finns inte längre",
   "fs.trashOtherDisk": "Den ligger på en annan disk än sin papperskorg",
   "fs.trashRestoreExists": "Det finns redan en fil med det namnet på den ursprungliga platsen",
+  "fs.watchRemote": "Ändringar i moln- och nätverksmappar kan inte följas; mappen listas om i stället",
   "fw.bpfConfig": "kunde inte konfigurera BPF: {errno}",
   "fw.bpfMaps": "kunde inte skapa BPF-mapparna: {errno}",
   "fw.bpfMissing": "programmet {program} saknas",
@@ -963,5 +966,9 @@
   "sentinela.notBlocked": "Det programmet finns inte på blockeringslistan.",
   "sentinela.noAppNetwork": "Den här processen har ingen egen app vars nätverk kan blockeras.",
   "sys.failed": "Något gick fel.",
-  "sys.unsupported": "Den här versionen av LordOS kan inte göra det."
+  "sys.unsupported": "Den här versionen av LordOS kan inte göra det.",
+  "theme.notAllowed": "{call} är inte tillgängligt för gemenskapsteman",
+  "theme.noHost": "Skrivbordsstilens LordOS-del saknas",
+  "hands.refused": "Bara du kan göra detta: aldrig en AI-agents inmatning",
+  "install.diskTooManyParts": "Den här disken har för många partitioner för att installationsprogrammet ska kunna lista dem"
 }

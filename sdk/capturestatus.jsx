@@ -7,10 +7,12 @@
 //     broker), brokerDevices in sdk/privacy.js;
 //   - what Linux and Flatpak apps capture through PipeWire, as lord-server's PipeWire guard sees it (linuxCapture);
 //   - the Linux apps reading LordOS Studio's camera device, which lord-server finds itself (studioUse): "Camera via
-//     LordOS Studio (the real camera) · effects on".
+//     LordOS Studio (the real camera) · effects on";
+//   - what opens a camera itself, which lord-server finds from the kernel (cameraUse): a web app (WebKit's web process
+//     opens the device in its sandbox), a Linux app using V4L2. Shown, with no Turn off.
 //
 // It is a security indicator: there is no setting to hide it, and every theme draws it where the privacy dots were
-// (<PrivacyIndicators />, next to the status items; a Lord Classic taskbar on the side hides its status items but not
+// (<PrivacyIndicators />, next to the status items; a Classic taskbar on the side hides its status items but not
 // this). A share's frames wait for it: lord-server sends none until an indicator is on screen (lord.share.shown,
 // lord.portal.castShown), and the screen-sharing API's share ends if every indicator leaves. When a window is full screen
 // the bars may be under it, so a small copy of the pill stays in the corner of each display (CaptureCorner).
@@ -26,7 +28,7 @@ import { wm, windows, getApp } from './windows.js';
 import { linuxAppFor, flatpakAppFor } from './apps.js';
 import { share, shareHolder } from './share.js';
 import { castRuns, castShown, castStop, shotTaken, castAppName } from './screencast.jsx';
-import { perms, brokerDevices, linuxCapture, studioUse } from './privacy.js';
+import { perms, brokerDevices, linuxCapture, studioUse, cameraUse } from './privacy.js';
 import { closeDevicesOf } from './media.js';
 import { firewall } from './monitor.js';
 import { componentOf } from './netmodel.js';
@@ -54,7 +56,8 @@ export function useCaptureRows() {
   const devices = useStore(brokerDevices);
   const linux = useStore(linuxCapture);
   const studio = useStore(studioUse);
-  return captureRows({ share: holder, casts, shots, devices, linux, studio }, { name: nameOf, enforceable: restrictable });
+  const cameras = useStore(cameraUse);
+  return captureRows({ share: holder, casts, shots, devices, linux, studio, cameras }, { name: nameOf, enforceable: restrictable });
 }
 
 // ---- the handshake: frames only once an indicator is on screen ----
@@ -320,12 +323,16 @@ export function PrivacyIndicators({ height = 22 }) {
 function Handshake() { useShownHandshake(); return null; }
 
 // Full screen: the bars may be under the window, so the pill stays in the top right corner of each display (no clicks:
-// the window's own). Mounted in the notification layer, above full-screen windows.
+// the window's own). Mounted in the notification layer, above full-screen windows. (0.8.9.6.2) With a community theme
+// it is always there while something captures: LordOS draws it above every layer the theme draws in, whatever the
+// theme shows or hides (sdk/themeapi.js, docs/THEMES-GUIDE.md "Community themes").
+let cornerAlways = false;
+export function captureCornerAlways() { cornerAlways = true; }
 export function CaptureCorner() {
   const rows = useCaptureRows();
   const glyph = captureGlyph(rows);
   const full = useStore(windows, (l) => l.some((w) => w.fullscreen && !w.minimized));
-  if (!glyph || !full) return null;
+  if (!glyph || !(full || cornerAlways)) return null;
   const list = screen.displays?.length ? screen.displays : [{ x: 0, y: 0, w: screen.width }];
   return (
     <View style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, pointerEvents: 'none' }} accessibilityLabel={summaryLabel(rows)}>

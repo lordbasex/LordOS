@@ -1,20 +1,22 @@
 // Settings — the window (a 220 px sidebar with a search field, the user card and colored section
-// icons, and the open page under a title bar) plus the appearance, wallpaper, language and region,
+// icons, and the open page under a title bar) plus the appearance, language and region,
 // keyboard, themes and session pages. The other pages are in their own files; all of them are built
-// from ./ui.jsx (docs/DESIGN.md, "Settings").
+// from ./ui.jsx (docs/DESIGN.md, "Settings"); the wallpaper page is ./WallpaperGallery.jsx.
+import { settingsPageDenied } from '../../sdk/handsdeny.js';
 import { BatterySettings } from './Battery.jsx';
 import {
-  View, Text, Image, useTheme, useSettings, shortcutList, shortcutsRev, themes, session, keyboard, admin, languages, setLanguage, useLocale,
-  reloadCatalogs, tOptional, statusText, fs, useStore, SidebarItem, Toggle, Slider, Button, TextInput, ScrollView, SearchField, Hairline, useSystemInfo, useAppWindow, useVisitHistory, useTrackpads,
-  spacing, typeScale, registerDockActions, hasTouchpad, findWallpaper, wallpaperThumb, wallpaperIdFor, wallpaperPatch, slideshowStop, displayWallpaperKey, displayLabel, WALLPAPER_CATEGORIES, GREETER_WALLPAPER, setLoginStill, setLoginImage, addWallpaperImage, removeWallpaperImage, userWallpaperName, Layer,  MOTION_SECTIONS, MOTION_RATES, motionBusy, motionItems, motionThumb, motionDownloads, useCodecs, downloadMotion, removeMotion, setLoginMotion, variantFor, userVideoProblem, media, FilePicker, screenDisplays, errorText, wm, Segmented, osk,
+  View, Text, useTheme, useSettings, shortcutList, shortcutsRev, themes, session, keyboard, admin, languages, setLanguage, useLocale,
+  reloadCatalogs, tOptional, statusText, fs, useStore, SidebarItem, Toggle, Button, TextInput, ScrollView, SearchField, Hairline, useSystemInfo, useAppWindow, useVisitHistory, useTrackpads,
+  spacing, typeScale, registerDockActions, hasTouchpad, errorText, wm, Segmented, osk,
   restoreMode, setRestoreMode, restoreBrowsers, setRestoreBrowsers, preferredLanguages, setPreferredLanguages, LANGUAGE_NAMES, Overlay, ToolbarButton, regionOf, localeOf, regionLabel, compareNames,
-  useSidebar, SidebarToggle, SidebarOverlay, battery, deviceList,
+  useSidebar, SidebarToggle, SidebarOverlay, battery, deviceList, SkinRegion, useSkin, useSkinned,
 } from '@lordos/sdk';
+import { settingsViewModel } from './skinmodel.js';
 import { useEffect, useRef, useState } from 'react';
 import { SoundSettings } from './Sound.jsx';
 import { SharingSettings } from './Sharing.jsx';
 import { CloudSettings, CloudHeaderAction, CloudSheets } from './Cloud.jsx';
-import { UsersSettings } from './Users.jsx';
+import { UsersSettings, UserAvatar } from './Users.jsx';
 import { NetworkSettings } from './Network.jsx';
 import { General, Updates } from './General.jsx';
 import { ClipboardSettings } from './Clipboard.jsx';
@@ -23,9 +25,10 @@ import { PrintersSettings } from './Printers.jsx';
 import { TrackpadSettings } from './Trackpad.jsx';
 import { WindowPrefs } from './WindowPrefs.jsx';
 import { DockSettings } from './Dock.jsx';
-import { ThemeOptions } from './ThemeExtras.jsx';
+import { ThemeOptions, ThemeParts } from './ThemeExtras.jsx';
 import { ThemeGallery } from './ThemeGallery.jsx';   // Desktop style: the gallery of themes (docs/THEMES-PLAN.md, stage 1)
-import { SlideshowSettings } from './Slideshow.jsx';
+import { WallpaperGallery } from './WallpaperGallery.jsx';
+import { subPage, placeOf, splitPlace } from './subpage.js';   // Wallpaper: the gallery (0.8.9.6.2)
 import { SwitcherSettings } from './Switcher.jsx';
 import { GlobalShortcutsSettings } from './GlobalShortcuts.jsx';
 import { BrowserFrameSettings } from './BrowserFrame.jsx';
@@ -35,6 +38,7 @@ import { BluetoothSettings } from './Bluetooth.jsx';
 import { PowerSettings } from './Power.jsx';
 import { CoolingSettings } from './Cooling.jsx';
 import { AISettings } from './AI.jsx';
+import { SpellingSettings } from './Spelling.jsx';
 import { NotificationsSettings } from './Notifications.jsx';
 import { DateTimeSettings } from './DateTime.jsx';
 import { DefaultAppsSettings } from './DefaultApps.jsx';
@@ -43,6 +47,7 @@ import { FlatpakSettings } from './Flatpak.jsx';
 import { FirmwareSettings } from './Firmware.jsx';
 import { GpusSettings, anyGpus } from './Gpus.jsx';
 import { Stack, Section, SettingRow, ValueRow, Badge, Note, Message, Actions, PopUp, shade } from './ui.jsx';
+import { foldSearch, sectionWords } from './searchmodel.js';
 
 export function Icon({ size: s }) {
   const dark = '#3b3e46';
@@ -112,6 +117,7 @@ function Appearance() {
     <Stack>
       <ThemeGallery />
       <ThemeOptions theme={themes.info()} />
+      <ThemeParts />
       <Section title={tr('settings.mode')}>
         <View style={{ flexDirection: 'row', gap: spacing.xxl, paddingVertical: spacing.m, justifyContent: 'center' }}>
           {[['dark', tr('settings.dark')], ['light', tr('settings.light')]].map(([id, label]) => (
@@ -150,286 +156,6 @@ function Appearance() {
       </Section>
       <WindowPrefs />
       <BrowserFrameSettings />
-    </Stack>
-  );
-}
-
-// A theme names its wallpapers with a locale key (nameKey) and an English fallback (name).
-const wallpaperName = (w) => (w.nameKey && tOptional(w.nameKey)) || w.name;
-
-// While a chosen wallpaper is starting; it turns only then.
-function TileSpinner() {
-  const [a, setA] = useState(0);
-  useEffect(() => { const id = setInterval(() => setA((x) => (x + 30) % 360), 80); return () => clearInterval(id); }, []);
-  return (
-    <View style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.45)' }}>
-      <Text style={{ fontSize: 22, color: '#fff', transform: `rotate(${a}deg)` }}>⟳</Text>
-    </View>
-  );
-}
-
-// The wallpaper grids' thumbnail width (issue #58, Settings → Wallpaper → Thumbnail size): 80-240 px, 100 by default.
-const thumbWidth = (s) => Math.max(80, Math.min(240, Math.round(+s.wallpaperThumbs) || 100));
-
-function MotionTile({ it, on, avail, percent, busy, onClick, tw = 100 }) {
-  const t = useTheme();
-  const { t: tr } = useLocale();
-  const name = tOptional(`settings.motion.item.${it.id}`) || it.name;
-  return (
-    <View onClick={avail ? onClick : undefined} style={{ alignItems: 'center', gap: 6, width: tw + 8, opacity: avail ? 1 : 0.45 }}>
-      <View style={{ padding: 2, borderRadius: 10, border: `2px solid ${on ? t.accent : 'transparent'}` }}>
-        <View style={{ width: tw, height: Math.round(tw * 9 / 16), borderRadius: 7, overflow: 'hidden', border: `1px solid ${t.separator}` }}>
-          <Image src={motionThumb(it)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-          {busy || percent != null ? <TileSpinner /> : null}
-          {percent != null ? <View style={{ position: 'absolute', left: 0, bottom: 0, height: 4, width: `${percent}%`, backgroundColor: t.accent }} /> : null}
-        </View>
-      </View>
-      <Text style={{ fontSize: typeScale.caption, color: on ? t.text : t.textDim, fontWeight: on ? 600 : 400, whiteSpace: 'nowrap', overflow: 'hidden', maxWidth: tw + 8 }}>{name}</Text>
-    </View>
-  );
-}
-
-// Moving wallpapers: downloaded on demand, played only with a compatible GPU.
-function MotionWallpapers({ login }) {
-  const t = useTheme();
-  const { t: tr } = useLocale();
-  const [s, set] = useSettings();
-  const codecs = useCodecs();
-  const downloads = useStore(motionDownloads);
-  const busy = useStore(motionBusy);
-  const [scope, setScope] = useState('*');
-  const [msg, setMsg] = useState('');
-  const [pick, setPick] = useState(false);
-  const [credits, setCredits] = useState(false);
-  const can = codecs.length > 0;
-  const displays = screenDisplays() || [];
-  const main = displays[0] || { w: 1920, h: 1080 };
-  const motion = s.motion || {};
-  const cur = motion[scope] || null;
-  // a video chosen ends the slideshow, which it would hide (sdk/slideshowmodel.js)
-  const choose = (id) => { const m = { ...motion }; if (id) m[scope] = id; else delete m[scope]; set({ motion: m, ...(id ? slideshowStop(s) : null) }); };
-  const select = (it) => {
-    setMsg('');
-    const apply = () => (login ? setLoginMotion(it).then(() => { set({ loginWallpaper: it.id }); setMsg(tr('settings.motion.loginDone')); }, (e) => setMsg(errorText(e))) : choose(it.id));
-    if ((s.motionFiles || {})[it.id]) { apply(); return; }
-    const v = variantFor(it, codecs, main);
-    if (!v) return;
-    downloadMotion(it, v).then(apply, (e) => setMsg(errorText(e)));
-  };
-  const curItem = motionItems.find((x) => x.id === cur);
-  const addFile = (path) => {
-    setPick(false);
-    media.probe(path).then((info) => {
-      const why = userVideoProblem(info, codecs);
-      if (why) { setMsg(tr(`settings.motion.problem.${why}`)); return; }
-      const id = `user:${Date.now()}`;
-      set({ motionUser: [...(s.motionUser || []), { id, name: path.split('/').pop(), path }] });
-      choose(id);
-    });
-  };
-  return (
-    <>
-      <Section title={tr('settings.motion.title')} footer={can ? tr('settings.motion.hint') : undefined}>
-        {!can ? <Note>{tr('settings.motion.needsGpu')}</Note> : null}
-        {msg ? <Note tone="warn">{msg}</Note> : null}
-        {can && displays.length > 1 ? (
-          <SettingRow label={tr('settings.motion.display')}>
-            <Segmented small value={scope} onChange={setScope} options={[['*', tr('settings.motion.allDisplays')], ...displays.map((d) => [d.id, displayLabel(d, displays)])]} />
-          </SettingRow>
-        ) : null}
-        {can ? (
-          <>
-            {login ? null : <><SettingRow label={tr('settings.motion.speed')}>
-              <Segmented small options={MOTION_RATES.map((r) => [r, `${r / 100}×`])} value={MOTION_RATES.includes(s.motionRate) ? s.motionRate : 100} onChange={(v) => set({ motionRate: v })} />
-            </SettingRow></>}
-            {!login && cur ? (
-              <SettingRow label={curItem ? (tOptional(`settings.motion.item.${curItem.id}`) || curItem.name) : tr('settings.motion.random')}>
-                <Actions>
-                  {curItem ? <Button small label={tr('settings.motion.remove')} onClick={() => removeMotion(curItem).catch((e) => setMsg(errorText(e)))} /> : null}
-                  <Button small label={tr('settings.motion.none')} onClick={() => choose(null)} />
-                </Actions>
-              </SettingRow>
-            ) : null}
-            <Actions style={{ paddingVertical: spacing.s }}>
-              {login ? <Button small label={tr('settings.motion.loginDefault')} onClick={() => setLoginMotion(null).then(() => { set({ loginWallpaper: null }); setMsg(tr('settings.motion.loginReset')); }, (e) => setMsg(errorText(e)))} /> : null}
-              {login ? null : <Button small label={tr('settings.motion.random')} disabled={Object.keys(s.motionFiles || {}).length < 2} onClick={() => choose('random')} />}
-              {login ? null : <Button small label={tr('settings.motion.add')} onClick={() => setPick(true)} />}
-              <Button small label={tr('settings.motion.credits')} onClick={() => setCredits(!credits)} />
-            </Actions>
-          </>
-        ) : null}
-      </Section>
-      {MOTION_SECTIONS.map((sec) => (
-        <Section key={sec} title={tr(`settings.wallpaperCategory.${sec}`)}>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingVertical: spacing.m }}>
-            {motionItems.filter((it) => it.section === sec).map((it) => (
-              <MotionTile key={it.id} it={it} avail={can} on={(login ? s.loginWallpaper : cur) === it.id} percent={downloads[it.id]} busy={!login && busy && cur === it.id} onClick={() => select(it)} tw={thumbWidth(s)} />
-            ))}
-          </View>
-        </Section>
-      ))}
-      {credits ? (
-        <Section title={tr('settings.motion.credits')}>
-          <View style={{ gap: 6, paddingVertical: spacing.s }}>
-            {motionItems.map((it) => (
-              <Text key={it.id} style={{ fontSize: typeScale.caption, color: t.textDim, textAlign: 'start' }}>{`${tOptional(`settings.motion.item.${it.id}`) || it.name} — ${it.author} — ${it.license} — ${it.source}`}</Text>
-            ))}
-          </View>
-        </Section>
-      ) : null}
-      {pick ? <FilePicker onPick={(p) => addFile(Array.isArray(p) ? p[0] : p)} onClose={() => setPick(false)} /> : null}
-    </>
-  );
-}
-
-// Pictures of the user's own. On the desktop a copy in their home is enough; the login screen gets one of its own.
-const MAX_IMAGES = 12;
-function UserImages({ login, curId, onChoose, onDefault, setNote }) {
-  const t = useTheme();
-  const { t: tr } = useLocale();
-  const [s, set] = useSettings();
-  const win = useAppWindow();
-  const [picking, setPicking] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const ids = s.wallpaperImages || [];
-  const images = ids.map((id) => findWallpaper([], id)).filter(Boolean);
-  const tw = thumbWidth(s);
-  const add = (path) => {
-    setPicking(false);
-    if (!path) return;
-    setBusy(true);
-    setNote('');
-    addWallpaperImage(path).then((id) => {
-      set({ wallpaperImages: [id, ...ids.filter((x) => x !== id)].slice(0, MAX_IMAGES) });
-      return onChoose(id);
-    }).catch((e) => setNote(errorText(e))).finally(() => setBusy(false));
-  };
-  const cur = ids.includes(curId) ? curId : null;
-  const remove = () => {
-    removeWallpaperImage(cur).then(() => {
-      // a display that showed it goes back to the picture of every display, and that one to the theme's default
-      const own = Object.fromEntries(Object.entries(s.wallpapers || {}).filter(([, v]) => v !== cur));
-      set({ wallpaperImages: ids.filter((x) => x !== cur), wallpapers: own, ...(s.wallpaper === cur ? { wallpaper: null } : {}) });
-    }, (e) => setNote(errorText(e)));
-  };
-  return (
-    <Section title={tr('settings.wallpaperCategory.mine')} footer={tr('settings.wallpaperImage.hint')}>
-      {images.length ? (
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingVertical: spacing.m }}>
-          {images.map((w) => (
-            <View key={w.id} onClick={() => { setNote(''); Promise.resolve(onChoose(w.id)).catch((e) => setNote(errorText(e))); }} style={{ alignItems: 'center', width: tw + 8 }}>
-              <View style={{ padding: 2, borderRadius: 10, border: `2px solid ${curId === w.id ? t.accent : 'transparent'}` }}>
-                <View style={{ width: tw, height: Math.round(tw * 9 / 16), borderRadius: 7, overflow: 'hidden', border: `1px solid ${t.separator}` }}>
-                  <Image src={wallpaperThumb(w)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                </View>
-              </View>
-            </View>
-          ))}
-        </View>
-      ) : null}
-      <Actions style={{ paddingVertical: spacing.s }}>
-        <Button small disabled={busy} label={tr(busy ? 'settings.wallpaperImage.working' : 'settings.wallpaperImage.choose')} onClick={() => setPicking(true)} />
-        {!login && cur && s.loginWallpaper !== cur ? <Button small label={tr('settings.wallpaperImage.remove')} onClick={remove} /> : null}
-        {login && cur ? <Button small label={tr('settings.motion.loginDefault')} onClick={onDefault} /> : null}
-      </Actions>
-      {picking ? (() => {
-        // over this Settings window, in the modal layer: the page itself scrolls
-        const g = wm.frame(wm.get(win.id) || {});
-        return (
-          <Layer name="modal">
-            <View style={{ position: 'absolute', left: g.x || 0, top: g.y || 0, width: g.w || 640, height: g.h || 480 }}>
-              <FilePicker computer title={tr('settings.wallpaperImage.pick')} filter={/\.(png|jpe?g)$/i} onClose={() => setPicking(false)} onPick={(p) => add([].concat(p)[0])} />
-            </View>
-          </Layer>
-        );
-      })() : null}
-    </Section>
-  );
-}
-
-// Grouped by category (Signature, Lumo, Cosmos, then the theme's own); grids use the thumbnails.
-function Wallpapers() {
-  const t = useTheme();
-  const { t: tr } = useLocale();
-  const [s, set] = useSettings();
-  const list = t.wallpapers || [];
-  if (!list.length) return <Stack><Note>{tr('settings.noWallpapers')}</Note></Stack>;
-  const [target, setTarget] = useState('desktop');
-  const login = target === 'login';
-  const [note, setNote] = useState('');
-  // several displays: the picture of every display ('*') or of one (its own, settings.wallpapers; sdk/wallpapers.js)
-  const displays = screenDisplays() || [];
-  const [scope, setScope] = useState('*');
-  const scopeDisplay = !login && displays.length > 1 ? displays.find((d) => d.id === scope) || null : null;
-  const desk = wallpaperIdFor(s, scopeDisplay, t.defaultWallpaper);
-  const shown = login ? s.loginWallpaper : desk;
-  const cur = findWallpaper(list, login ? (list.some((w) => w.id === shown) || userWallpaperName(shown) ? shown : GREETER_WALLPAPER) : desk, t.defaultWallpaper);
-  // a picture chosen ends the slideshow (sdk/slideshowmodel.js)
-  const chooseDesk = (id) => set({ ...wallpaperPatch(s, id, scopeDisplay), ...slideshowStop(s) });
-  const slideshow = !login && !!themes.info()?.wallpaperSlideshow;
-  const ownCount = Object.keys(s.wallpapers || {}).filter((k) => displays.some((d) => displayWallpaperKey(d) === k)).length;
-  const stillPick = (id) => {
-    if (!login) { chooseDesk(id); return; }
-    setLoginStill(id).then(() => { set({ loginWallpaper: id }); setNote(tr('settings.wallpaperImage.loginDone')); }, (e) => setNote(errorText(e)));
-  };
-  const cats = [...new Set([...WALLPAPER_CATEGORIES, ...list.map((w) => w.category || 'other')])]
-    .map((c) => [c, list.filter((w) => (w.category || 'other') === c)]).filter(([, ws]) => ws.length);
-  const catName = (c) => tOptional(`settings.wallpaperCategory.${c}`) || tr('settings.wallpaperCategory.other');
-  // the grids' thumbnails: 16:9 like the thumbnails themselves
-  const tw = thumbWidth(s), th = Math.round(tw * 9 / 16);
-  const cap = { fontSize: typeScale.caption, color: t.textDim };
-  return (
-    <Stack>
-      <Segmented value={target} onChange={(v) => { setTarget(v); setNote(''); }} options={[['desktop', tr('settings.wallpaperFor.desktop')], ['login', tr('settings.wallpaperFor.login')]]} />
-      {note ? <Note>{note}</Note> : null}
-      {!login && displays.length > 1 ? (
-        <Section footer={scope === '*' && ownCount ? tr('settings.wallpaperFor.allResets') : tr('settings.wallpaperFor.displayHint')}>
-          <SettingRow label={tr('settings.wallpaperFor.display')}>
-            <Segmented small value={scope} onChange={setScope} options={[['*', tr('settings.motion.allDisplays')], ...displays.map((d) => [d.id, displayLabel(d, displays)])]} />
-          </SettingRow>
-        </Section>
-      ) : null}
-      <Section>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.l, paddingVertical: spacing.m }}>
-          <View style={{ width: 128, height: 72, borderRadius: 8, overflow: 'hidden', border: `1px solid ${t.separator}` }}>
-            <Image src={wallpaperThumb(cur)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-          </View>
-          <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-            <Text style={{ fontSize: typeScale.headline, fontWeight: 600, color: t.text, textAlign: 'start' }}>{wallpaperName(cur)}</Text>
-            <Text style={{ fontSize: typeScale.caption, color: t.textDim, textAlign: 'start' }}>{catName(cur.category || 'other')}</Text>
-          </View>
-        </View>
-        <SettingRow label={tr('settings.wallpaperThumbs.size')}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.s, direction: 'ltr' }}>
-            <Text style={cap}>{tr('settings.wallpaperThumbs.small')}</Text>
-            <Slider value={tw} min={80} max={240} width={150} onChange={(v) => set({ wallpaperThumbs: Math.round(v) })} />
-            <Text style={cap}>{tr('settings.wallpaperThumbs.large')}</Text>
-          </View>
-        </SettingRow>
-      </Section>
-      {slideshow ? <SlideshowSettings displays={displays} /> : null}
-      <UserImages login={login} curId={shown} setNote={setNote}
-        onChoose={(id) => (login ? setLoginImage(id).then(() => { set({ loginWallpaper: id }); setNote(tr('settings.wallpaperImage.loginDone')); }) : chooseDesk(id))}
-        onDefault={() => setLoginMotion(null).then(() => { set({ loginWallpaper: null }); setNote(tr('settings.motion.loginReset')); }, (e) => setNote(errorText(e)))} />
-      <MotionWallpapers login={login} />
-      {cats.map(([c, ws]) => (
-        <Section key={c} title={catName(c)}>
-          {/* 108 px items (the default size) with 10 px gaps: a category of five fits on one row in the default window */}
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingVertical: spacing.m }}>
-            {ws.map((w) => (
-              <View key={w.id} onClick={() => stillPick(w.id)} style={{ alignItems: 'center', gap: 6, width: tw + 8 }}>
-                <View style={{ padding: 2, borderRadius: 10, border: `2px solid ${cur.id === w.id ? t.accent : 'transparent'}` }}>
-                  <View style={{ width: tw, height: th, borderRadius: 7, overflow: 'hidden', border: `1px solid ${t.separator}` }}>
-                    <Image src={wallpaperThumb(w)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  </View>
-                </View>
-                <Text style={{ fontSize: typeScale.caption, color: cur.id === w.id ? t.text : t.textDim, fontWeight: cur.id === w.id ? 600 : 400,
-                  whiteSpace: 'nowrap', overflow: 'hidden', maxWidth: tw + 8 }}>{wallpaperName(w)}</Text>
-              </View>
-            ))}
-          </View>
-        </Section>
-      ))}
     </Stack>
   );
 }
@@ -761,6 +487,7 @@ function Keyboard() {
           <TextInput value={sample} onChange={setSample} placeholder={tr('settings.kb.placeholder')} onCancel={() => setSample('')} />
         </View>
       </Section>
+      <SpellingSettings />
       <SwitcherSettings tr={tr} />
       <ShortcutsList />
       <GlobalShortcutsSettings tr={tr} />
@@ -856,12 +583,14 @@ function GpuGlyph() {
 
 // Sidebar groups (as in TangoOS): [id, component, icon color, symbol (a glyph or a component)].
 const GROUPS = [
-  [['general', General, '#8e8e93', 'i'], ['appearance', Appearance, '#3a3a3c', '◐'], ['wallpaper', Wallpapers, '#30b0c7', '▣'], ['dock', DockSettings, '#3a3a3c', '▁'], ['displays', DisplaysSettings, '#0a84ff', '▭']],
+  [['general', General, '#8e8e93', 'i'], ['appearance', Appearance, '#3a3a3c', '◐'], ['wallpaper', WallpaperGallery, '#30b0c7', '▣'], ['dock', DockSettings, '#3a3a3c', '▁'], ['displays', DisplaysSettings, '#0a84ff', '▭']],
   [['network', NetworkSettings, '#0a84ff', '⇅'], ['bluetooth', BluetoothSettings, '#0a84ff', 'ᛒ'], ['sound', SoundSettings, '#ff375f', '♪'], ['notifications', NotificationsSettings, '#ff3b30', '◉'], ['printers', PrintersSettings, '#636366', '⎙'], ['clipboard', ClipboardSettings, '#5e5ce6', '⎘'], ['sharing', SharingSettings, '#34c759', '⇄'], ['cloud', CloudSettings, '#0a84ff', '☁']],
   [['language', LanguageRegion, '#30b0c7', 'A'], ['datetime', DateTimeSettings, '#0a84ff', '◷'], ['keyboard', Keyboard, '#8e8e93', '⌨'], ['trackpad', TrackpadSettings, '#8e8e93', '▭'], ['defaultapps', DefaultAppsSettings, '#8e8e93', '◫'], ['webapps', WebAppsSettings, '#5e5ce6', '◎'], ['flatpak', FlatpakSettings, '#4a86cf', '◇'], ['ai', AISettings, '#bf5af2', '✦']],
   [['battery', BatterySettings, '#30d158', '▮'], ['power', PowerSettings, '#30d158', BoltGlyph], ['cooling', CoolingSettings, '#32ade6', FanGlyph], ['firmware', FirmwareSettings, '#5e5ce6', ChipGlyph], ['gpus', GpusSettings, '#5e5ce6', GpuGlyph], ['privacy', PrivacySettings, '#0a84ff', LockGlyph], ['users', UsersSettings, '#0a84ff', '☺'], ['updates', Updates, '#8e8e93', '↻'], ['session', Session, '#ff453a', '↪']],
 ];
 const SECTIONS = GROUPS.flat();
+// Pages whose every answer is the person's own (docs/HANDS.md "Never"; the list is sdk/handsdeny.js): an AI agent never
+// reads, clicks or types in them (handsDeny).
 // Board firmware
 // only on a BCM2712 board (Raspberry Pi 5, 500, CM5: lord.system.info().board)
 const isPi5 = () => { try { return lord.system.info().board === 'pi5'; } catch (e) { return false; } };
@@ -882,21 +611,27 @@ function SectionIcon({ color, glyph: G, size = 20 }) {
     : <Badge color={color} size={size}><G /></Badge>;
 }
 
-// Session user: initials, name and whether they are an administrator.
+// the session's own account (its picture and color), or null (no lord.users: an older server, a test)
+function selfUser() {
+  try { return (typeof lord.users === 'undefined' ? null : (lord.users.list().users || []).find((u) => u.self)) || null; } catch (e) { return null; }
+}
+
+// Session user: the account's picture (or its initials on its color, as Users draws it), name and whether they are an
+// administrator. Read again when the Users page is opened or left (where the picture is changed).
 function UserCard({ onClick, selected }) {
   const t = useTheme();
   const { t: tr } = useLocale();
   const [hover, setHover] = useState(false);
   const info = useSystemInfo(60000);
   const name = info.fullName || info.user || '';
-  const initials = name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('') || '?';
+  const [me, setMe] = useState(selfUser);
+  useEffect(() => { setMe(selfUser()); }, [selected, name]);
+  const user = me || { name: info.user || '?', full: name };
   return (
     <View onClick={onClick} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
       style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 8, paddingVertical: 6, borderRadius: 8,
         backgroundColor: selected || hover ? t.hover : 'transparent' }}>
-      <View style={{ width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(180deg, #5ac8fa, #0a6cd6)' }}>
-        <Text style={{ fontSize: 14, fontWeight: 600, color: '#fff' }}>{initials}</Text>
-      </View>
+      <UserAvatar user={user} size={36} />
       <View style={{ flex: 1, minWidth: 0, gap: 1 }}>
         <Text style={{ fontSize: typeScale.body, fontWeight: 600, color: t.text, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>{name}</Text>
         <Text style={{ fontSize: typeScale.caption, color: t.textDim, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>
@@ -908,7 +643,7 @@ function UserCard({ onClick, selected }) {
 
 // The open section survives the interface being remounted when the language changes.
 let lastSection = 'general';
-// a small window (a Lord Workspaces tile): below SIDE_AT the sections hide behind a button in the title bar
+// a small window (a Workspaces tile): below SIDE_AT the sections hide behind a button in the title bar
 const SIDE_AT = 700;
 
 // Other apps open a section: wm.open('settings', { args: { section: 'network', page: 'vpn' } }).
@@ -919,20 +654,44 @@ export default function Settings() {
   const [section, setSectionState] = useState(lastSection);
   const [query, setQuery] = useState('');
   const side = useSidebar(SIDE_AT);
-  const setSection = (s) => { lastSection = s; setSectionState(s); if (side.narrow) side.close(); };
-  useVisitHistory(section, (s) => { lastSection = s; setSectionState(s); });   // the mouse's back and forward buttons (#234)
+  // (0.8.9.6.2) a theme's `home` skin (docs/THEMES-GUIDE.md, "App skins → Settings"): a page of categories before a
+  // section is open; Settings opens on it unless another app asked for a section
+  const homeSkin = useSkin('settings', 'home');
+  const [atHomeState, setAtHome] = useState(() => !args?.section);
+  const atHome = !!homeSkin && atHomeState;
+  const denied = settingsPageDenied(section);   // a person-only page: out of an AI agent's reach (sdk/handsdeny.js)
+  const setSection = (s) => { lastSection = s; setSectionState(s); setAtHome(false); subPage.set(null); if (side.narrow) side.close(); };
+  // the mouse's back and forward buttons (#234) walk sections and a section's sub-pages (subpage.js: Wallpaper's collections)
+  const sub = useStore(subPage);
+  useVisitHistory(placeOf(section, sub), (p) => { const [s, sp] = splitPlace(p); lastSection = s; setSectionState(s); subPage.set(sp); });
   // 'themes' (the old Themes page, links from older help) now opens Appearance
-  useEffect(() => { const sec = args?.section === 'themes' ? 'appearance' : args?.section; if (sec && SECTIONS.some(([id]) => id === sec)) setSection(sec); }, [args?.nonce]);
+  // (0.8.9.6.2) AI's pages are sub-pages: { section: 'ai', page: 'sentinela' } opens Sentinela's (set after setSection clears it)
+  useEffect(() => {
+    const sec = args?.section === 'themes' ? 'appearance' : args?.section;
+    if (!sec || !SECTIONS.some(([id]) => id === sec)) return;
+    setSection(sec);
+    if (sec === 'ai' && typeof args?.page === 'string' && /^[a-z]+$/.test(args.page)) subPage.set(args.page);
+  }, [args?.nonce]);
   const [, Body] = SECTIONS.find(([id]) => id === section) || SECTIONS[0];
-  const q = query.trim().toLowerCase();
+  const q = foldSearch(query.trim());
   // Mouse & Trackpad always shows (its touchpad rows need a touchpad, which lord-sessiond lends with the monitor);
   // hasPad is still passed to sectionShown, which only hides Board firmware off a Raspberry Pi 5
   const hasPad = useTrackpads().some((d) => d.kind === 'touchpad');
   const [pi5] = useState(isPi5);
   const [gpus] = useState(anyGpus);
-  const visible = (id) => sectionShown(id, hasPad, pi5, gpus) && `${tr(`settings.section.${id}`)} ${tr(`settings.keywords.${id}`)}`.toLowerCase().includes(q);
+  const visible = (id) => sectionShown(id, hasPad, pi5, gpus) && foldSearch(sectionWords(id, tr)).includes(q);
+  const groupIndex = GROUPS.map((g, i) => (g.some(([id]) => visible(id)) ? i : -1)).filter((i) => i >= 0);
   const groups = GROUPS.map((g) => g.filter(([id]) => visible(id))).filter((g) => g.length);
   const pad = side.narrow ? spacing.l : spacing.xxl;
+  // the view model a theme's skin gets: the sections and Settings' own ways to move between them
+  const skinned = useSkinned('settings');
+  const info = useSystemInfo(60000);
+  const vm = skinned ? settingsViewModel({ atHome, section, query, groups, groupIndex, tr, SectionIcon, userName: info.fullName || info.user, admin: info.admin }, {
+    open: (id) => { if (SECTIONS.some(([x]) => x === id) && sectionShown(id, hasPad, pi5, gpus)) setSection(id); },
+    home: () => { if (homeSkin) { setAtHome(true); subPage.set(null); } },
+    search: (q) => setQuery(String(q || '')),
+    users: () => setSection('users'),
+  }) : null;
   const sidebar = (
       <View style={{ width: 220, flex: side.narrow ? 1 : undefined, backgroundColor: t.sidebarBg, paddingTop: spacing.m }}>
         <Hairline edge="end" />
@@ -958,8 +717,11 @@ export default function Settings() {
   );
   return (
     <View style={{ flex: 1, flexDirection: 'row' }}>
-      {side.narrow ? null : sidebar}
-      <View style={{ flex: 1, minWidth: 0 }}>
+      {side.narrow ? null : <SkinRegion app="settings" region="sidebar" model={vm}>{sidebar}</SkinRegion>}
+      {atHome ? <View style={{ flex: 1, minWidth: 0 }}><SkinRegion app="settings" region="home" model={vm} /></View> : (
+      // a person-only page (sdk/handsdeny.js): the whole content column is handsDeny, its header (Cloud's Add Account)
+      // included, and so are its sheets below (security scan 0.8.9.6.2, F4)
+      <View handsDeny={denied || undefined} style={{ flex: 1, minWidth: 0 }}>
         <View style={{ height: 48, flexDirection: 'row', alignItems: 'center', gap: spacing.s, paddingHorizontal: pad }}>
           <Hairline edge="bottom" />
           {side.narrow ? <SidebarToggle small shown={side.shown} onClick={side.toggle} /> : null}
@@ -967,19 +729,19 @@ export default function Settings() {
             {tr(`settings.section.${section}`)}</Text>
           {section === 'cloud' ? <CloudHeaderAction /> : null}
         </View>
-        <ScrollView resetKey={section} style={{ flex: 1 }}>
+        <ScrollView resetKey={placeOf(section, sub)} style={{ flex: 1 }}>
           <View style={{ paddingHorizontal: pad, paddingTop: side.narrow ? spacing.l : spacing.xl, alignItems: 'center' }}>
-            {/* Cloud's account page has two columns: it takes a wider column on wide windows */}
-            <View style={{ width: '100%', maxWidth: section === 'cloud' ? 980 : 680 }}>
+            {/* Cloud's account page has two columns, Wallpaper and AI are galleries: they take a wider column on wide windows */}
+            <View handsDeny={denied || undefined} style={{ width: '100%', maxWidth: section === 'cloud' ? 980 : section === 'wallpaper' || section === 'ai' ? 1180 : 680 }}>
               <Body page={section === 'network' || section === 'cloud' || section === 'ai' ? args?.page : undefined}
                 alert={section === 'ai' ? args?.alert : undefined} />
             </View>
           </View>
         </ScrollView>
-      </View>
+      </View>)}
       {side.narrow && side.shown ? <SidebarOverlay width={220} onClose={side.close}>{sidebar}</SidebarOverlay> : null}
       {/* Cloud's sheets: inside this window, over its content, never in the shell's modal layer (docs/CLOUD.md 18.2) */}
-      {section === 'cloud' ? <CloudSheets /> : null}
+      {section === 'cloud' ? <CloudSheets handsDeny={denied} /> : null}
     </View>
   );
 }

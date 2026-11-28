@@ -201,6 +201,7 @@
   "power.healthNormal": "Kesehatan baterai: {pct}% (normal)",
   "power.healthService": "Kesehatan baterai: {pct}% (disarankan servis)",
   "power.healthUnknown": "Kesehatan baterai: tidak diketahui",
+  "power.h": "{h} j",
   "power.hm": "{h} j {m} mnt",
   "power.immediately": "Segera",
   "power.left": "Tersisa {time}",

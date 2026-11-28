@@ -30,7 +30,7 @@ Segure o modificador e toque em Tab: uma faixa de ícones mostra o nome do app e
 recentes primeiro. Tab avança, ⇧Tab volta, Esc cancela e soltar o modificador alterna. Um toque rápido
 volta ao app anterior.
 
-## Lord Flow
+## Flow
 
 | Atalho | O que faz |
 |---|---|
@@ -51,7 +51,7 @@ emulador de terminal, onde Ctrl+C é a interrupção), só para esse app. Por is
 dele: com um app Linux à frente a tela bloqueia com ❖⌃Q e a área de transferência abre com ❖⇧V. Em um
 app do LordOS dentro da sessão ❖V também cola; ❖⇧V é a área de transferência.
 
-## Lord Classic
+## Classic
 
 | Atalho | O que faz |
 |---|---|
@@ -76,7 +76,7 @@ app do LordOS dentro da sessão ❖V também cola; ❖⇧V é a área de transfe
 
 | Atalho | O que faz |
 |---|---|
-| ❖N · ❖T · ❖W | Nova janela · nova aba · fechar (Lord Classic: ⌃N, ⌃T, ⌃W) |
+| ❖N · ❖T · ❖W | Nova janela · nova aba · fechar (Classic: ⌃N, ⌃T, ⌃W) |
 | ❖F · ❖G | Buscar · próximo resultado |
 | ❖C · ❖X | Copiar · cortar |
 | ❖Z · ❖⇧Z | Desfazer · refazer |

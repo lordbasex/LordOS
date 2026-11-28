@@ -39,6 +39,7 @@ function searchBox() {
 
 const USE_FILE = '.local/share/lordos/spotlight.json';
 let usage = null;
+let useDirMade = false;
 function loadUsage() {
   if (usage) return usage;
   usage = {};
@@ -54,7 +55,8 @@ function noteUse(key) {
   u[key] = { n: (u[key]?.n || 0) + 1, at: Date.now() };
   const keys = Object.keys(u);
   if (keys.length > 300) for (const k of keys.sort((a, b) => u[a].at - u[b].at).slice(0, keys.length - 300)) delete u[k];
-  try { ensureDir('.local/share/lordos'); fs.write(USE_FILE, JSON.stringify(u)); } catch (e) { /* no disk: memory only */ }
+  // on a worker: the memory copy is the one read (loadUsage); a busy disk never holds the interface (QA ws174)
+  try { if (!useDirMade) { ensureDir('.local/share/lordos'); useDirMade = true; } fs.writeAsync(USE_FILE, JSON.stringify(u)).catch(() => { /* memory only */ }); } catch (e) { /* no disk: memory only */ }
 }
 function usageBoost(key) {
   const u = loadUsage()[key];
@@ -233,9 +235,9 @@ function revealFile(f) {
 
 let recentCache = { at: 0, list: [] };
 function recentFiles() {
-  if (Date.now() - recentCache.at > 60000) {
+  if (Date.now() - recentCache.at > 60000 || !recentCache.list.length) {
     let list = [];
-    try { list = typeof lord !== 'undefined' && lord.fs?.recent ? fs.recent(200, 30) || [] : []; } catch (e) { list = []; }
+    try { list = typeof lord !== 'undefined' && lord.fs?.recent ? fs.recentCached(200, 30) || [] : []; } catch (e) { list = []; }
     recentCache = { at: Date.now(), list: list.filter((f) => f && f.name && !f.dir) };
   }
   return recentCache.list;
@@ -280,7 +282,13 @@ const SETTINGS = ['general', 'appearance', 'wallpaper', 'network', 'sound', 'cli
 function buildResults(raw, apps) {
   const query = raw.trim();
   const q = fold(query);
-  if (!q) return [];
+  // nothing typed: the files changed most recently (the last 30 days), newest first
+  if (!q) {
+    const items = [...recentFiles()].sort((a, b) => (b.mtime || 0) - (a.mtime || 0)).slice(0, 6)
+      .map((f) => ({ key: `file:${f.path}`, score: 1, title: f.name, subtitle: f.path.replace(fs.home(), '~'), glyph: IMG.test(f.name) ? '🖼' : '📄',
+        preview: { kind: 'file', file: f }, run: () => openFile(f), reveal: () => revealFile(f) }));
+    return items.length ? [{ id: 'recent', items, top: 1 }] : [];
+  }
   const sections = [];
   const add = (id, items, top) => { if (items.length) sections.push({ id, items, top: top ?? Math.max(...items.map((x) => x.score || 0)) }); };
 
@@ -491,6 +499,7 @@ function Panel() {
   const box = searchBox();
   const W = Math.min(720, box.width - 40);
   const listW = cur && query.trim() ? W - 260 : W;
+  const showList = !!query.trim() || flat.length > 0;      // with nothing typed: the recent files, when there are any
   return h(View, { onClick: () => spotlight.close(), style: { position: 'absolute', ...box } },
     h(View, {
       onClick: (e) => e.stopPropagation(),
@@ -503,8 +512,8 @@ function Panel() {
       h(Text, { style: { fontSize: 20, color: th.textDim } }, '⌕'),
       h(TextInput, { value: query, onChange: setQuery, autoFocus: true, size: 20, placeholder: t('shell.spotlight.placeholder'),
         onKeyDown: onKey, onCancel: () => spotlight.close(), style: { flex: 1, backgroundColor: 'transparent', border: '0 solid transparent' } })),
-    query.trim() && h(View, { style: { height: 1, backgroundColor: th.separator } }),
-    query.trim() && h(View, { style: { flexDirection: 'row', maxHeight: 440 } },
+    showList && h(View, { style: { height: 1, backgroundColor: th.separator } }),
+    showList && h(View, { style: { flexDirection: 'row', maxHeight: 440 } },
       h(View, { style: { width: listW, paddingVertical: 6, maxHeight: 440, overflow: 'hidden' } },
         flat.length === 0 && h(Text, { style: { fontSize: 13, color: th.textDim, padding: 14 } }, t('shell.spotlight.none')),
         ...visibleRows(sections, cur).map((r) => (r.header
@@ -525,7 +534,7 @@ function Panel() {
             h(Text, { style: { fontSize: 13, color: active ? '#fff' : th.text, whiteSpace: 'nowrap', overflow: 'hidden', maxWidth: listW * 0.55 } }, it.title),
             h(Text, { style: { flex: 1, fontSize: 11, color: active ? 'rgba(255,255,255,0.8)' : th.textDim, whiteSpace: 'nowrap', overflow: 'hidden' } }, it.subtitle || ''));
           })()))),
-      cur && h(Preview, { item: cur, th })),
+      cur && query.trim() && h(Preview, { item: cur, th })),
     h(View, { style: { height: 1, backgroundColor: th.separator } }),
     h(View, { style: { flexDirection: 'row', gap: 14, paddingHorizontal: 14, paddingVertical: 6 } },
       h(Text, { style: { fontSize: 10, color: th.textDim } }, t('shell.spotlight.keys')))));

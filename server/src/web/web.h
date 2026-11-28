@@ -40,6 +40,7 @@
 #include "webscheme.h"
 #include "webinspect.h"
 #include "webguard.h"
+#include "webwatch.h"
 
 #include <limits.h>
 #include <sys/types.h>
@@ -113,12 +114,50 @@ void web_offline_restyle(Web *w);
 double web_now_ms(void);                                 /* monotonic */
 /* an editing command on the page (webedit.h's WEBEDIT_*): the Edit menu, the context menu */
 void web_edit(Web *w, int cmd);
-/* the person chose item (WEBMENU_*) in the page's context menu; link and image are what was under the pointer */
-void web_menu_chosen(Web *w, int item, const char *link, const char *image);
-/* a right click in the page (WEBMENU_AT_* of what is under the pointer, a link's and an image's address or NULL):
- * LordOS's menu with the items for it (webbus_menu); addresses of the wrong kind are dropped */
-void web_context_menu(Web *w, unsigned at, const char *link, const char *image);
+/* what a right click in the page was on (webselect.c's report, or WebKit's hit test): WEBMENU_AT_EDITABLE and
+ * WEBMENU_AT_SELECTION, the media states (WEBMENU_AT_PAUSED…), and the page's strings (each may be NULL): a link's
+ * address, an image's, a video's or audio's source, the selected text (text_cut: the page had more of it) */
+typedef struct { unsigned at; const char *link, *image, *media, *text; int text_cut; } WebMenuAt;
+/* webmenu.c: LordOS's menu at the pointer with the items for it (org.lordos.WebApps1.Menu); addresses of the wrong
+ * kind are dropped, and what the person chooses runs here */
+void web_context_menu(Web *w, const WebMenuAt *a);
+/* WebKit asked for its own menu (the view's "context-menu"): its spelling suggestions, Ignore Spelling and Learn
+ * Spelling are kept for LordOS's menu of the same right click */
+void web_menu_webkit(Web *w, WebKitContextMenu *m);
+/* ✨ AI's Replace from the shell (WriteReplace, lord-server only): text into the field the last menu's selection was in,
+ * only if it still has the focus and that very selection (webmenu.c); it waits for the window to have the keyboard
+ * again (web_menu_ai_focused, from webwin.c's keyboard enter) */
+void web_menu_ai_replace(Web *w, const char *text);
+void web_menu_ai_focused(Web *w);
+#define WEBSELECT_WORLD "lordos-web-select"         /* the page script's world (webselect.c SELECT_WORLD) */
+/* 1 when WebKit asks for its menu on a right click in a text field the page left alone (WPEPlatform): the page
+ * script lets it then, for the spelling items */
+int web_menu_webkit_asks(void);
+/* the key of a download (g_object_get_data) whose file the person chose in the save dialog: its path */
+#define WEBMENU_DEST_KEY "lord-web-dest"
+/* Save Image As… on an image the page made itself (a blob: address), read by webxfer.c: its bytes (taken over) */
+void web_menu_save_bytes(Web *w, const char *mime, GBytes *data);
 void web_state_save(Web *w);
+
+/* webhints.c: Chrome's Client Hints and navigator.userAgentData for a profile that identifies as Chrome (webua.h) */
+void webhints_context(Web *w);                           /* the web process extension, before any web process starts */
+void webhints_view(Web *w);                              /* navigator.userAgentData's script, when the identity is Chrome */
+void webhints_identity(Web *w);                          /* the identity changed (SetUserAgent): script and extension follow */
+void webhints_response(Web *w, WebKitURIResponse *r);    /* a main frame's response: its Accept-CH */
+/* the pieces, for tests/webcalls_check.c too: the extension's data, the userAgentData script, the extension's folder */
+GVariant *webhints_variant(int chrome, const char *machine, const WebUaSites *sites);
+WebKitUserScript *webhints_script_new(const char *machine);
+int webhints_ext_dir(char *out, size_t n);
+
+/* webcalls.c: the call log (webcall.h) */
+void webcalls_init(Web *w);                              /* webcall.js, its bridge and the message handler */
+/* the same on any view: on_message(WebKitUserContentManager *, JSCValue *, data) gets each report (a JSON string) */
+int  webcalls_add_scripts(WebKitUserContentManager *ucm, GCallback on_message, gpointer data);
+/* a camera, microphone or screen permission answered (kinds: WEBREG_PERM_*), how: "asked" or "the app's setting" */
+void webcalls_permission(Web *w, const int *kinds, int n, int allowed, const char *how);
+/* the cameras' udev database entries, read-only, in WebKit's web process sandbox (webcam.h); before any web process
+ * of c starts (WebKit refuses a sandbox path after that): how many */
+int  webcalls_sandbox_cameras(WebKitWebContext *c);
 
 /* webxfer.c */
 void webxfer_init(Web *w);                               /* the clipboard script and its message handler */
@@ -143,14 +182,19 @@ int webxfer_paste_text(Web *w, const char *text);
 /* the context menu's Copy Image: the page's image at uri (read by the page's own origin, in lord-web's isolated world,
  * made a PNG when it is in another format) goes to the session's clipboard */
 void webxfer_copy_image(Web *w, const char *uri);
+/* Save Image As… on a blob: image: the same read, its bytes to web_menu_save_bytes */
+void webxfer_save_image(Web *w, const char *uri);
 
 /* webdark.c */
 void webdark_init(Web *w);                               /* the script and the background, before the first load */
 void web_set_scheme(Web *w, int scheme);                 /* the desktop's mode changed (SetColorScheme) */
 void webdark_load(Web *w, WebKitLoadEvent ev);           /* the view's load-changed */
 
-/* webselect.c: dragging across text selects it (WPE 2.48 has no drag support, which in WebCore holds that too) */
+/* webselect.c: dragging across text selects it (WPE 2.48 has no drag support, which in WebCore holds that too); the
+ * right click's report; the page's selection as the session's primary selection (webwin_set_primary) */
 void webselect_init(Web *w);
+/* the context menu's media items on the element it was opened on: play, pause, mute, unmute, loop, controls */
+void webselect_media(Web *w, const char *what);
 
 /* webbus.c */
 void webbus_init(Web *w);
@@ -171,9 +215,14 @@ void webbus_edit(Web *w, const char *sender, int cmd);
 void webbus_scheme(Web *w, const char *sender, int scheme);
 /* org.lordos.WebApp1.SetUserAgent(chrome|edge|firefox|lordos) from sender: the same check, then web_set_user_agent */
 void webbus_user_agent(Web *w, const char *sender, int kind);
-/* the page's context menu: org.lordos.WebApps1.Menu(app, profile, items) on lord-server, which shows it at the
- * pointer; the chosen item goes to web_menu_chosen with link and image (copied here) */
-void webbus_menu(Web *w, const int *items, int n, const char *link, const char *image);
+void webbus_write_replace(Web *w, const char *sender, const char *text);
+
+/* webhang.c: the page's watch (docs/WEBAPPS.md, "When a web app stops answering"; webwatch.h's WEBWATCH_PAGE) */
+void web_hang_start(Web *w);                             /* after the view is made: the ping every 15 s */
+void web_hang_urgent(Web *w);                            /* the window is shown: a ping now, with the short wait */
+int  web_hang_take(Web *w);                              /* web-process-terminated: 1 when lord-web ended it (a hang) */
+const char *web_hang_word(void);                         /* Ping's answer: "ok", or "page" while a page ping is late */
+void web_hang_set_limits(WebWatchLimits lim);            /* tests/webhang_check.c: shorter than WEBWATCH_PAGE */
 
 /* webtray.c */
 WebTray *webtray_new(Web *w);

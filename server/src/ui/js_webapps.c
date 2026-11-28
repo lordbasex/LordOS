@@ -30,14 +30,24 @@
  *                                       the browser its pages are told it is; lord-web maps the word to the string). A
  *                                       running profile gets it at once and loads its page again (SetUserAgent,
  *                                       webask_user_agent)
- *   fetchIcon(app)                      → probe id; the site's own icon for an installed or a catalog app: the probe
- *                                       of "Add from an address" on the app's own start address (lord-web needed)
+ *   fetchIcon(app, manual)              → probe id; the site's own icon for an installed or a catalog app: the probe
+ *                                       of "Add from an address" on the app's own start address (lord-web needed).
+ *                                       manual (Settings → Refresh icon) may use every slot; the Store's background
+ *                                       fetches leave one fetch and WEB_PROBE_RESERVED probe slots to it, and a probe
+ *                                       is freed as soon as iconResult read it
  *   iconResult(app)                     null while it runs; { done, ok, iconPath } once the icon is kept in
  *                                       ~/.cache/lordos/web/icons/<app>.<png|svg> (webicon.c), or { done, ok: false, error }
+ *                                       (webapps.iconOrigin, webapps.noIcon, or the runtime's web.probe.… code: the
+ *                                       probe's, or the last icon's when none was usable)
  *   icons()                             { [app]: path } of the cached icons (list() and get() already use them)
  *   badges()                            [{ app, profile, count }]: the unread counts lord-web set (SetBadge, webask.c)
  *   launch(app, profile)                → 'started' or 'running' (lord-server then asks it to show its window)
+ *                                       (and a ping: one that doesn't answer within 5 s is started again, webalive.h)
  *   running()                           [{ app, profile, pid, inspect }] (inspect: started with developer tools on)
+ *   quit(app, profile)                  Force Quit: that profile's lord-web ended (its group and the WebKit processes
+ *                                       under it); → true when it ran. Only a process lord-server started
+ *   restart(app, profile)               → 'restarted' or 'started': ended when it runs, then started again
+ *   restartAll()                        → how many: every running lord-web restarted (Restart web apps engine)
  *   memory(app)                         null when none of its profiles runs; else { kb, processes, unreadable,
  *                                       profiles: [{ profile, kb, processes }] }: the Pss of each running lord-web of
  *                                       the app and of its WebKit processes (web/webmem.c; read-only, bounded)
@@ -47,6 +57,9 @@
  *   edit(app, profile, command)         the Edit menu on that web app's window: undo|redo|cut|copy|paste|selectAll, to its
  *                                       lord-web (org.lordos.WebApp1.Edit, which checks the caller is lord-server)
  *   menuAnswer(id, item)                the person's choice in a page's context menu (the "webapps-menu" event), or ""
+ *   writeReplace(app, profile, text)    ✨ AI's Replace in a page: the text to lord-web (webask_write_replace)
+ *   searchEngine() · setSearchEngine(name)  Settings → Web Apps → Search the web with (google, duckduckgo, bing,
+ *                                       startpage; ~/.config/lordos/web/search.json): the page's context menu's search
  *   developerMode() · setDeveloperMode(on)  Settings → Web Apps → Developer mode (~/.config/lordos/web/developer.json);
  *                                       off ends every window that has developer tools on
  *   inspect(app, profile)               → 'started' or 'running': that window again with WebKit's remote inspector on
@@ -57,12 +70,14 @@
 #include "js_err.h"
 #include "js_sys.h"
 #include "webask.h"
+#include "webalive.h"
 #include "webicon.h"
 #include "../hw/notifyd.h"
 #include "../sec/json.h"
 #include "../web/webedit.h"
 #include "../web/webmem.h"
 #include "../web/webmgr.h"
+#include "../web/websearch.h"
 #include "../wl/wl.h"
 #include "../wl/wl.h"
 #include "../wl/xdgact.h"
@@ -405,6 +420,7 @@ static int icon_source(const char *app, char *start, char *origin) {
 }
 
 #define ICON_FETCHES 4
+#define ICON_FETCHES_BG 3                               /* the last one is for the person's Refresh icon */
 static struct { char app[WEBREG_ID_MAX + 1]; int probe; char origin[WEBREG_URL_MAX + 1]; } fetches[ICON_FETCHES];
 
 static int fetch_of(const char *app) {
@@ -412,20 +428,37 @@ static int fetch_of(const char *app) {
     return -1;
 }
 
+/* fetches nobody will read: the probe is gone, or finished and unread for WEB_PROBE_BG_KEEP_MS (the shell gave up on
+ * it): their probe slot and entry go */
+static void fetches_sweep(void) {
+    for (int i = 0; i < ICON_FETCHES; i++) {
+        if (!fetches[i].probe) continue;
+        long age = webmgr_probe_age(fetches[i].probe);
+        if (age < 0 || age > WEB_PROBE_BG_KEEP_MS) {
+            webmgr_probe_release(fetches[i].probe);
+            memset(&fetches[i], 0, sizeof fetches[i]);
+        }
+    }
+}
+
 static JSValue f_fetch_icon(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t;
     const char *app = arg_str(c, argc, argv, 0);
     if (!app) return js_throw_code(c, "sys.badArgument", NULL);
+    int manual = argc > 1 && JS_ToBool(c, argv[1]) > 0;
     const char *err = NULL;
+    fetches_sweep();
     int id = 0, i = webreg_id_ok(app) ? fetch_of(app) : -1;
     if (!webreg_id_ok(app)) err = "webapps.badId";
     else if (i >= 0) id = fetches[i].probe;              /* already on its way */
     else {
         static char start[WEBREG_URL_MAX + 1], origin[WEBREG_URL_MAX + 1];
+        int busy = 0;
+        for (int k = 0; k < ICON_FETCHES; k++) busy += !!fetches[k].probe;
         for (i = 0; i < ICON_FETCHES && fetches[i].probe; i++) {}
-        if (i == ICON_FETCHES) err = "webapps.tooMany";
+        if (i == ICON_FETCHES || (!manual && busy >= ICON_FETCHES_BG)) err = "webapps.tooMany";
         else if (icon_source(app, start, origin)) err = "webapps.notInstalled";
-        else if ((id = webmgr_probe(start, &err))) {
+        else if ((id = webmgr_probe_ex(start, !manual, &err))) {
             snprintf(fetches[i].app, sizeof fetches[i].app, "%s", app);
             snprintf(fetches[i].origin, sizeof fetches[i].origin, "%s", origin);
             fetches[i].probe = id;
@@ -469,6 +502,7 @@ static JSValue f_icon_result(JSContext *c, JSValueConst t, int argc, JSValueCons
     if (j && !json_parse(j, strlen(j), &d, NULL, 0)) {
         const JVal *r = d.root;
         const char *e = json_str(r, "error"), *origin = json_str(r, "origin"), *path = json_str(r, "iconPath");
+        const char *why = json_str(r, "iconError");       /* why no icon was usable (webmgr.c: a web.probe.… code) */
         static char code[48];
         if (!json_bool(r, "ok", 0)) {
             /* the probe's own code (web.probe.…, webapps.probe…: made by lord-server, never the page's text) */
@@ -476,7 +510,10 @@ static JSValue f_icon_result(JSContext *c, JSValueConst t, int argc, JSValueCons
             snprintf(code, sizeof code, "%s", known ? e : "webapps.probeFailed");
             err = code;
         } else if (!err && (!origin || strcmp(origin, fetches[i].origin))) err = "webapps.iconOrigin";   /* it ended on another site */
-        else if (!err && (!path || !path[0])) err = "webapps.noIcon";
+        else if (!err && (!path || !path[0])) {
+            snprintf(code, sizeof code, "%s", why && webreg_probe_code_ok(why) ? why : "webapps.noIcon");
+            err = code;                                     /* copied: the answer's text is freed below */
+        }
         else if (!err && !probe_icon_path_ok(path)) err = "webapps.noIcon";
         else if (!err) {
             size_t len = 0;
@@ -488,6 +525,7 @@ static JSValue f_icon_result(JSContext *c, JSValueConst t, int argc, JSValueCons
         json_free(&d);
     } else if (j) err = "webapps.probeFailed";
     free(j);
+    webmgr_probe_release(fetches[i].probe);                 /* read: its slot is free now, not in 15 minutes */
     memset(&fetches[i], 0, sizeof fetches[i]);
     return icon_answer(c, err, kept);
 }
@@ -551,10 +589,44 @@ static JSValue f_launch(JSContext *c, JSValueConst t, int argc, JSValueConst *ar
         snprintf(wid, sizeof wid, "lordos-web.%s.%s", app, prof);
         const char *tk = xact_issue(xact_now(), XACT_LAUNCH_MS, 1, wid);
         if (webask_show(app, prof, tk)) fprintf(stderr, "webapps: %s/%s is running but the session bus is not there to show it\n", app, prof);
+        /* and it must answer within 5 s: a lord-web that hangs shows nothing, so it is started again (webalive.h) */
+        webalive_urgent(app, prof);
     }
     JS_FreeCString(c, app);
     JS_FreeCString(c, prof);
     return done(c, err, JS_NewString(c, raised ? "running" : "started"));
+}
+
+/* Force Quit and Restart (Settings → Web apps, the window's menu; the shell asked the person first): only the lord-web
+ * lord-server started for that app and profile (webmgr's table), never a pid from JS */
+static JSValue f_quit(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    const char *app = arg_str(c, argc, argv, 0), *prof = arg_str(c, argc, argv, 1);
+    int was = 0;
+    const char *err = !app || !prof ? "sys.badArgument" : webmgr_quit(app, prof, &was);
+    if (!err && was) fprintf(stderr, "webapps: %s/%s force quit\n", app, prof);
+    JS_FreeCString(c, app);
+    JS_FreeCString(c, prof);
+    return done(c, err, JS_NewBool(c, was));
+}
+
+static JSValue f_restart(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    const char *app = arg_str(c, argc, argv, 0), *prof = arg_str(c, argc, argv, 1);
+    int was = 0;
+    const char *err = !app || !prof ? "sys.badArgument" : webmgr_restart(app, prof, &was);
+    if (!err) fprintf(stderr, "webapps: %s/%s %s by the person\n", app, prof, was ? "restarted" : "started");
+    JS_FreeCString(c, app);
+    JS_FreeCString(c, prof);
+    return done(c, err, JS_NewString(c, was ? "restarted" : "started"));
+}
+
+/* Settings → Web apps → Restart web apps engine: every running lord-web, ended and started again */
+static JSValue f_restart_all(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc; (void)argv;
+    int n = webmgr_restart_all();
+    fprintf(stderr, "webapps: engine restarted by the person: %d app windows\n", n);
+    return JS_NewInt32(c, n);
 }
 
 static JSValue f_running(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
@@ -644,6 +716,20 @@ static JSValue f_edit(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
     return JS_NewBool(c, sent);
 }
 
+/* ✨ AI's Replace (docs/AI.md "Writing"), on the person's click in the shell's panel: the text to that app and profile's
+ * lord-web (webask_write_replace), which inserts it only where the menu's selection still is */
+static JSValue f_write_replace(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    const char *app = arg_str(c, argc, argv, 0), *prof = arg_str(c, argc, argv, 1), *text = arg_str(c, argc, argv, 2);
+    int ok = app && prof && text && webreg_id_ok(app) && webreg_id_ok(prof) && strlen(text) <= WEBAI_MAX;
+    int sent = ok && !webask_write_replace(app, prof, text);
+    JS_FreeCString(c, app);
+    JS_FreeCString(c, prof);
+    JS_FreeCString(c, text);
+    if (!ok) return js_throw_code(c, "sys.badArgument", NULL);
+    return JS_NewBool(c, sent);
+}
+
 /* The person's choice in a page's context menu (the "webapps-menu" event): one of its items, or "" */
 static JSValue f_menu_answer(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t;
@@ -666,6 +752,20 @@ static JSValue f_set_developer_mode(JSContext *c, JSValueConst t, int argc, JSVa
     (void)t;
     if (argc < 1 || !JS_IsBool(argv[0])) return js_throw_code(c, "sys.badArgument", NULL);
     return done(c, webmgr_set_developer(JS_ToBool(c, argv[0]) == 1), JS_TRUE);
+}
+
+/* Settings → Web apps → Search the web with (websearch.h): "google", "duckduckgo", "bing" or "startpage" */
+static JSValue f_search_engine(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc; (void)argv;
+    return JS_NewString(c, websearch_engine_name(webmgr_search_engine()));
+}
+
+static JSValue f_set_search_engine(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    const char *v = arg_str(c, argc, argv, 0);
+    const char *err = v ? webmgr_set_search_engine(v) : "sys.badArgument";
+    JS_FreeCString(c, v);
+    return done(c, err, JS_TRUE);
 }
 
 /* the shell asked the person first (<WebAppInspectPrompt />); the window starts again with the inspector on */
@@ -711,21 +811,27 @@ static const JSCFunctionListEntry webapps_funcs[] = {
     JS_CFUNC_DEF("setNotifySound", 2, f_set_notify_sound),
     JS_CFUNC_DEF("setColorScheme", 2, f_set_color_scheme),
     JS_CFUNC_DEF("setUserAgent", 3, f_set_user_agent),
-    JS_CFUNC_DEF("fetchIcon", 1, f_fetch_icon),
+    JS_CFUNC_DEF("fetchIcon", 2, f_fetch_icon),
     JS_CFUNC_DEF("iconResult", 1, f_icon_result),
     JS_CFUNC_DEF("icons", 0, f_icons),
     JS_CFUNC_DEF("badges", 0, f_badges),
     JS_CFUNC_DEF("launch", 2, f_launch),
     JS_CFUNC_DEF("running", 0, f_running),
+    JS_CFUNC_DEF("quit", 2, f_quit),
+    JS_CFUNC_DEF("restart", 2, f_restart),
+    JS_CFUNC_DEF("restartAll", 0, f_restart_all),
     JS_CFUNC_DEF("memory", 1, f_memory),
     JS_CFUNC_DEF("owner", 1, f_owner),
     JS_CFUNC_DEF("answer", 2, f_answer),
     JS_CFUNC_DEF("asks", 0, f_asks),
     JS_CFUNC_DEF("edit", 3, f_edit),
     JS_CFUNC_DEF("menuAnswer", 2, f_menu_answer),
+    JS_CFUNC_DEF("writeReplace", 3, f_write_replace),
     JS_CFUNC_DEF("developerMode", 0, f_developer_mode),
     JS_CFUNC_DEF("setDeveloperMode", 1, f_set_developer_mode),
     JS_CFUNC_DEF("inspect", 2, f_inspect),
+    JS_CFUNC_DEF("searchEngine", 0, f_search_engine),
+    JS_CFUNC_DEF("setSearchEngine", 1, f_set_search_engine),
 };
 
 /* notifyd's question: is pid one of our lord-web processes (and whose)? */

@@ -712,6 +712,7 @@
   "agent.toolsAutoFailed": "Az automatikus frissítés nem sikerült ({have} → {want}).",
   "agent.toolsUpdateBtn": "Frissítés",
   "agent.st.needsTools": "Eszközök kellenek",
+  "agent.st.oldLordos": "Frissítse benne a LordOS-t",
   "agent.st.needsXclip": "xclip kell",
   "agent.toolsInstalled": "A LordOS-eszközök telepítve vannak és futnak a gépen; minden bejelentkezéskor újraindulnak.",
   "agent.timesync": "Óra beállítása",
@@ -880,6 +881,8 @@
   "un.how.preseed": "A válaszok a telepítő saját indítófájljaiba kerülnek, a jelszava csak hash-ként, és a rendszer telepítése után törlődnek.",
   "un.how.autoinstall": "A válaszok egy kis lemezre kerülnek, amelyet a telepítő beolvas, a jelszava csak hash-ként, és a lemez a rendszer telepítése után eltávolításra kerül.",
   "un.how.kickstart": "A válaszok egy kis lemezre kerülnek, amelyet a telepítő beolvas, a jelszava csak hash-ként, és a lemez a rendszer telepítése után eltávolításra kerül.",
+  "un.how.kali": "A válaszok a telepítő saját indítófájljaiba kerülnek, a jelszava csak hash-ként, és a rendszer telepítése után törlődnek.",
+  "un.how.lordos": "A válaszok egy kis lemezre kerülnek, amelyet a telepítő beolvas, a jelszava csak hash-ként, és a lemez a rendszer telepítése után eltávolításra kerül.",
   "un.image": "Telepítés innen: {file}, a készítő aláírt listájával is ellenőrizve",
   "un.review": "Kérdések nélkül: {user} fiók a(z) {host} gépen",
   "un.reviewOff": "Ön válaszol a telepítő kérdéseire",
@@ -1100,6 +1103,7 @@
   "apps.menu": "Alkalmazások",
   "apps.needsAgent": "Az alkalmazásmódhoz a gép csatlakozott ügynöke kell",
   "win.appsNeedsTools": "Az alkalmazásmódhoz LordOS vagy Windows kell a gépen, a LordOS eszközeivel",
+  "win.appsOldLordos": "Az alkalmazásmódhoz LordOS {version} vagy újabb kell a gépen belül. Frissítse a LordOS-t a gépen; a LordOS eszközei önmagukban nem elegendők.",
   "apps.noApps": "A gép még nem sorolta fel az alkalmazásait",
   "apps.gone": "Ez az ablak bezárult a gépen",
   "apps.dropTitle": "Engedd el, hogy ezek a fájlok ennek a gépen belüli ablaknak jussanak",
@@ -2027,5 +2031,7 @@
   "req.row.answers": "Telepítési válaszok",
   "req.use.answers": "Maga a Machines készíti: nincs mit telepíteni",
   "req.st.download": "Létrehozáskor",
-  "req.st.builtin": "Beépített"
+  "req.st.builtin": "Beépített",
+  "cfg.closeOnStop": "Az ablak bezárása, amikor a gép leáll",
+  "cfg.closeOnStopNote": "Leállítás vagy Kikapcsolás után. Ha hiba miatt áll le, az ablak nyitva marad, és megmutatja, mi történt."
 }

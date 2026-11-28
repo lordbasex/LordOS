@@ -8,10 +8,11 @@ import {
   formatBytes, t as tr, ScrollView, Toolbar, ToolbarButton, ToolbarGroup, SearchField, Hairline, direction, spacing, typeScale, registerDockActions,
   useDisks, admin, systemInfo, lan, shortcutTaken, useSettings, cloudModel, cloud, errorText, useCloud, formatNumber, Button, openUrl,
   wayland, linuxAppFor, shortAppName, unmountedDisks, diskRelease, statusText, useSidebar, SidebarToggle, SidebarOverlay,
-  ConfirmDialog, Checkbox, setDefaultProvider, openExtOf, openHintsFor, slowClick, DOUBLE_CLICK_MS,
+  ConfirmDialog, Checkbox, setDefaultProvider, openExtOf, openHintsFor, slowClick, DOUBLE_CLICK_MS, SkinRegion, useSkinned,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { FolderGlyph, TAG_COLORS, TrashGlyph, DriveGlyph } from './glyphs.jsx';
+import { FolderGlyph, TAG_COLORS, TrashGlyph, DriveGlyph, EntryIcon } from './glyphs.jsx';
+import { filesViewModel, addressPath, SKIN_PLACES } from './skinmodel.js';
 import { IconView, ListView, ColumnView, GalleryView } from './views.jsx';
 import { ContextMenu, QuickLook, InfoPanel, Confirm } from './panels.jsx';
 import { loadEntries, sortEntries, groupEntries, sameLoc, userDirs, LIST_CAP } from './locations.js';
@@ -47,7 +48,7 @@ export function Icon({ size: s }) {
   );
 }
 
-// A menu never shows a key the theme takes: Lord Classic has ❖N, ❖D, ❖I, ❖A and ❖1…4, where Files answers to Ctrl as well.
+// A menu never shows a key the theme takes: Classic has ❖N, ❖D, ❖I, ❖A and ❖1…4, where Files answers to Ctrl as well.
 const ARROW_KEY = { '↑': 'ArrowUp', '↓': 'ArrowDown' };
 function localKey(hint) {
   const m = /^❖([A-Z0-9,↑↓])$/.exec(hint || '');
@@ -1172,41 +1173,133 @@ export default function Files() {
     </ScrollView>
   );
 
+  // ---- app skins (docs/THEMES-GUIDE.md, "App skins → Files") ----
+  // A theme may draw the toolbar, the address bar, the sidebar, the items, the status bar and the context menu; it gets
+  // this view model and asks for these actions, which do exactly what Files' own buttons do, with the same checks.
+  const statusText = msg || (loc.type === 'network' ? netStatus(netState, entries.foundCount || 0, entries.hiddenDevices || 0) : [sel.length ? tr('files.status.selected', { count: sel.length, total: flat.length }) : tr('files.items', { count: flat.length }),
+    waitShown ? tr('files.status.waiting') : '',
+    curAcc && entries.capped ? tr('cloud.listCapped', { count: formatNumber(LIST_CAP) }) : '',
+    curAcc ? footerLine(curAcc) : freeSpace ? tr('files.status.free', { free: formatBytes(freeSpace.free) }) : ''].filter(Boolean).join(curAcc ? ' · ' : ', '));
+  const skinned = useSkinned('files');
+  const iconRef = useRef(null);
+  if (!iconRef.current) {
+    // the file's own icon for a skin (a folder, a thumbnail, a document by kind, or the style pack's), by the item's key
+    iconRef.current = function FileIcon({ item, size = 32 }) {
+      const tt = useTheme();
+      const e = item && byPathRef.current.get(item.key);
+      return e ? <EntryIcon e={e} size={size} dark={tt.mode === 'dark'} /> : null;
+    };
+  }
+  const placeLoc = (id) => {
+    if (id === 'home') return homeLoc();
+    if (id === 'computer') return computerLoc();
+    if (id === 'network') return lan.available() ? { type: 'network' } : null;
+    if (id === 'recent' || id === 'trash') return { type: id };
+    const d = dirs.find((x) => x.label === id);
+    return d ? dirLoc(d.path) : null;
+  };
+  const skinPlaces = () => SKIN_PLACES.map((id) => ({ id, l: placeLoc(id) })).filter((p) => p.l).map(({ id, l }) => ({
+    id, kind: id === 'computer' || id === 'network' || id === 'trash' || id === 'recent' ? id : 'folder', selected: sideSel(l),
+    label: id === 'computer' ? computerName() : tr(`files.place.${id}`),
+  }));
+  const skinActions = useRef({});
+  // the actions read the current render's state through this ref: the object a skin holds stays the same (made only
+  // while a theme skins Files)
+  if (skinned) skinActions.current.now = {
+    back: goBack, forward: goForward, up: goUp,
+    goPlace: (id) => { const l = placeLoc(id); if (l) navigate(l); },
+    goCrumb: (i) => { if (crumbs[i]) navigate(crumbs[i].loc); },
+    // a typed address: a folder Files can open, else the status bar says it isn't there
+    goAddress: (text) => {
+      const p = addressPath(text, fs.home(), curDir);
+      if (!p) return false;
+      if (fs.isRemote(p)) { navigate(dirLoc(p)); return true; }
+      try { if (fs.stat(p).dir) { navigate(dirLoc(p)); return true; } } catch (e) { /* below */ }
+      setMsg(tr('files.fav.gone', { name: String(text).trim() }));
+      return false;
+    },
+    open: (key) => { const e = byPath.get(key); if (e) { cancelSlow(); open(e); } },
+    openSelection: () => openSel(),
+    select: (key, how = {}) => { const e = byPath.get(key); if (e) onItemDown(e, { button: 0, shift: !!how.range, ctrl: !!how.add, x: 0, y: 0 }); press.current = null; },
+    selectAll: () => selectAll(),
+    clearSelection: () => { if (renaming) commitRename(); setSelected(new Set()); },
+    // the context menu at the event's place (a skin's own row or background was right-clicked); Files builds the items
+    menu: (key, ev) => {
+      const at = ev && typeof ev.local === 'function' ? ev : { x: 0, y: 0, local: () => ({ x: 40, y: 40 }) };
+      if (key == null) onBgContext(at); else { const e = byPath.get(key); if (e) onContext(e, at); }
+    },
+    newFolder: () => newFolder(null),
+    rename: (key) => { const e = key ? byPath.get(key) : first; if (e) startRename(e); },
+    renameChange: (v) => setRenaming((r) => (r ? { ...r, value: String(v) } : r)),
+    renameCommit: () => commitRename(),
+    renameCancel: () => setRenaming(null),
+    copy: () => { if (selPaths.length) copyFiles(selPaths); },
+    cut: () => cutSel(),
+    paste: () => doPaste(),
+    trash: () => toTrash(),
+    duplicate: () => duplicate(),
+    info: () => setInfo(true),
+    quickLook: () => { if (sel.length) setQuick(true); },
+    terminal: () => openTerminal(),
+    emptyTrash: () => askEmpty(),
+    setView: (v) => { if (VIEWS.includes(v)) setView(v); },
+    sortBy: (by) => { if (['name', 'kind', 'date', 'size'].includes(by)) setSort(by); },
+    zoom: (d) => zoomStep(d > 0 ? 1 : -1),
+    search: (q) => setQuery(String(q || '')),
+    newWindow: () => wm.open('files', { new: true }),
+  };
+  if (skinned && !skinActions.current.stable) {
+    const stable = {};
+    for (const k of Object.keys(skinActions.current.now)) stable[k] = (...args) => skinActions.current.now[k](...args);
+    skinActions.current.stable = Object.freeze(stable);
+  }
+  const vm = skinned ? filesViewModel({
+    loc: baseLoc, title, crumbs: crumbs.map((c) => ({ label: c.label, folder: c.loc.type === 'dir' })), readOnly, readOnlyText: roWhy && loc.type === 'dir' ? tr(`files.readOnly.${roWhy}`) : null,
+    writable: !!wDir, canBack: !!tab.back.length, canForward: !!tab.fwd.length, canUp: (!!curDir && curDir !== '/' && curDir !== fs.home()) || baseLoc.type === 'archive',
+    view: shownView, views: VIEWS, sort: sortBy, zoom, query, items: flat, selected, cut, renaming, shownName: viewCtx.shownName,
+    places: skinPlaces(), statusText, message: msg, job: job ? { label: tr(job.move ? 'files.job.moving' : 'files.job.copying', { name: fs.basename(job.src) }), fraction: job.total ? Math.min(1, job.bytes / job.total) : 0 } : null,
+    emptyText: viewCtx.emptyText, loading: !!entries.loading, canPaste: canPaste(clip), FileIcon: iconRef.current,
+  }, skinActions.current.stable) : null;
+
   return (
     <View ref={root} style={{ flex: 1, flexDirection: 'row' }}>
       {/* sidebar (source list) */}
       {sb.narrow ? null : <View style={{ width: sideW, backgroundColor: t.sidebarBg }}>
         <Hairline edge="end" />
-        {sideScroll}
+        <SkinRegion app="files" region="sidebar" model={vm}>{sideScroll}</SkinRegion>
         <View onMouseDown={startSide} style={{ position: 'absolute', top: 0, bottom: 0, ...(direction() === 'rtl' ? { left: 0 } : { right: 0 }), width: 6, cursor: 'ew-resize' }} />
       </View>}
 
       <View style={{ flex: 1, minWidth: 0 }}>
         {/* toolbar */}
+        <SkinRegion app="files" region="toolbar" model={vm}>
         <Toolbar>
           {sb.narrow ? <SidebarToggle shown={sb.shown} onClick={sb.toggle} /> : null}
           <ToolbarGroup>
-            <ToolbarButton icon={direction() === 'rtl' ? '›' : '‹'} iconSize={20} small title={tr('files.menu.back')} onClick={goBack} disabled={!tab.back.length} />
-            <ToolbarButton icon={direction() === 'rtl' ? '‹' : '›'} iconSize={20} small title={tr('files.menu.forward')} onClick={goForward} disabled={!tab.fwd.length} />
+            <ToolbarButton icon={direction() === 'rtl' ? '›' : '‹'} iconName="back" iconSize={20} small title={tr('files.menu.back')} onClick={goBack} disabled={!tab.back.length} />
+            <ToolbarButton icon={direction() === 'rtl' ? '‹' : '›'} iconName="forward" iconSize={20} small title={tr('files.menu.forward')} onClick={goForward} disabled={!tab.fwd.length} />
           </ToolbarGroup>
-          <ToolbarButton icon={<NewFolderGlyph />} title={tr('files.menu.newFolder')} onClick={() => newFolder(null)} disabled={!wDir && !roWhy} />
+          <ToolbarButton icon={<NewFolderGlyph />} iconName="newFolder" title={tr('files.menu.newFolder')} onClick={() => newFolder(null)} disabled={!wDir && !roWhy} />
           {/* the folder's name is in the window's title bar, every theme draws it there */}
           <View style={{ flex: 1, minWidth: 0 }} />
           {curAcc && !tight ? <TransfersPill t={t} accounts={cf.accounts} acc={curAcc} /> : null}
           {narrow ? (
-            <View ref={viewBtn}><ToolbarButton icon={VIEW_GLYPH[tab.view]} title={tr('files.menu.view')} onClick={() => menuUnder(viewBtn, viewMenuItems())} /></View>
+            <View ref={viewBtn}><ToolbarButton icon={VIEW_GLYPH[tab.view]} iconName="views" title={tr('files.menu.view')} onClick={() => menuUnder(viewBtn, viewMenuItems())} /></View>
           ) : (
             <ToolbarGroup style={{ direction: 'ltr' }}>
-              {VIEWS.map((v) => <ToolbarButton key={v} small icon={VIEW_GLYPH[v]} iconSize={14} title={tr(`files.view.${v}`)} active={tab.view === v} onClick={() => setView(v)} />)}
+              {VIEWS.map((v) => <ToolbarButton key={v} small icon={VIEW_GLYPH[v]} iconName={v} iconSize={14} title={tr(`files.view.${v}`)} active={tab.view === v} onClick={() => setView(v)} />)}
             </ToolbarGroup>
           )}
-          <View ref={sortBtn}><ToolbarButton icon="⇅" title={tr('files.groupSort')} onClick={() => menuUnder(sortBtn, groupSortItems())} /></View>
-          {!narrow && <View ref={tagBtn}><ToolbarButton icon="●" iconSize={11} color={t.textDim} title={tr('files.menu.tags')} disabled={!sel.length} onClick={() => menuUnder(tagBtn, tagItems())} /></View>}
-          {loc.type === 'network' && <ToolbarButton icon="↻" iconSize={13} title={tr('files.net.search')} disabled={netState.running} onClick={searchLan} />}
-          {!tight && <ToolbarButton icon=">_" iconSize={12} title={tr('files.menu.openTerminal')} disabled={!curDir} onClick={() => openTerminal()} />}
-          <View ref={moreBtn}><ToolbarButton icon="⋯" title={tr('files.actions')} onClick={() => menuUnder(moreBtn, actionItems())} /></View>
+          <View ref={sortBtn}><ToolbarButton icon="⇅" iconName="sort" title={tr('files.groupSort')} onClick={() => menuUnder(sortBtn, groupSortItems())} /></View>
+          {!narrow && <View ref={tagBtn}><ToolbarButton icon="●" iconName="tags" iconSize={11} color={t.textDim} title={tr('files.menu.tags')} disabled={!sel.length} onClick={() => menuUnder(tagBtn, tagItems())} /></View>}
+          {loc.type === 'network' && <ToolbarButton icon="↻" iconName="refresh" iconSize={13} title={tr('files.net.search')} disabled={netState.running} onClick={searchLan} />}
+          {!tight && <ToolbarButton icon=">_" iconName="terminal" iconSize={12} title={tr('files.menu.openTerminal')} disabled={!curDir} onClick={() => openTerminal()} />}
+          <View ref={moreBtn}><ToolbarButton icon="⋯" iconName="more" title={tr('files.actions')} onClick={() => menuUnder(moreBtn, actionItems())} /></View>
           <SearchField value={query} onChange={setQuery} placeholder={tr('files.search')} width={tight ? 120 : narrow ? 150 : 180} />
         </Toolbar>
+        </SkinRegion>
+        {/* Files has no address bar of its own (the path bar is at the bottom); a skin may draw one here */}
+        <SkinRegion app="files" region="addressBar" model={vm} />
         {query.trim() !== '' && (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingHorizontal: spacing.m, height: 32 }}>
             <Hairline edge="bottom" />
@@ -1257,13 +1350,16 @@ export default function Files() {
         {/* content */}
         <View style={{ flex: 1 }} onMouseDown={() => { if (renaming) commitRename(); setSelected(new Set()); }} onContextMenu={onBgContext}
           {...(curDir ? { dropPath: curDir } : {})}>
+          <SkinRegion app="files" region="itemView" model={vm}>
             {view === 'icons' && <IconView groups={groups} ctx={viewCtx} />}
             {view === 'list' && <ListView groups={groups} ctx={viewCtx} sort={sortBy} onSort={setSort} />}
             {view === 'columns' && <ColumnView root={curDir || fs.home()} chain={tab.chain} setChain={(chain) => patchTab((x) => chainStep(x, chain, viewCtx.isDir))} entriesOf={entriesOf} ctx={viewCtx} sort={tab.sort}
               widths={prefs.colWidths} onWidth={onColWidth} />}
             {view === 'gallery' && <GalleryView entries={flat} ctx={viewCtx} />}
+          </SkinRegion>
         </View>
         {/* path bar and status bar */}
+        <SkinRegion app="files" region="statusBar" model={vm}>
         <View style={{ height: 26, flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingHorizontal: spacing.m, overflow: 'hidden' }}>
           <Hairline edge="top" />
           <PathCrumbs t={t} crumbs={crumbs.map((c) => ({ label: c.label, folder: c.loc.type === 'dir', drop: c.loc.type === 'dir' ? { dropPath: c.loc.path } : null }))} onGo={(i) => navigate(crumbs[i].loc)} />
@@ -1285,13 +1381,11 @@ export default function Files() {
             </View>
           ) : (
             <Text style={{ fontSize: typeScale.caption, color: msg ? t.accent : t.textDim, whiteSpace: 'nowrap', overflow: 'hidden' }}>
-              {msg || (loc.type === 'network' ? netStatus(netState, entries.foundCount || 0, entries.hiddenDevices || 0) : [sel.length ? tr('files.status.selected', { count: sel.length, total: flat.length }) : tr('files.items', { count: flat.length }),
-                waitShown ? tr('files.status.waiting') : '',
-                curAcc && entries.capped ? tr('cloud.listCapped', { count: formatNumber(LIST_CAP) }) : '',
-                curAcc ? footerLine(curAcc) : freeSpace ? tr('files.status.free', { free: formatBytes(freeSpace.free) }) : ''].filter(Boolean).join(curAcc ? ' · ' : ', '))}
+              {statusText}
             </Text>
           )}
         </View>
+        </SkinRegion>
       </View>
 
       {sb.narrow && sb.shown ? <SidebarOverlay width={sideW} onClose={sb.close}>{sideScroll}</SidebarOverlay> : null}
@@ -1322,7 +1416,11 @@ export default function Files() {
       {remoteAsk && <RemoteSheet ask={remoteAsk} onClose={() => setRemoteAsk(null)} onMounted={(at) => { const a = remoteAsk; noteOrigin(at, `${a.kind}://${a.user ? `${a.user}@` : ''}${a.host}${a.port ? `:${a.port}` : ''}${a.path ? `/${a.path.replace(/^\/+/, '')}` : ''}`); setRemoteAsk(null); setVolumes(fs.volumes()); navigate(dirLoc(at)); }}
         onStore={(pkg) => { setRemoteAsk(null); wm.open('store', { args: { search: pkg, package: pkg } }); }}
         onTerminal={remoteAsk.ssh ? () => { const typed = remoteAsk.ssh; setRemoteAsk(null); wm.open('terminal', { new: true, args: { typed } }); } : null} />}
-      {menu && <ContextMenu x={menu.x} y={menu.y} items={localKeys(menu.items)} onClose={() => setMenu(null)} bounds={bounds()} />}
+      {menu && (
+        <SkinRegion app="files" region="contextMenu" model={{ x: menu.x, y: menu.y, items: localKeys(menu.items), close: () => setMenu(null), bounds: bounds() }}>
+          <ContextMenu x={menu.x} y={menu.y} items={localKeys(menu.items)} onClose={() => setMenu(null)} bounds={bounds()} />
+        </SkinRegion>
+      )}
     </View>
   );
 }

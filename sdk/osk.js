@@ -13,7 +13,8 @@ import { addListener, displayFor, mainDisplay, onCommit, shellHasKeyboard } from
 import { createStore } from './store.js';
 import { settings } from './settings.js';
 import { keyboard } from './keyboard.js';
-import { wm, windows, workAreaOf, windowChrome, appIdOf, appMenus } from './windows.js';
+import { wm, windows, workAreaOf, windowChrome, appIdOf } from './windows.js';
+import { menusWithSpeech } from './voice.js';
 import { shellLayers } from './layers.js';
 import { onTextField, textFieldActive, textFieldCaret } from './textfocus.js';
 import { TOP_GAP, caretOnScreen, fallbackLabels, panelSize, planAvoid } from './oskmodel.js';
@@ -59,8 +60,9 @@ function fieldWindow() {
   return w && !w.minimized ? w : null;
 }
 
-// From the window's top to its content: the title bar, and Lord Classic's menu strip when it has one.
-const contentTop = (w) => (w.args?.csd ? 0 : windowChrome().h + (appMenus.get()[w.id]?.length ? windowChrome().menu || 0 : 0));
+// From the window's top to its content: the title bar, and Classic's menu strip when it has one.
+// a Linux window's menu strip (its Edit menu with Speech) counts as the app's own menus do (sdk/shellxmodel.js chromeInset)
+const contentTop = (w) => (w.args?.csd ? 0 : windowChrome().h + (menusWithSpeech(w.id, undefined, w)?.length ? windowChrome().menu || 0 : 0));
 
 function boxFor(w) {
   const d = w ? displayFor(wm.frame(w)) : mainDisplay();

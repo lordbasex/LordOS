@@ -128,5 +128,6 @@
   "user.user": "İstifadəçi adı",
   "user.userHint": "Kiçik hərflər, rəqəmlər, - və _. Administrator (sudo) olacaq.",
   "welcome.text": "Bu köməkçi LordOS-u bu kompüterin diskinə quraşdırır. Dili, klaviaturanı, diski və istifadəçinizi seçəcəksiniz. Quraşdırma seçilmiş diski silir, əgər mövcud olanların yanında quraşdırmırsınızsa və ya bölmələri özünüz seçmirsinizsə.",
-  "welcome.title": "LordOS-a xoş gəlmisiniz"
+  "welcome.title": "LordOS-a xoş gəlmisiniz",
+  "disk.unreadable": "Bir diskin təsviri oxuna bilmədi, ona görə siyahıda yoxdur. Yenidən axtarın; hələ də yoxdursa, xahiş edirik bildirin."
 }

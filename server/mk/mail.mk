@@ -55,6 +55,7 @@ build/obj/mail/mimg.o: src/mail/mimg.c
 build/lord-maild: $(LMD_SRC) build/obj/mail/mimg.o $(MAIL_HDR) src/sec/sandbox.h src/sec/cgroup.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ $(LMD_SRC) build/obj/mail/mimg.o $(shell pkg-config --libs openssl) -lpthread -lm
+	chmod g-w $@
 # manual driver for lord-maild (not in `make test`): build/maild-cli '{"op":"status"}' --wait 5
 build/maild-cli: tests/maild_cli.c src/mail/mailc.c src/doc/wire.c src/sec/json.c src/mail/mailc.h $(NETCONN_SRC)
 	@mkdir -p build

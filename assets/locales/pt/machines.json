@@ -712,6 +712,7 @@
   "agent.toolsAutoFailed": "A atualização automática não funcionou ({have} → {want}).",
   "agent.toolsUpdateBtn": "Atualizar",
   "agent.st.needsTools": "Precisa das ferramentas",
+  "agent.st.oldLordos": "Atualize o LordOS nela",
   "agent.st.needsXclip": "Precisa do xclip",
   "agent.toolsInstalled": "As ferramentas do LordOS estão instaladas e funcionando na máquina; iniciam de novo a cada entrada na sessão.",
   "agent.timesync": "Acertar o relógio",
@@ -880,6 +881,8 @@
   "un.how.preseed": "As respostas vão nos arquivos de início do próprio instalador, sua senha só como hash, e são apagadas quando o sistema estiver instalado.",
   "un.how.autoinstall": "As respostas vão num pequeno disco que o instalador lê, sua senha só como hash, e o disco é removido quando o sistema estiver instalado.",
   "un.how.kickstart": "As respostas vão num pequeno disco que o instalador lê, sua senha só como hash, e o disco é removido quando o sistema estiver instalado.",
+  "un.how.kali": "As respostas vão nos arquivos de início do próprio instalador, sua senha só como hash, e são apagadas quando o sistema estiver instalado.",
+  "un.how.lordos": "As respostas vão num pequeno disco que o instalador lê, sua senha só como hash, e o disco é removido quando o sistema estiver instalado.",
   "un.image": "Instala a partir de {file}, também verificada com a lista assinada de quem a faz",
   "un.review": "Sem perguntas: conta {user} em {host}",
   "un.reviewOff": "Você responde às perguntas do instalador",
@@ -1100,6 +1103,7 @@
   "apps.menu": "Aplicativos",
   "apps.needsAgent": "O modo apps precisa do agente da máquina, conectado",
   "win.appsNeedsTools": "O modo apps precisa do LordOS ou do Windows na máquina, com as ferramentas do LordOS",
+  "win.appsOldLordos": "O modo apps precisa do LordOS {version} ou posterior dentro da máquina. Atualize o LordOS na máquina; só as ferramentas do LordOS não bastam.",
   "apps.noApps": "A máquina ainda não listou seus apps",
   "apps.gone": "Esta janela foi fechada na máquina",
   "apps.dropTitle": "Solte para entregar estes arquivos a esta janela da máquina",
@@ -2027,5 +2031,7 @@
   "req.row.answers": "Respostas de instalação",
   "req.use.answers": "Feitas pelo próprio Machines: nada a instalar",
   "req.st.download": "Ao criar",
-  "req.st.builtin": "Incluído"
+  "req.st.builtin": "Incluído",
+  "cfg.closeOnStop": "Fechar a janela quando a máquina parar",
+  "cfg.closeOnStopNote": "Depois de um desligamento ou de Desligar. Se ela parar por causa de um problema, a janela fica aberta para mostrar o que aconteceu."
 }

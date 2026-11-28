@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from 'react';
 import { EntryIcon, TagDots, tagTint } from './glyphs.jsx';
 import { kindOf, isImage, isTextual, thumbSrc } from './kinds.js';
 import { tagsOf, commentOf } from './ops.js';
+import { renameSelection } from './names.js';
 import { visible, resize, moveColumn, dropBefore, totalWidth, NAME_MIN } from './columns.js';
 import { sortEntries } from './locations.js';
 import { colWidth, clampCol, fitCol, colStrip, chainFolder } from './colview.js';
@@ -35,7 +36,7 @@ function Name({ e, ctx, center, color, lines = 1, font, line, fieldW, room }) {
       <View onMouseDown={(ev) => ev.stopPropagation()} style={{ width: fieldW || (center ? 110 : 240), height: h }}>
         <View style={{ position: 'absolute', left: 0, right: 0, top: Math.round((h - FIELD_H) / 2), height: FIELD_H }}>
           {/* Tab keeps the new name, as Enter does, instead of leaving the field open without the keys (sdk/focus.js) */}
-          <TextInput autoFocus selectAll value={ctx.renaming.value} onChange={ctx.onRenameChange} onSubmit={ctx.onRenameCommit} onCancel={ctx.onRenameCancel}
+          <TextInput autoFocus selectAll select={renameSelection(ctx.renaming.value, !!e.dir)} value={ctx.renaming.value} onChange={ctx.onRenameChange} onSubmit={ctx.onRenameCommit} onCancel={ctx.onRenameCancel}
             onKeyDown={(k) => { if (k.key !== 'Tab' || k.ctrl || k.alt || k.meta) return false; ctx.onRenameCommit(); return true; }}
             style={{ height: FIELD_H, paddingHorizontal: 4 }} />
         </View>

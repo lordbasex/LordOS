@@ -681,6 +681,7 @@ sudo usermod -aG lpadmin lord        # manage printers (LordOS administrators ha
 | `samba` (`--no-install-recommends`) | 4.22.11 | VM 127, for about ten minutes on 2026-11-11 (GitHub #101): `smbd` run by hand on `127.0.0.1:4445` only, with its own `smb.conf`, passdb and folders in `/tmp`, every unit masked before installing; `build/lan-list` signed in with `server signing` set to default, disabled and mandatory, directly and through a loopback proxy that leaves the final session setup answer unsigned as a server that doesn't require signing does. Purged with its dependencies and the units unmasked afterwards |
 | `qemu-system-x86`, `qemu-utils`, `ovmf`, `passt`, `swtpm`, `qemu-system-modules-opengl` (`--no-install-recommends`) | Debian 13's | VM 127, 2026-11-20: Machines' own packages (what `vm-enable` installs), to see the New Machine sheet and Configure on a test machine (`~/Machines/Prueba.lordvm`, never started; no nested KVM). Windows 11 itself was tested on the maintainer's PC (125 GB of RAM), not here |
 | `libwpewebkit-2.0-1` 2.54.3-1~lordos13+2 (our backport, from `dpkg -i`), with `libhyphen0`, `libenchant-2-2` (and its `enchant-2`, `aspell`, `aspell-en`, `hunspell-en-us`, `dictionaries-common`, `emacsen-common`, `libtext-iconv-perl` from `apt-get --fix-broken install`) | 2.54.3 / Debian 13's | VM 127, 2026-11-25: `lordos-web` 0.8.9.5+ws147 depends on WPE WebKit 2.54, which Debian 13 doesn't have; Debian's `wpewebkit-webdriver` 2.48.3 (pinned to the old library) was removed to let it in. For the ws147 desktop e2e pass (a web app loads and follows a link) |
+| `gstreamer1.0-nice` (libnice's ICE for GStreamer) | Debian 13's | the ws171 QA VM (plain Debian 13), 2026-11-27: `lordos-web` 0.8.9.6.2 Depends on it (WebRTC calls in web apps, `tools/iso/mkdeb-web.sh`); installed by hand there because the package was installed with `dpkg -i`, which installs no dependency. `apt install ./lordos-web_….deb` and LordOS's package engine (Store updates) resolve it |
 | `thunderbird` (with its Recommends) | 1:153.7.0esr-1~deb13u1 | VM 127, 2026-11-25 (GitHub #188): drag and drop in Thunderbird on Wayland (`MOZ_ENABLE_WAYLAND=1`) and on X11 (`MOZ_ENABLE_WAYLAND=0 GDK_BACKEND=x11`): a message between Local Folders, files from Files into a compose window, a message out to Files and to the desktop. A throwaway profile (`--profile ~/tbtest --no-remote`) with only Local Folders and `.example.invalid` messages, no mail account; the profile was deleted afterwards and Thunderbird left installed |
 | `gcc-mingw-w64-x86-64-posix` (with `binutils-mingw-w64-x86-64`, `mingw-w64-x86-64-dev`) | 14.2.0-19+27 | the build machine (the maintainer's PC), 2026-11-20: cross-builds `lordos-guest-win.exe`, the LordOS guest tools Machines installs into Windows guests (`server/mk/vm.mk`, `tools/guest-win`); the rule is skipped with a note when it is missing, and `mkdeb.sh` then refuses an amd64 package without it. Tested against the Windows 11 clone `~/lordos-test/vms/win-tools.lordvm` (virtio-win 0.1.271 drivers) with `lordvm-dev` |
 | `avahi-daemon`, `avahi-utils` | 0.8 | CUPS announces and finds printers; in the tests, announcing the scanner (`avahi-publish`). LordOS's mDNS doesn't need it |
@@ -1343,7 +1344,7 @@ See `WAYLAND.md` ("X11 apps (Xwayland)") and `PRIVACY.md` ("X11 apps"). Installe
 
 ## Step 35 — The Classic theme as a second full appearance (VM 119 `lordos-spot`, October 19)
 
-See `DESIGN.md` ("Lord Classic") and `WINDOWS.md` ("Snapping"). On VM 119 (172.17.0.54), tree in
+See `DESIGN.md` ("Classic") and `WINDOWS.md` ("Snapping"). On VM 119 (172.17.0.54), tree in
 `~/LordOS-classic`, built there (`make -C server`, `make -C server test`) and installed into
 `/usr/lib/lordos` (`lord-server`, `lord-media`, `lord-vault`, `lord-maild`, the theme bundles, the
 app host, the system apps, `assets/{fonts,locales,shell,icons,mascot,monitor,help}` and the wallpaper
@@ -1889,7 +1890,24 @@ sudo apt-get install -y --no-install-recommends picard   # 2026-11-11: a Qt 5 ap
                                    # xcb fallback, docs/WAYLAND.md "How to open an app")
 sudo apt-get install -y gparted    # 2026-11-11: an X11 app run as root through pkexec, for GitHub #107 (the X cookie,
                                    # docs/WAYLAND.md "How it starts"); x11-utils (xdpyinfo) came with the ISO
+sudo apt-get install -y --no-install-recommends gir1.2-gtk-3.0 python3-pyqt6
+                                   # 2026-11-25: the GTK 3 and Qt 6 rows of lordos-testbench --toolkits
+                                   # (docs/TOOLKIT-AUDIT.md, "Measured"; 3.24.49-3 and 6.9.0-2 with Qt 6.8.2).
+                                   # python3-gi, gir1.2-gtk-4.0 and python3-pyqt5 (5.15.11) were already there
 ```
+
+**2026-11-26, the toolkit audit's packages ship with LordOS** (docs/TOOLKIT-AUDIT.md, "Shipped"). They are in the ISO and the
+Raspberry Pi image (`PKGS_TOOLKITS`) and Recommends of the `lordos` package, so VM 127 and the dev VMs get them with the next
+update of `lordos`, the Store's update installing the new Recommends; nothing is installed by hand any more. The whole list,
+all from trixie (amd64 and arm64):
+
+```sh
+python3-gi gir1.2-gtk-3.0 gir1.2-gtk-4.0 python3-pyqt5 python3-pyqt6 qtwayland5 qt6-wayland   # the bindings and Qt's Wayland plugins
+qgnomeplatform-qt5 qgnomeplatform-qt6        # 0.9.2: QT_QPA_PLATFORMTHEME=gnome (server/src/wl/toolkitenv.h), Qt follows dark mode
+```
+
+On the maintainer's development PC (Debian 13, not LordOS's VMs) the bindings were already installed; QGnomePlatform was
+tested headless from the trixie packages unpacked into a scratch folder (`QT_PLUGIN_PATH`, `LD_LIBRARY_PATH`), not installed.
 
 Driving the VM from the Proxmox host: `qm sendkey 127 <key>` for keys and `qm monitor 127` → `screendump` for the screen. The
 monitor's `mouse_move` doesn't reach the guest; the pointer is moved with QMP `input-send-event` (`abs` x and y in 0–32767 on

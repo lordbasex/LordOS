@@ -94,7 +94,7 @@ static size_t seed(int kind, uint8_t *b) {
                size_t n = 0; int k = 1 + (int)below(20);
                for (int i = 0; i < k && n < 900; i++) { const char *t = chance(50) ? tags[below(sizeof tags / sizeof *tags)] : "text \xc3\xa9 "; size_t l = strlen(t); memcpy(b + n, t, l); n += l; }
                return n; }
-    default: { const char *h = "lordos-guest 10 clipboard clipx clipreq windows perf shell links notify send"; size_t n = strlen(h); memcpy(b, h, n); return n; }
+    default: { const char *h = "lordos-guest 11 clipboard clipx clipreq windows perf shell links notify send"; size_t n = strlen(h); memcpy(b, h, n); return n; }
     }
 }
 

@@ -14,14 +14,16 @@ keywords: placa de vídeo, gpu, nvidia, amd, intel, driver, cuda, compatibilidad
 
 O suporte a NVIDIA é **experimental e verificado pela comunidade**. A equipe do LordOS testou gráficos Intel e AMD nos
 próprios computadores, mas não todos os modelos da NVIDIA, então uma placa NVIDIA diz *"Experimental — ainda não
-verificada no modelo da sua placa"*. Seus usos futuros aparecem como **planejados**:
+verificada no modelo da sua placa"*. O driver livre (nouveau, do Mesa) é o padrão. O driver da própria NVIDIA é
+opcional: Loja → Para este computador o oferece para uma placa NVIDIA enquanto o driver livre está em uso.
+Seus usos aparecem assim:
 
-- **IA e computação (CUDA):** instalar o driver da NVIDIA e as bibliotecas CUDA pelos Ajustes.
-- **Área de trabalho:** desenhar a área de trabalho com o driver da NVIDIA.
-
-Nenhum dos dois pode ser ativado ainda, e o LordOS não muda nada na placa até que estejam prontos: os dois precisam de
-ações de sistema que ainda estão em revisão, e a área de trabalho precisa também de sincronização explícita no servidor
-de tela.
+- **IA e computação (CUDA):** **planejado**; o LordOS ainda não oferece.
+- **Área de trabalho:** **experimental**. Na placa que desenha a sua sessão, os Ajustes mostram como a área de trabalho
+  é composta de fato (na placa ou pelo processador). Com o driver da NVIDIA, até agora um relato da comunidade mostra a
+  área de trabalho composta na placa (uma GTX 1070, Pascal, driver 580); um anterior (uma RTX 3060 no LordOS 0.8.8.9)
+  era composto pelo processador, e outra pessoa viu janelas de alguns apps não aparecerem depois de instalar o driver.
+  Mais relatos nos dizem quais placas e drivers funcionam.
 
 ## Como ajudar a testar
 

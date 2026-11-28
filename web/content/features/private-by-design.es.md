@@ -102,6 +102,21 @@ Una ventana se puede marcar como protegida. La de Contraseñas lo está. En las 
 
 [[shot:5]]
 
+## Un agente de IA en tu escritorio, con tu permiso (desde la 0.8.9.6.2)
+
+Desde la 0.8.9.6.2: **Manos** deja que un agente de IA como Claude Code use el escritorio de LordOS como Claude in Chrome usa un navegador. Se conecta con `lordos-mcp` (`claude mcp add -s user lordos-mcp -- lordos-mcp`), que habla con `org.lordos.Hands1` de `lord-server` en el bus de sesión. En vez de adivinar a partir de los píxeles, el agente lee el árbol de la interfaz del propio LordOS: cada botón, campo, menú y fila con su rol, su nombre, su estado y una `ref` estable. Puede listar las ventanas, abrir apps y archivos, hacer clic, escribir, desplazarse, sacar capturas, poner el valor de un campo, leer el registro de una app y grabar un GIF. Ninguna herramienta ejecuta código, y sus clics y teclas pasan por el propio camino de entrada de `lord-server`, nunca por `/dev/uinput`.
+
+- **Apagado hasta que lo encendés**, en Ajustes → Inteligencia artificial → Manos, solo para esta sesión.
+- **Cada programa pregunta primero.** Un aviso del sistema muestra el nombre y la ruta del programa que informa, marcados como no verificados, con Esta sesión o Denegar. Solo tu mouse y tu teclado reales lo responden.
+- **Lo ves y lo detenés.** Mientras un agente trabaja, cada pantalla muestra «Claude Code está usando tu computadora» con Detener; **Ctrl+Alt+Esc** detiene a todos los agentes y apaga Manos. Bloquear la pantalla también lo detiene, y cuando tocás el mouse o el teclado el agente espera 3 segundos.
+- **Lo ves trabajar.** El agente tiene su propio cursor violeta, con el nombre que da («informado», sin verificar). En modo *humano*, el predeterminado, se desliza hasta cada botón, se detiene y recién entonces hace clic, y escribe al ritmo de una persona; el modo *máquina* actúa al instante y solo destella donde cae (Ajustes → Inteligencia artificial → Manos → Movimiento del agente). Tu puntero nunca se mueve por él.
+- **Lista opcional** («Solo estas apps»), límites de ritmo y un registro de lo que hizo en palabras cerradas, nunca tu texto.
+- **Nunca a su alcance:** los avisos de permiso, del llavero, de contraseña y de administrador, los campos de contraseña, las ventanas protegidas, Ajustes → Inteligencia artificial → Manos, las confirmaciones destructivas, las páginas de la Tienda, Privacidad, Usuarios, Actualizaciones y Firewall, la pantalla de bloqueo y la de inicio de sesión. Las capturas las muestran en negro.
+- **Lo que no puede prometer:** los programas que corren como vos son una sola frontera de confianza en cualquier escritorio; LordOS no dice distinguir un Claude Code real de un programa que dice serlo, y por eso muestra el nombre como informado y te pregunta.
+- **Probá una app sin tocar tu escritorio:** `lordos-mcp --headless notes` arranca un escritorio privado que nadie ve, con archivos de ejemplo, que se borra al terminar.
+
+Lo verifican `build/hands-test` (91 verificaciones), `hands_model_test.mjs` (49) y una prueba de punta a punta con 33 verificaciones en un escritorio sin pantalla (importar un archivo en Notas, un aviso de permiso rechazado, el Detener del aviso, el diálogo de confianza de un tema rechazado).
+
 ## Límites honestos
 
 - **Las apps de Linux no están en caja de arena de forma predeterminada.** Se les aplican las reglas de red, la atribución y las restricciones que fijes; las restricciones no cubren el portapapeles, el Bluetooth a través de BlueZ en el bus del sistema, el bus del sistema en general ni los programas iniciados fuera del lanzador de apps.
@@ -121,3 +136,4 @@ Una ventana se puede marcar como protegida. La de Contraseñas lo está. En las 
 - [sdk/privacy.js](https://github.com/lordbasex/LordOS/blob/main/sdk/privacy.js) y [sdk/powerbox.jsx](https://github.com/lordbasex/LordOS/blob/main/sdk/powerbox.jsx): los avisos y el diálogo de archivos
 - [server/tests/sandbox_test.c](https://github.com/lordbasex/LordOS/blob/main/server/tests/sandbox_test.c) y [tests/lpk-evil](https://github.com/lordbasex/LordOS/tree/main/tests/lpk-evil): las pruebas
 - [docs/PRIVACY.md](https://github.com/lordbasex/LordOS/blob/main/docs/PRIVACY.md)
+- [docs/HANDS.md](https://github.com/lordbasex/LordOS/blob/main/docs/HANDS.md): el diseño de Manos (un agente de IA en el escritorio, desde la 0.8.9.6.2)

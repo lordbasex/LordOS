@@ -15,8 +15,8 @@
 #    accepted, bad signature, truncated, link, writable by others, not root's, older version all refused). Theme b
 #    must be refused when lord.themes.use asks for it (js_theme_prepare), before anything is discarded: the running
 #    theme is never stopped, and no switch starts.
-# 3. Live, the four desktops (needs node with esbuild, npm install, and build/wlperf-client): the real Lord Flow, Lord
-#    Classic, Lord Workspaces and Lord Celeste with a small driver (tests/theme_switch_scene.mjs) that opens Settings
+# 3. Live, the four desktops (needs node with esbuild, npm install, and build/wlperf-client): the real Flow, Lord
+#    Classic, Workspaces and Celeste with a small driver (tests/theme_switch_scene.mjs) that opens Settings
 #    and Files and switches to the next one through the SDK's themes.use, round all four and back, while a Wayland
 #    client draws on every frame callback. The process must stay up, each step must run the desktop asked for with the
 #    two apps back, the "changing the desktop style" overlay must be up while it switches, the Wayland client must stay

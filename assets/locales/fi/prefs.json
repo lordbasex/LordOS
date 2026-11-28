@@ -202,6 +202,7 @@
   "power.healthNormal": "Akun kunto: {pct} % (normaali)",
   "power.healthService": "Akun kunto: {pct} % (huoltoa suositellaan)",
   "power.healthUnknown": "Akun kunto: tuntematon",
+  "power.h": "{h} h",
   "power.hm": "{h} h {m} min",
   "power.immediately": "Heti",
   "power.left": "{time} jäljellä",

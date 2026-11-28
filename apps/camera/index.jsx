@@ -6,7 +6,7 @@
 // light theme.
 import {
   View, Text, Image, MediaView, Toggle, useTheme, useKeyboard, wm,
-  t as tr, errorText, media, usePlayer, useThumb, userDirs, fs, mediaFormatTime, useSettings, useCameras,
+  t as tr, errorText, media, usePlayer, useThumb, userDirs, fs, mediaFormatTime, useSettings, useCameras, SkinHeader, appName, getApp,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 
@@ -86,7 +86,10 @@ function NoCamera({ title, hint }) {
   );
 }
 
-export default function Camera() {
+// (0.8.9.6.2) app skins (docs/THEMES-GUIDE.md, "App skins → the shared shapes"): a header a theme may add above the app
+export default function Camera() { return <SkinHeader app="camera" title={appName(getApp('camera'))}><CameraMain /></SkinHeader>; }
+
+function CameraMain() {
   const th = useTheme();
   const [s, update] = useSettings();
   const mirror = (s.camera?.mirror ?? true);

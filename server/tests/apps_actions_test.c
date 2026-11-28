@@ -106,6 +106,17 @@ int main(void) {
         m = apps_list("es", &l2);
         for (int i = 0; i < m; i++) if (!strcmp(l2[i].id, "lord-demo")) nm = l2[i].name;
         CHECK("es: not the modified one", !strcmp(nm, "Demo"));
+        /* (ws170 QA BUG-23) every Name[xx] the file has, for Hands' open_app: not a modifier's */
+        const char *names = "";
+        for (int i = 0; i < m; i++) if (!strcmp(l2[i].id, "lord-demo")) names = l2[i].names;
+        CHECK("names: Name[es_AR], not Name[en@shaw] or Name[es@x]", !strcmp(names, "Demo AR"));
+        char list[16] = "";
+        apps_add_name(list, sizeof list, "Uno");
+        apps_add_name(list, sizeof list, "Dos");
+        apps_add_name(list, sizeof list, "Uno");
+        apps_add_name(list, sizeof list, "Demasiado largo");
+        apps_add_name(list, sizeof list, "a\nb");
+        CHECK("names: each once, one per line, never cut", !strcmp(list, "Uno\nDos"));
     }
 
     /* a package that names its file freely ("Lord Spaced App.desktop"): listed as Lord-Spaced-App,
@@ -234,20 +245,35 @@ int main(void) {
                      home, fps[i][0], commit, fps[i][0], commit, fps[i][0], fps[i][0], fps[i][0], commit, fps[i][0], fps[i][1], fps[i][0]);
             if (system(tree)) {}
         }
+        /* (ws170 QA BUG-22) a second export of an app, named after its id plus a suffix, declares the types (LibreOffice's
+         * .writer): they go to the app's own entry, which becomes an "Open with" choice; an export of no installed app adds
+         * nothing to anyone */
+        snprintf(tree, sizeof tree, "d='%s/.local/share/flatpak/exports/share/applications' && "
+                 "printf '[Desktop Entry]\nType=Application\nName=Writer\nExec=nope\nMimeType=application/vnd.oasis.opendocument.text;text/plain;\n' > \"$d/org.example.NoMime.writer.desktop\" && "
+                 "printf '[Desktop Entry]\nType=Application\nName=Other\nExec=nope\nMimeType=image/png;\n' > \"$d/org.example.Nothere.desktop\" && "
+                 "printf '[Desktop Entry]\nType=Application\nName=Calc\nExec=nope\nMimeType=text/csv;\n' > \"$d/org.example.Opens.calc.desktop\"", home);
+        if (system(tree)) {}
         const DesktopApp *fl;
         int nf = apps_flatpak_list("en", &fl), no = -1, yes = -1;
         for (int i = 0; i < nf; i++) {
             if (!strcmp(fl[i].id, "org.example.NoMime")) no = i;
             if (!strcmp(fl[i].id, "org.example.Opens")) yes = i;
         }
+        (void)no;                       /* read only on x86-64 below (the tree is an x86_64 deployment) */
+        (void)yes;
 #if defined(__x86_64__)
         CHECK("both Flatpak apps are listed", no >= 0 && yes >= 0);
-        CHECK("their MIME types are read", no >= 0 && yes >= 0 && !fl[no].mime[0] && strstr(fl[yes].mime, "text/plain") != NULL);
+        CHECK("their MIME types are read, a second export's added to its app", no >= 0 && yes >= 0 &&
+              !strcmp(fl[no].mime, "application/vnd.oasis.opendocument.text;text/plain;") &&
+              !strcmp(fl[yes].mime, "text/plain;text/csv;"));
+        int extra = 0;
+        for (int i = 0; i < nf; i++) if (strstr(fl[i].id, ".writer") || strstr(fl[i].id, ".calc") || strstr(fl[i].id, "Nothere")) extra = 1;
+        CHECK("a second export is no app of its own, nor one of no installed app", !extra && nf == 2);
 #endif
         snprintf(doc, sizeof doc, "%s/note.txt", home);
         f = fopen(doc, "w");
         if (f) { fputs("hi\n", f); fclose(f); }
-        CHECK("Open with a Flatpak app that declares no MimeType is refused", apps_launch_flatpak_with("org.example.NoMime", doc) != 0);
+        CHECK("Open with a Flatpak app's second export by its own name is refused", apps_launch_flatpak_with("org.example.NoMime.writer", doc) != 0);
         CHECK("Open with an app that isn't installed is refused", apps_launch_flatpak_with("org.example.Gone", doc) != 0);
         CHECK("Open with the home folder itself is refused", apps_launch_flatpak_with("org.example.Opens", home) != 0);
         snprintf(doc, sizeof doc, "%s/.config/lordos", home);

@@ -49,7 +49,7 @@ int  wl_pointer(float x, float y, struct Node *hit, int moved, int nbuttons, con
  * (they are sent leave) and only the button count is tracked. */
 void wl_pointer_grab(int nbuttons, const int *down, const int *button);
 /* 0: the key is the shell's; 1: it went to the focused app; 2: it went to the app as another key
- * (Lord Flow's ❖ → Ctrl): the shell is only told, so ❖ does not count as pressed alone. */
+ * (Flow's ❖ → Ctrl): the shell is only told, so ❖ does not count as pressed alone. */
 int  wl_key(int code, int value, const KeyInfo *k);
 void wl_keymap_changed(void);
 int  wl_send_paste(void);               /* synthetic Ctrl+V to the Linux app with the keyboard */
@@ -61,6 +61,7 @@ int  wl_test_xwl(void);                /* build/lord-server-test only: a connect
  * (zwp_text_input_v3), on screen. 0 without one. */
 int  wl_text_caret(float *x, float *y, float *w, float *h);
 int  wl_focus_protected(void);          /* is that app's window a protected one? */
+int  wl_textinput_secret(void);         /* its focused field said it is a password, a PIN or hidden text (text-input-v3) */
 const char *wl_focus_app(void);         /* the isolated app with the keyboard, or NULL */
 int  wl_focus_pid(void);                 /* the process of the app with the keyboard, 0 if none (ui/portal.c) */
 int  wl_surface_pid(int id);             /* the process of window id (its client), 0 if none (lord.webapps.owner) */
@@ -123,6 +124,9 @@ void wl_paint(Canvas *c, int id, int node, float x, float y, float w, float h, f
  * window: box and picture in the canvas's physical px, the part of the picture (s*, picture px). 0: paint it by CPU */
 int  wl_paint_media(Canvas *c, int src, int node, float bx, float by, float bw, float bh, float px, float py, float pw, float ph,
                     float sx, float sy, float sw, float sh, float op);
+/* GPU path: a frosted node whose only backdrop is such a picture, blurred by the GPU over it (gpu_draw_frosted); logical
+ * box, radius and blur. 0: the caller blurs on the CPU */
+int  wl_paint_frost(int src, int node, float x, float y, float w, float h, float rad, float blur);
 void wl_paint_popups(Canvas *c);
 
 /* Presentation (main.c). */
@@ -130,6 +134,7 @@ int  wl_gpu_layers_empty(void);             /* no app window, fullscreen or menu
 void wl_gpu_draw_layer(int layer);          /* 0 = windows (below the UI), 1 = menus and fullscreen */
 void wl_paint_fullscreen(Canvas *out);      /* CPU path: the fullscreen window over the frame */
 int  wl_fullscreen_active(void);
+int  wl_fullscreen_box(float *x, float *y, float *w, float *h);  /* the display a fullscreen Linux window covers (logical px); 0 none */
 /* Sharing a screen or a window (cast/cast.c): while on, the boxes of the windows and menus whose content changed are
  * kept (logical px), also on the GPU path, where an app's new frame is only a texture and no UI damage. take: their
  * box since the last take, 0 if none. */

@@ -41,9 +41,16 @@ endif
 # the language of its own words, an app that is offline (weboffline.h: which load errors are the network's, the retry's delay, its page),
 # the gate in front of the developer tools (webguard.h: the request head, Host, Origin, the one-time address and the cookie)
 WEB_PURE_SRC := src/web/webargs.c src/web/webreg.c src/web/weburl.c src/web/webmanifest.c src/web/webdl.c src/web/webaxis.c src/web/webpage.c \
-                src/web/webdrop.c src/web/webclip.c src/web/webedit.c src/web/webscheme.c src/web/webinspect.c src/web/webguard.c src/sec/json.c
+                src/web/webdrop.c src/web/webclip.c src/web/webedit.c src/web/websearch.c src/web/webscheme.c src/web/webinspect.c src/web/webguard.c src/web/webua.c src/web/webcall.c src/web/webcam.c src/web/webwatch.c src/spellang.c src/sec/json.c
 WEB_PURE_HDR := src/web/webargs.h src/web/webreg.h src/web/weburl.h src/web/webmanifest.h src/web/webdl.h src/web/webaxis.h src/web/webpage.h \
-                src/web/webdrop.h src/web/webclip.h src/web/webedit.h src/web/webscheme.h src/web/webinspect.h src/web/webguard.h src/web/weblangid.h src/web/weboffline.h src/web/webframe.h src/sec/json.h
+                src/web/webdrop.h src/web/webclip.h src/web/webedit.h src/web/websearch.h src/web/webscheme.h src/web/webinspect.h src/web/webguard.h src/web/weblangid.h src/web/weboffline.h src/web/webframe.h src/web/webua.h src/web/webcall.h src/web/webcam.h src/web/webwatch.h src/spellang.h src/sec/json.h
+
+# Chrome's Client Hints and navigator.userAgentData from one table (webua.h), the call log's lines (webcall.h)
+test: build/webua-test
+build/webua-test: tests/webua_test.c $(WEB_PURE_SRC) $(WEB_PURE_HDR)
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/webua_test.c $(WEB_PURE_SRC)
+	./$@ || { rm -f $@; exit 1; }
 
 test: build/webapp-test
 build/webapp-test: tests/webapp_test.c $(WEB_PURE_SRC) $(WEB_PURE_HDR)
@@ -64,7 +71,7 @@ WEB_PROTO := staging/xdg-activation/xdg-activation-v1
 $(foreach p,$(WEB_PROTO),$(eval $(call wl_client_proto,$(p))))
 WEB_GEN := $(foreach p,$(WEB_PROTO),build/gen/client/$(notdir $(p))-client-protocol.h build/gen/client/$(notdir $(p))-protocol.c)
 WEB_CLIENT_C := $(filter %/xdg-shell-protocol.c %/xdg-decoration-unstable-v1-protocol.c %/linux-dmabuf-v1-protocol.c %/viewporter-protocol.c \
-                         %/fractional-scale-v1-protocol.c %/text-input-unstable-v3-protocol.c %/cursor-shape-v1-protocol.c %/tablet-v2-protocol.c,$(CLIENT_GEN)) \
+                         %/fractional-scale-v1-protocol.c %/text-input-unstable-v3-protocol.c %/cursor-shape-v1-protocol.c %/tablet-v2-protocol.c %/primary-selection-unstable-v1-protocol.c,$(CLIENT_GEN)) \
                 $(filter %.c,$(WEB_GEN))
 
 ifeq ($(LORD_WEB_BACKEND),platform)
@@ -73,8 +80,8 @@ else
 WEB_BACK_SRC := src/web/webback_legacy.c src/web/webshm.c
 endif
 WEB_SRC := src/web/webmain.c src/web/webengine.c src/web/webwin.c $(WEB_BACK_SRC) src/web/webbus.c src/web/webtray.c src/web/webprobe.c \
-           src/web/weblang.c src/web/webxfer.c src/web/webselect.c src/web/webdark.c src/web/webproxy.c $(WEB_PURE_SRC) src/sec/cgroup.c src/sec/sandbox.c
-WEB_HDR := src/web/web.h src/web/webwin.h src/web/webback.h src/web/webshm.h $(WEB_PURE_HDR) src/sec/cgroup.h src/sec/sandbox.h
+           src/web/weblang.c src/web/webxfer.c src/web/webselect.c src/web/webdark.c src/web/webproxy.c src/web/webhints.c src/web/webcalls.c src/web/webmenu.c src/web/webhang.c $(WEB_PURE_SRC) src/sec/cgroup.c src/sec/sandbox.c src/lordlog.c
+WEB_HDR := src/web/web.h src/web/webwin.h src/web/webback.h src/web/webshm.h $(WEB_PURE_HDR) src/sec/cgroup.h src/sec/sandbox.h src/lordlog.h
 
 # WebKit's headers are not ours: -isystem, so -Wall -Wextra apply to lord-web's own code only
 WEB_CFLAGS := $(patsubst -I%,-isystem %,$(shell pkg-config --cflags $(WEB_PKGS)))
@@ -86,15 +93,79 @@ build/gen/webscheme_js.h: src/web/webscheme.js
 	@{ printf '/* generated from src/web/webscheme.js by mk/web.mk */\nstatic const char WEBSCHEME_JS[] =\n'; \
 	   sed -e '/^[[:space:]]*\/\//d' -e 's/\\/\\\\/g' -e 's/"/\\"/g' -e 's/^/"/' -e 's/$$/\\n"/' $<; printf ';\n'; } > $@.new && mv $@.new $@
 
+# navigator.userAgentData (src/web/webua.js) and the call log's page side (src/web/webcall.js), the same way
+build/gen/webua_js.h: src/web/webua.js
+	@mkdir -p build/gen
+	@{ printf '/* generated from src/web/webua.js by mk/web.mk */\nstatic const char WEBUA_JS[] =\n'; \
+	   sed -e '/^[[:space:]]*\/\//d' -e 's/\\/\\\\/g' -e 's/"/\\"/g' -e 's/^/"/' -e 's/$$/\\n"/' $<; printf ';\n'; } > $@.new && mv $@.new $@
+build/gen/webcall_js.h: src/web/webcall.js
+	@mkdir -p build/gen
+	@{ printf '/* generated from src/web/webcall.js by mk/web.mk */\nstatic const char WEBCALL_JS[] =\n'; \
+	   sed -e '/^[[:space:]]*\/\//d' -e 's/\\/\\\\/g' -e 's/"/\\"/g' -e 's/^/"/' -e 's/$$/\\n"/' $<; printf ';\n'; } > $@.new && mv $@.new $@
+
 # the backend built last time: a switch (LORD_WEB_BACKEND) rebuilds lord-web and the backend test
 build/gen/web_backend: FORCE
 	@mkdir -p build/gen
 	@echo "$(LORD_WEB_BACKEND)" | cmp -s - $@ || echo "$(LORD_WEB_BACKEND)" > $@
 
-build/lord-web: $(WEB_SRC) $(WEB_HDR) $(CLIENT_GEN) $(WEB_GEN) build/obj/ui/stb.o build/gen/lord_version.h build/gen/webscheme_js.h build/gen/web_backend
+build/lord-web: $(WEB_SRC) $(WEB_HDR) $(CLIENT_GEN) $(WEB_GEN) build/obj/ui/stb.o build/gen/lord_version.h build/gen/webscheme_js.h build/gen/webua_js.h build/gen/webcall_js.h build/gen/web_backend
 	@mkdir -p build
 	@echo "lord-web: $(LORD_WEB_BACKEND) backend"
 	$(CC) $(CPPFLAGS) -Ibuild/gen/client $(WEB_CFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ $(WEB_SRC) $(WEB_CLIENT_C) build/obj/ui/stb.o $(WEB_LIBS) -lm
+	chmod g-w $@
+
+# lord-web's web process extension (src/web/webext.c): Chrome's Client Hints on the page's requests. WebKit loads it
+# from build/lord-web-ext/ next to lord-web (/usr/lib/lordos/bin/lord-web-ext/ once installed), never from elsewhere
+ALL += build/lord-web-ext/lord-web-ext.so
+all: build/lord-web-ext/lord-web-ext.so
+test: build/lord-web-ext/lord-web-ext.so
+build/lord-web-ext/lord-web-ext.so: src/web/webext.c src/web/webua.c src/web/webua.h src/web/webpage.h
+	@mkdir -p build/lord-web-ext
+	$(CC) $(CPPFLAGS) $(patsubst -I%,-isystem %,$(shell pkg-config --cflags wpe-web-process-extension-2.0)) $(CFLAGS) $(WARN) -std=c11 -fPIC -shared \
+	    -Wl,-z,now -Wl,-z,relro -o $@ src/web/webext.c src/web/webua.c $(shell pkg-config --libs wpe-web-process-extension-2.0)
+
+# Chrome's identity (Client Hints, userAgentData) and the call log on the real engine, headless (WPEPlatform only), driven
+# by tests/webcalls_check.py (run by tests/run_suites.sh, and by tools/pkg/wpewebkit-chroot.sh's test with WebRTC)
+ifeq ($(LORD_WEB_BACKEND),platform)
+build/webcalls-check: tests/webcalls_check.c src/web/webhints.c src/web/webcalls.c $(WEB_PURE_SRC) $(WEB_PURE_HDR) src/web/web.h \
+                      build/gen/lord_version.h build/gen/webua_js.h build/gen/webcall_js.h build/lord-web-ext/lord-web-ext.so
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(WEB_CFLAGS) $(patsubst -I%,-isystem %,$(shell pkg-config --cflags wpe-platform-headless-2.0)) $(CFLAGS) $(WARN) -std=c11 \
+	    -o $@ tests/webcalls_check.c src/web/webhints.c src/web/webcalls.c $(WEB_PURE_SRC) $(WEB_LIBS) $(shell pkg-config --libs wpe-platform-headless-2.0) -lm
+test: build/webcalls-check
+
+# the capture indicator's camera rows (src/hw/camuse.c) on the real /dev/video* nodes, for tests/webcam_check.py
+build/camuse-check: tests/camuse_check.c src/hw/camuse.c src/hw/camuse.h src/media/mstudiohub.c src/media/mstudiohub.h src/sec/appid.c src/sec/appid.h src/fw/rules.c src/fw/fwmap.c src/sec/json.c
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/camuse_check.c src/hw/camuse.c src/media/mstudiohub.c src/sec/appid.c src/fw/rules.c src/fw/fwmap.c src/sec/json.c
+test: build/camuse-check
+
+# lord-web's watch over its page (src/web/webhang.c) on the real engine, headless: a page that answers is left alone, one
+# that hangs has its web process ended and a new one works (tests/webhang_check.c, run by tests/run_suites.sh)
+build/webhang-check: tests/webhang_check.c src/web/webhang.c src/web/webwatch.c src/web/webwatch.h src/web/web.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(WEB_CFLAGS) $(patsubst -I%,-isystem %,$(shell pkg-config --cflags wpe-platform-headless-2.0)) $(CFLAGS) $(WARN) -std=c11 \
+	    -o $@ tests/webhang_check.c src/web/webhang.c src/web/webwatch.c $(WEB_LIBS) $(shell pkg-config --libs wpe-platform-headless-2.0) -lm
+test: build/webhang-check
+endif
+
+# what the context menu takes from WebKit, headless (tests/web_menu_check.c): spelling suggestions with the dictionaries
+# spellang.h picks, applied after the menu; WPEPlatform only (run by tests/run_suites.sh when a dictionary is installed)
+ifeq ($(LORD_WEB_BACKEND),platform)
+build/web-menu-check: tests/web_menu_check.c $(WEB_BACK_SRC) src/web/webback.h src/web/websearch.c src/web/websearch.h src/spellang.c src/spellang.h src/sec/json.c build/gen/web_backend
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(WEB_CFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/web_menu_check.c $(WEB_BACK_SRC) src/web/websearch.c src/spellang.c src/sec/json.c $(WEB_LIBS) -lm
+test: build/web-menu-check
+endif
+
+# ✨ AI's Replace in a page, headless (tests/web_ai_replace_check.c): lord-web's scripts (webedit.c) on a textarea, a
+# contenteditable box and a Lexical-like editor, and their refusals; WPEPlatform only (run by tests/run_suites.sh)
+ifeq ($(LORD_WEB_BACKEND),platform)
+build/web-ai-replace-check: tests/web_ai_replace_check.c $(WEB_BACK_SRC) src/web/webback.h src/web/webedit.c src/web/webedit.h build/gen/web_backend
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(WEB_CFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/web_ai_replace_check.c $(WEB_BACK_SRC) src/web/webedit.c $(WEB_LIBS) -lm
+test: build/web-ai-replace-check
+endif
 
 # the backend alone, headless (tests/web_backend_test.c): a local page rendered and its pixels checked, a key and a
 # click that reach the page's listeners, a resize and a scale; run by tests/run_suites.sh (WebKit's sandbox: bwrap)

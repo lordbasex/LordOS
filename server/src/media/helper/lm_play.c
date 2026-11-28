@@ -112,7 +112,7 @@ typedef struct {
     int64_t skip_before;            /* after a seek: discard what's before (ms) */
 
     /* statistics (written by the decoding thread) */
-    long decoded, shown, dropped;
+    long decoded, shown, dropped, capped;     /* capped: skipped by the frame-rate cap (not counted as dropped) */
     double dec_ms;
     double sync_sum, sync_max;      /* |frame pts - clock| when presenting it (ms) */
     long sync_n;
@@ -576,6 +576,10 @@ static void send_info(int render) {
 void lm_player(const char *params, int fd, int pulse, int render) {
     char err[160];
     lm_out_init((int)mp_param_int(params, "native", 0));
+    lm_out_format((int)mp_param_int(params, "nv12", 0));
+    int fps_cap = (int)mp_param_int(params, "fpscap", 0);
+    if (fps_cap < 0 || fps_cap > 240) fps_cap = 0;
+    int64_t cap_last = -1;                          /* pts of the last frame sent under the cap */
     int loop = (int)mp_param_int(params, "loop", 0);
     int autoplay = (int)mp_param_int(params, "autoplay", 1);
     int want_audio = (int)mp_param_int(params, "audio", 1);
@@ -686,6 +690,8 @@ void lm_player(const char *params, int fd, int pulse, int render) {
                 case MM_PAUSE: set_playing(0); break;
                 case MM_SEEK: if (!P.live || P.dur_ms > 0) { ended = 0; seek_to(m.v[0]); seek_wait = 1; } break;
                 case MM_LOOP: loop = (!P.live || P.dur_ms > 0) && m.v[0] != 0; break;
+                case MM_FORMAT: lm_out_format((int)m.v[0]); if (lm_out_has_last()) lm_out_redraw(); break;
+                case MM_FPSCAP: fps_cap = m.v[0] > 0 && m.v[0] <= 240 ? (int)m.v[0] : 0; cap_last = -1; break;
                 case MM_TRACK:
                     pthread_mutex_lock(&P.mu);
                     if (m.v[0] == 's' && (m.v[1] < 0 || ((unsigned)m.v[1] < P.fmt->nb_streams && P.fmt->streams[m.v[1]]->codecpar->codec_type == AVMEDIA_TYPE_SUBTITLE)))
@@ -752,6 +758,14 @@ void lm_player(const char *params, int fd, int pulse, int render) {
             pthread_cond_broadcast(&P.cv);
             pthread_mutex_unlock(&P.mu);
             if (late && !seek_wait) { P.dropped++; av_frame_free(&vf.f); continue; }
+            /* the frame-rate cap (MM_FPSCAP): a frame sooner than 1/cap after the last one sent is skipped before its read
+             * back; a pts going back (the loop started over, a seek) starts the count again */
+            if (fps_cap > 0 && !seek_wait && cap_last >= 0 && vf.pts >= cap_last && vf.pts - cap_last < 1000 / fps_cap - 2) {
+                P.capped++;
+                av_frame_free(&vf.f);
+                continue;
+            }
+            cap_last = vf.pts;
             int64_t clk = clock_ms();
             int r = lm_out_present(vf.f, vf.pts);
             int hwframe = vf.f->format == AV_PIX_FMT_VAAPI || vf.f->format == AV_PIX_FMT_DRM_PRIME;

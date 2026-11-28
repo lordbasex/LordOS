@@ -5,7 +5,7 @@
 // waveform, play, rename, trim and export to Opus, MP3 or WAV (lord-media, with FFmpeg).
 import {
   View, Text, Image, ScrollView, Button, TextInput, Segmented, Hairline, EmptyState, useTheme, useKeyboard, typeScale,
-  t as tr, media, usePlayer, userDirs, fs, mediaFormatTime, formatDate, formatTime, addListener, useSound, microphones, defaultSource, useNarrow,
+  t as tr, media, usePlayer, userDirs, fs, mediaFormatTime, formatDate, formatTime, addListener, useSound, microphones, defaultSource, useNarrow, SkinHeader, appName, getApp,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
@@ -75,7 +75,10 @@ function useBoxWidth(ref, initial) {
   return w;
 }
 
-export default function Recorder() {
+// (0.8.9.6.2) app skins (docs/THEMES-GUIDE.md, "App skins → the shared shapes"): a header a theme may add above the app
+export default function Recorder() { return <SkinHeader app="recorder" title={appName(getApp('recorder'))}><RecorderMain /></SkinHeader>; }
+
+function RecorderMain() {
   const th = useTheme();
   const snd = useSound();
   const mics = microphones(snd);

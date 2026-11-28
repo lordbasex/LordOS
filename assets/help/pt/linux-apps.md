@@ -14,7 +14,7 @@ Firefox, Electron— abrem como mais uma janela da área de trabalho.
 - **Abrir um arquivo com um deles:** em [Arquivos](help:files), botão direito → “Abrir com”.
 - **Área de transferência:** o que você copia em um app Linux cola no LordOS e vice-versa, também
   imagens.
-- **Teclado e touchpad:** recebem as teclas (as combinações com ❖ continuam sendo do LordOS, exceto no Lord Flow, onde [❖C, ❖V e outras chegam como Ctrl](help:shortcuts)) e os
+- **Teclado e touchpad:** recebem as teclas (as combinações com ❖ continuam sendo do LordOS, exceto no Flow, onde [❖C, ❖V e outras chegam como Ctrl](help:shortcuts)) e os
   gestos de pinça e deslizar.
 
 Os apps que desenham a própria moldura (por exemplo os do GNOME com libadwaita) aparecem sem a
@@ -33,5 +33,5 @@ um comando digitado.
   vale quando o Brave fechar); no próprio Brave: menu ☰ → Configurações → Aparência → Tema → GTK.
   Para usar a moldura do LordOS: ative ali «Usar barra de título e bordas do sistema».
 - **GTK e GNOME** seguem o modo escuro ou claro e a cor de destaque do LordOS ao vivo, e põem os
-  botões da janela à esquerda, como os semáforos (à direita no tema Lord Classic). Os apps GTK 3 usam o
+  botões da janela à esquerda, como os semáforos (à direita no tema Classic). Os apps GTK 3 usam o
   tema «LordOS»; a cor de destaque deles é fixa.

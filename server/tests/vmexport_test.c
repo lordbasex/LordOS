@@ -550,6 +550,44 @@ static void test_tar_big(void) {
            (double)(b.tv_sec - a.tv_sec) + (double)(b.tv_nsec - a.tv_nsec) / 1e9, (long long)st.st_blocks / 2);
 }
 
+/* QA 0.8.9.6.2 (BUG-M): an export's manifest is the person's own file (not root's), read through its folder, and
+ * every hostile shape is refused without hanging */
+static void test_read(const char *json) {
+    char d[400], p[460];
+    snprintf(d, sizeof d, "%s/read", root);
+    mkdir(d, 0755);
+    snprintf(p, sizeof p, "%s/manifest.json", d);
+    FILE *f = fopen(p, "w");
+    if (f) { fputs(json, f); fclose(f); }
+    chmod(p, 0664);                                         /* a umask 0002 home, or a USB stick's loose modes */
+    int dfd = open(d, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+    VmxManifest m;
+    char why[256];
+    CHECK(vmx_manifest_read(dfd, &m, why, sizeof why) == 0 && m.n == NFILES && m.snapshots == 1);
+    if (*why) fprintf(stderr, "  read: %s\n", why);
+    /* a link to a good manifest */
+    char t[460];
+    snprintf(t, sizeof t, "%s/real.json", d);
+    rename(p, t);
+    CHECK(!symlink("real.json", p) && vmx_manifest_read(dfd, &m, why, sizeof why) == -1);
+    unlink(p);
+    /* a FIFO: refused at once, never waited on */
+    CHECK(!mkfifo(p, 0600) && vmx_manifest_read(dfd, &m, why, sizeof why) == -1);
+    unlink(p);
+    /* a folder, nothing, an empty file, one past the cap, broken JSON */
+    CHECK(!mkdir(p, 0700) && vmx_manifest_read(dfd, &m, why, sizeof why) == -1);
+    rmdir(p);
+    CHECK(vmx_manifest_read(dfd, &m, why, sizeof why) == -1);
+    f = fopen(p, "w"); if (f) fclose(f);
+    CHECK(vmx_manifest_read(dfd, &m, why, sizeof why) == -1);
+    f = fopen(p, "w");
+    if (f) { for (long i = 0; i <= (long)VMX_MANIFEST_MAX; i++) fputc(' ', f); fclose(f); }
+    CHECK(vmx_manifest_read(dfd, &m, why, sizeof why) == -1);
+    f = fopen(p, "w"); if (f) { fputs("{\"format\":\"lordvm-export\",", f); fclose(f); }
+    CHECK(vmx_manifest_read(dfd, &m, why, sizeof why) == -1);
+    close(dfd);
+}
+
 int main(void) {
     snprintf(root, sizeof root, "/var/tmp/lordos-vmexport-test/%d", (int)getpid());
     mkdir("/var/tmp/lordos-vmexport-test", 0755);
@@ -558,7 +596,7 @@ int main(void) {
     VmxManifest m;
     char *json = NULL;
     test_manifest(&m, &json);
-    if (json) { test_parse(json); test_fuzz(json); }
+    if (json) { test_parse(json); test_fuzz(json); test_read(json); }
     free(json);
     test_ovf();
     test_tar_small();

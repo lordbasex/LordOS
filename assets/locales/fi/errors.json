@@ -234,6 +234,7 @@
   "fs.moveRemoveFailed": "Kopioitu, mutta alkuperäistä ei voitu poistaa: {errno}",
   "fs.noTrash": "Tälle sijainnille ei ole roskakoria",
   "fs.notFile": "Se ei ole tiedosto",
+  "fs.notFolder": "Se ei ole kansio",
   "fs.notInTrash": "Se ei ole roskakorissa",
   "fs.notRegular": "Se ei ole tavallinen tiedosto (onko se linkki?)",
   "fs.openFailed": "Tiedostoa ei voitu avata: {errno}",
@@ -243,11 +244,13 @@
   "fs.systemFolder": "Tiedostot ei näytä järjestelmän sisäisiä kansioita (/proc, /sys, /dev ja /run)",
   "fs.tooLarge": "Tiedosto on liian suuri (enint. {max})",
   "fs.tooManyCopies": "Liian monta kopiointia käynnissä; yritä uudelleen, kun jokin valmistuu",
+  "fs.tooManyWatches": "Liian monta kansiota on seurannassa (enintään {max})",
   "fs.trashBadOrigin": "Alkuperäinen sijainti ei ole kelvollinen",
   "fs.trashEntryFailed": "Roskakorimerkintää ei voitu luoda",
   "fs.trashOriginGone": "Alkuperäistä kansiota ei ole enää olemassa",
   "fs.trashOtherDisk": "Se on eri levyllä kuin roskakorinsa",
   "fs.trashRestoreExists": "Alkuperäisessä sijainnissa on jo samanniminen tiedosto",
+  "fs.watchRemote": "Pilvi- ja verkkokansioiden muutoksia ei voi seurata; kansio listataan sen sijaan uudelleen",
   "fw.bpfConfig": "BPF:ää ei voitu määrittää: {errno}",
   "fw.bpfMaps": "BPF-karttoja ei voitu luoda: {errno}",
   "fw.bpfMissing": "ohjelma {program} puuttuu",
@@ -963,5 +966,9 @@
   "sentinela.notBlocked": "Ohjelma ei ole estolistalla.",
   "sentinela.noAppNetwork": "Tällä prosessilla ei ole omaa sovellusta, jonka verkon voisi estää.",
   "sys.failed": "Jokin meni vikaan.",
-  "sys.unsupported": "Tämä LordOS-versio ei osaa tehdä sitä."
+  "sys.unsupported": "Tämä LordOS-versio ei osaa tehdä sitä.",
+  "theme.notAllowed": "{call} ei ole yhteisön teemojen käytettävissä",
+  "theme.noHost": "Työpöytätyylin LordOS-osa puuttuu",
+  "hands.refused": "Vain sinä voit tehdä tämän: tekoälyagentin syöte ei koskaan",
+  "install.diskTooManyParts": "Levyllä on liian monta osiota, jotta asennusohjelma voisi luetella ne"
 }

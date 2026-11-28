@@ -3,7 +3,7 @@
 // the scanner sends is decoded and converted in the sandboxed lord-doc helper.
 import {
   View, Text, Button, Segmented, Hairline, EmptyState, ScrollView, useTheme, useAppWindow, wm, fs, print, DocImage, releaseImage, decodeImage, convertImage,
-  formatDate, formatTime, typeScale, useNarrow, t as tr,
+  formatDate, formatTime, typeScale, useNarrow, t as tr, SkinHeader, appName, getApp,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 
@@ -29,7 +29,10 @@ function destDir(kind) {
   return home;
 }
 
-export default function Scanner() {
+// (0.8.9.6.2) app skins (docs/THEMES-GUIDE.md, "App skins → the shared shapes"): a header a theme may add above the app
+export default function Scanner() { return <SkinHeader app="scanner" title={appName(getApp('scanner'))}><ScannerMain /></SkinHeader>; }
+
+function ScannerMain() {
   const th = useTheme();
   const { args } = useAppWindow();
   const [scanner, setScanner] = useState(args?.scanner || null);
@@ -46,7 +49,7 @@ export default function Scanner() {
   const [msg, setMsg] = useState(null);
   const box = useRef(null);
   const drag = useRef(null);
-  // a small window (a tile of Lord Workspaces): a narrower settings panel, and the preview scaled down to the room it has
+  // a small window (a tile of Workspaces): a narrower settings panel, and the preview scaled down to the room it has
   const narrow = useNarrow();
   const pad = narrow ? 12 : 20;
   const pane = useRef(null);

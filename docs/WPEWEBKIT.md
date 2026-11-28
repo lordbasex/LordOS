@@ -21,7 +21,7 @@ published; the latest release, 0.8.9.5-beta, still uses Debian's 2.48. The curre
 
 `tools/pkg/build-wpewebkit.sh <debian-version> [lordos-revision]`, for example `tools/pkg/build-wpewebkit.sh 2.54.3-1 2`,
 makes version `2.54.3-1~lordos13+2` (`~` sorts it below Debian's own `2.54.3-1`, so a later Debian package of the same
-version wins; `lordos13` is Debian 13). `ARCH=arm64` builds arm64 on an amd64 machine under qemu-user (below). Its
+version wins; `lordos13` is Debian 13). The revision is a number or `n.m`: `4.1` sorts after `+4` and before `+5`. `ARCH=arm64` builds arm64 on an amd64 machine under qemu-user (below). Its
 steps, each in a clean chroot made by `mmdebstrap` (a Debian build tool, installed on the build machine with
 `apt-get install mmdebstrap`; no container runtime):
 
@@ -72,6 +72,38 @@ backends with no warnings, `web-backend-test` prints `ok platform (WPE WebKit 2.
 `+1`, `tools/release/image-sources.sh` run on the test chroot listed `wpewebkit` with origin `lordos` (176 other source
 packages `debian`). Not checked yet: lord-web's windows on the VM with these packages.
 
+Results of `+3` on amd64 (2026-11-25; WebRTC and the SharedArrayBuffer patch, `out/test/report.txt` and
+`out/test/webcalls.txt`): every check of `+2` above passes again (pkg-config, no DRM backend, no `libinput`/`libudev`,
+SONAME, 930 of 930 symbols kept, 1345 exported, the headless render, lord-web on both backends); the library links
+`libgstwebrtc-1.0`; lintian 0 errors, 5 warnings. `tests/webcalls_check.py` (in the test chroot, sandbox on): Chrome's
+Client Hints and `navigator.userAgentData` equal Chrome 158's; SharedArrayBuffer is a function on a page served with
+COOP and COEP and undefined on a plain page, before and after it; `RTCPeerConnection` exists; the loopback call gathers
+no ICE candidate because the web process has no network (WEBAPPS.md, "Calls"). The build was interrupted by a desktop
+session restart at step 8428 of 8967 and finished in the same tmpfs tree (`dpkg-buildpackage -b -nc`, then
+`dpkg-genchanges -sa`); the source package was made before the interruption. arm64: not built yet; the same command
+with `ARCH=arm64` (below), then the test stage on the Pi 5.
+
+Results of `+4` on amd64 (2026-11-26; librice `0.4.3-1~lordos13+1` from `EXTRA_DEBS`): `dpkg-buildpackage` 1730 s
+(16 jobs); lintian 0 errors; `libWPEWebKit-2.0.so.1` links `librice-proto` and `librice-io`; every check of `+3` passes,
+and `tests/webcalls_check.py --webrtc` now connects the loopback call: host candidates (4 UDP, 8 TCP) gathered by the
+network process, connected in 300 to 400 ms, Opus with VP8 and Opus with H.264, about 215 audio packets and 63 frames
+each in 4 s; TURN URLs with `?transport=` accepted. Against Chrome and a public meeting server: WEBAPPS.md, "Calls".
+Not published; arm64 not built yet.
+
+Results of `+4.2` on amd64 (2026-11-26; `+4.1` plus `lordos-sw-notifications.patch`, librice `0.4.3-1~lordos13+1`
+from `EXTRA_DEBS`, built from a `git archive` snapshot of `feat/web-calls`): `dpkg-buildpackage` 1775 s (16 jobs);
+lintian 0 errors, 6 warnings; `libwpewebkit-2.0-1` 32.7 MB as `+4.1`; 930 of 930 symbols of 2.48 kept, 1345 exported
+(the patch adds no symbol). Every check of `+4.1` passes again (pkg-config, no DRM backend, no `libinput`/`libudev`,
+the headless render, lord-web on both backends with its backend and probe tests, Chrome's identity, SharedArrayBuffer,
+Document-Isolation-Policy, the loopback call with Opus + VP8 and Opus + H.264). `tests/webcalls_check.py --swnotify`
+(test stage run again with `TEST_ONLY=1` from a later snapshot, the same packages): a page's service worker shows two
+notifications with one tag; both reach the view's `show-notification` with their title, body (UTF-8) and tag, the
+first is closed when the second replaces it, and nothing reaches D-Bus; `webkit_notification_clicked` on the second
+reaches the worker's `notificationclick` (title, body, `data`, 1 window client), whose `clients.focus()` resolves and
+the view emits `lordos-focus-from-service-worker`; with the page gone to another origin first (no view of the worker's
+origin), the worker's notification goes to D-Bus as before (`Notify` with the app's name) and the server's
+`ActionInvoked` click reaches the worker's `notificationclick`. Not published; arm64 not built yet.
+
 Output, in `$LORDOS_WPE_WORK/<version>/out/` (default `/var/tmp/lordos-wpewebkit`; on the maintainer's build machine
 `/mnt/HD08TB/build/wpewebkit`): the `.deb`s, the **source package** (`wpewebkit_<version>.dsc`,
 `wpewebkit_<upstream>.orig.tar.xz`, `wpewebkit_<upstream>.orig.tar.xz.asc`, `wpewebkit_<version>.debian.tar.xz`),
@@ -86,6 +118,12 @@ All in `backport()` of `tools/pkg/wpewebkit-chroot.sh`; a change that stops appl
 |---|---|
 | `debian/rules`: `-DENABLE_WPE_PLATFORM=ON`, `-DENABLE_WPE_PLATFORM_HEADLESS=ON`, `-DENABLE_WPE_PLATFORM_WAYLAND=ON`, `-DENABLE_WPE_LEGACY_API=ON` | Upstream's defaults in 2.54 already, but written out: a release that changes a default must fail here, not ship without WPEPlatform or without the legacy API |
 | `debian/rules`: `-DENABLE_WPE_PLATFORM_DRM=OFF`; `debian/libwpewebkit-2.0-1.symbols`: the DRM backend's 9 symbols removed (`wpe_display_drm_*`, `wpe_{screen,toplevel,view}_drm_get_type`) | Maintainer's decision, 2026-11-24: WPEPlatform's DRM backend (WebKit driving a screen itself) is the only part that links `libinput` and `libudev`, which LordOS's dependency policy keeps out; lord-web has its own `WPEDisplay` on the compositor and never uses it. Without it those symbols aren't in the library, and `dpkg-gensymbols` stops the build unless the symbols file says so. WPEPlatform's core DRM device API (`wpe_drm_device_*`, for dmabuf) stays |
+| `debian/rules`: `-DENABLE_MEDIA_STREAM=ON`, `-DENABLE_WEB_RTC=ON`, `-DUSE_GSTREAMER_WEBRTC=ON`, `-DUSE_LIBRICE=OFF`; `debian/control`: Build-Depends `libssl-dev`, and `libwpewebkit-2.0-1` Recommends `gstreamer1.0-nice`, `gstreamer1.0-plugins-bad`, `-good`, `-base` (`+3`) | Maintainer's decision, 2026-11-25: voice and video calls in web apps ([WEBAPPS.md](WEBAPPS.md), "Calls"). WebKit's GStreamer WebRTC backend (GStreamer 1.26's `webrtcbin`, not Google's libwebrtc); its only new build dependency is OpenSSL 3 (WebCore links `libcrypto` for SFrame); ICE (libnice), DTLS, SRTP, SCTP, RTP, Opus, VP8 and H.264 (OpenH264) are GStreamer elements loaded at run time. librice, the ICE agent WebKit can run in its network process, isn't in Debian 13, so it stays off: ICE runs in the web process (see "WebRTC and the web process's network" below) |
+| `debian/rules`: `-DUSE_LIBRICE=ON`; `debian/control`: Build-Depends `librice-dev (>= 0.4.3)` (`+4`) | ICE in WebKit's network process ("librice" below): the web process keeps no network, and calls connect |
+| `debian/patches/lordos-turn-transport-query.patch` (`+4`) | WebKit's `RTCPeerConnection` refused every TURN URL with a query (an inverted check: `query()` has no `?`, so `find("?transport=")` is `notFound`, which is true); sites hand out `turn:host:443?transport=tcp`. Now exactly `transport=udp` and `transport=tcp` are accepted, which the ICE agent reads; another query is still a `SyntaxError` |
+| `debian/patches/lordos-sharedarraybuffer-coi.patch` (`+3`) | SharedArrayBuffer only in a web process made for cross-origin-isolated documents (COOP `same-origin` + COEP `require-corp`): WebKit already gives such a document a process of its own (`CrossOriginMode::Isolated`, `WebProcessProxy::shouldEnableSharedArrayBuffer()`), but only its Cocoa launcher turned SharedArrayBuffer on there; the patch does the same in the GLib launcher (`JSC_useSharedArrayBuffer=1` in that process's environment only, removed from every other's). Before it WPE never had SharedArrayBuffer, and a messaging web app requires it for calls. Checked by `tests/webcalls_check.py`: a plain page never has it, before or after an isolated one in the same view |
+| `debian/patches/lordos-document-isolation-policy.patch` (`+4.1`) | A messaging web app makes its page cross-origin isolated with **Document-Isolation-Policy** (DIP), which WebKit doesn't implement, next to COOP `same-origin-allow-popups`: without it the page had no SharedArrayBuffer and offered no calls. A document with DIP `isolate-and-require-corp` (or `-credentialless`), an enforced COEP `require-corp` and COOP `unsafe-none` or `same-origin-allow-popups` gets WebKit's own isolation, as if its COOP were `same-origin`. "Document-Isolation-Policy (since `+4.1`)" below |
+| `debian/patches/lordos-sw-notifications.patch` (`+4.2`) | A service worker's notification (`registration.showNotification`, which messaging and chat web apps use) has no page, so WebKit's GLib port sent it to `org.freedesktop.Notifications` itself and lord-web never saw it: no LordOS sound rule, no `silent`, no window brought forward on a click. It now goes to the `show-notification` signal of a view of the worker's network session whose page has the worker's origin, like a page's notification; with no such view, D-Bus as before. A worker's `clients.focus()` emits the view's `lordos-focus-from-service-worker`. "Service-worker notifications (since `+4.2`)" below |
 | `debian/control`: `Maintainer: LordOS`, `Uploaders` removed | Bugs in this build come to LordOS, not to Debian. Debian's WebKit team stays credited in the changelog and `debian/copyright` (not as `XSBC-Original-Maintainer`: Debian's lintian doesn't know that field) |
 | `debian/changelog`: entry `<version>~lordos13+<n>` for `trixie`, dated one second after the Debian entry it follows | The backport's version, below Debian's own. A fixed date (later than Debian's, as lintian requires) is the build's `SOURCE_DATE_EPOCH`, so building the same version again gives the same `.debian.tar.xz` |
 
@@ -93,7 +131,7 @@ Nothing else changes: every build dependency of 2.54.3-1 is in trixie (clang 19 
 `clang`, libsoup 3, GLib 2.84, GStreamer 1.26, libjxl, libavif, libwebp, HarfBuzz, libgbm, libwayland,
 wayland-protocols; `libinput-dev` stays a build dependency, unused without the DRM backend), and no feature had to be
 turned off for trixie: apart from the DRM backend, with the same build dependencies and cmake options as Debian unstable, the features are unstable's
-(no Manette gamepads, no WebRTC, no encrypted media, as there). WOFF2 web fonts come from FreeType now (Debian dropped
+(no Manette gamepads, no WebRTC, no encrypted media, as there; WebRTC is on since `+3`, above). WOFF2 web fonts come from FreeType now (Debian dropped
 `libwoff-dev` in 2.54.0-1: trixie's FreeType 2.13, built with Brotli, decodes WOFF2 itself). The `clang-22 [armhf]` build dependency can't be met on
 trixie, but LordOS doesn't build armhf.
 
@@ -125,6 +163,227 @@ Measured by the test against trixie's `libwpewebkit-2.0-1` 2.48.3-1 (`+2`, 2026-
   (`libwayland-client`, `libwayland-egl`, `libwayland-server`, `libxkbcommon`), `libatk-bridge`, `libenchant`,
   `libhyphen` and `libgpg-error`; gone: `libwoff2dec` (FreeType decodes WOFF2), Flite and `libgsttranscoder`.
   `libgbm` and `libdrm` were already there in 2.48. Only lord-web loads WebKit; `lord-server` links none of them.
+
+## LibWebRTC (`+5`, paused 2026-11-26)
+
+"Option B", approved by the maintainer on 2026-11-26 and **paused the same day**: WebRTC with WebKit's **LibWebRTC**
+backend (WebKit's own copy of Google's libwebrtc) instead of the GStreamer backend of `+3`/`+4`. Paused because calls in
+a messaging web app already work with `+4.1` (GStreamer, librice and the DIP patch); to be resumed with WebKit 2.56.
+Nothing of `+5` is published or installed. Why it was tried: with `+4` against Chrome, the answering side, a transport
+per media (`balanced`), DTLS against a video bridge and TURN through librice failed (WEBAPPS.md, "Calls"); upstream
+deleted the GStreamer WebRTC backend (WebKit commit 6ae9a398d5, 2026-07-24), so LibWebRTC is the one WebKit maintains.
+
+**Verdict: feasible.** WPE 2.54.3 builds with `-DUSE_GSTREAMER_WEBRTC=OFF` (WebKit's CMake then sets `USE_LIBWEBRTC`)
+with two small patches to WebKit's CMake for libwebrtc, and a third for VP8 (below). Everything else, WebCore's and
+WebKit's LibWebRTC glue for the GLib ports included, compiled unchanged. Feasibility took about 1.3 hours.
+
+How to build it again: `WEBRTC_BACKEND=libwebrtc tools/pkg/build-wpewebkit.sh 2.54.3-1 5` (the default stays
+`gstreamer`). The pieces, committed:
+
+- **The source** (`tools/pkg/wpewebkit-libwebrtc-source.sh`, pins in `tools/pkg/wpewebkit-libwebrtc.sums`). Release
+  tarballs leave `Source/ThirdParty/libwebrtc` out, so it becomes a second upstream tarball of the source package, the
+  `libwebrtc` component (`wpewebkit_2.54.3.orig-libwebrtc.tar.xz`, 66 MB; `debian/rules` links `libwebrtc/` to
+  `Source/ThirdParty/libwebrtc` before cmake). Made from WebKit's git at the release commit only (sparse, about 400 MB),
+  checked: tag `wpewebkit-2.54.3` = tag object `f91ccd8f…` → commit `c01fbd90…`; the subtree's git tree `6cfa7bee…`;
+  `Source/cmake` at that commit byte for byte the signed release tarball's (92 files). Its 8 prebuilt test files
+  (`.o`, `.a`, `.lib`, an Android `.jar`) are left out. Dates are the commit's and xz is single-threaded: the same
+  SHA-256 (`18836cf3…`, pinned) three times; the build chroot checks it again.
+- **The packaging** (`tools/pkg/wpewebkit-libwebrtc/backport.sh`, run after `backport()`, so SharedArrayBuffer, the TURN
+  query and DIP patches stay): `-DUSE_GSTREAMER_WEBRTC=OFF`, `-DUSE_LIBRICE=OFF`; Build-Depends `libasound2-dev`,
+  `libevent-dev`, `libopus-dev`, `libpulse-dev`, `nasm [amd64]` instead of `libssl-dev` and `librice-dev`; Recommends
+  without `gstreamer1.0-nice`; the changelog lines; `debian/copyright` stanzas for `libwebrtc/` and each bundled library
+  from the component's own licence files (`copyright.sh`: BSD-3-clause libwebrtc, libvpx, libyuv, libwebm, libsrtp,
+  crc32c, opus, rnnoise with the patent grants named; Apache-2.0 BoringSSL and abseil; BSD-2-clause + AOM patent licence
+  libaom; pffft; yasm).
+- **Patches:** `lordos-libwebrtc-vpx-include.patch` (libvpx's include folder was Apple-only, but the precompiled header
+  includes `vpx/vpx_codec.h`: the port's only build error); `lordos-libwebrtc-vpx-cpu-flags.patch` (every libvpx file
+  was built with `-mavx2` / `-march=armv8.2-a+dotprod`, which can crash CPUs without AVX2 or an Armv8.0 Raspberry Pi 4;
+  now per file, as libvpx's own build); `lordos-libwebrtc-vp8-encoder.patch` (VP8 from libwebrtc's own libvpx encoder,
+  as WebKit already does for VP9: through GStreamer's `vp8enc` a canvas-sourced track encoded no frame, and libwebrtc
+  switched the call to VP9). The VP8 patch compiles (feasibility tree) but no package with it was built or tested yet.
+- **The test** (`wpewebkit-chroot.sh`, `WEBRTC_BACKEND=libwebrtc`): `libevent` and `libopus` in `NEEDED`; no
+  `libgstwebrtc`, no `librice`; and no symbol of libwebrtc, BoringSSL, libvpx or libaom exported (they stay inside
+  `libWPEWebKit-2.0.so.1`, hidden: AGENTS.md, lord-web).
+
+**What the `+5` build showed** (amd64, 2026-11-26, without the VP8 patch; `/mnt/HD08TB/build/wpewebkit/2.54.3-1~lordos13+5/amd64/out/`
+on the maintainer's build machine):
+
+- `dpkg-buildpackage` 2711 s (16 jobs, a busy desktop; `+4` took 1730 s), 11296 build steps (`+4` about 9000).
+  `libWPEWebKit-2.0.so.1` 137.1 MB (`+4` 127.7 MB, +9.5 MB), `libwpewebkit-2.0-1` .deb 35.7 MB (32.7 MB), installed
+  137.9 MB (128.7 MB). Exported symbols 1345, as `+2`/`+3` (no libwebrtc/BoringSSL/libvpx/libaom symbol). New in `NEEDED`:
+  `libevent-2.1.so.7`, `libopus.so.0`; gone: `libgstwebrtc-1.0`, `librice-proto`, `librice-io`, `libssl`, `libcrypto`.
+- Every earlier check passes: pkg-config, no DRM backend, no `libinput`/`libudev`, the headless render, lord-web on both
+  backends (no warnings; `web-backend-test` and `web_probe_test` pass, 299 MB and 308 MB peak PSS), the identity, the
+  SharedArrayBuffer and DIP checks of `webcalls_check.py`, and the TURN query check.
+- `webcalls_check.py --webrtc` loopback: Opus + H.264 connected in 101 ms (107 frames, 203 audio packets in 4 s);
+  **fails** the VP8 case: the track negotiates VP8 but encodes no frame, and libwebrtc switches to VP9 (what the VP8 patch
+  is for).
+- Against Chrome 158 (headless, fake devices; lord-web's engine with WebKit's mock camera and microphone in the build's
+  test chroot, sandbox on; `tests/webcalls_pair.py`, whose page now waits for the remote description before adding the
+  other side's candidates: libwebrtc gathers fast enough that they arrived before it and were rejected):
+
+  | Case | Result |
+  |---|---|
+  | engine offers, `max-bundle` | **pass**: connected ~200 ms, host/UDP, DTLS (SRTP AES_CM_128_HMAC_SHA1_80), Opus + VP8 640×480 both ways (~300 frames, ~750 audio packets each way in 15 s) |
+  | engine offers, `balanced` | media flows both ways (Opus + VP8, ~700 frames each way), ICE and DTLS connected, but the engine's `connectionState` stays `connecting` (Chrome's `connected`): **open** |
+  | Chrome offers, engine answers (`balanced`) | **pass**: 100 ms, Opus + VP8 both ways (`+4` picked PCMU and sent nothing) |
+  | Chrome offers, engine answers, `max-bundle` | **pass**: 100 ms, Opus + VP8 both ways |
+  | TURN relay only, UDP (local coturn in the test chroot) | **pass**: relay ↔ relay, 200–300 ms, DTLS, Opus + VP8 both ways |
+  | TURN relay only, TCP to the TURN server | **pass**: the same, coturn saw 3 allocations over TCP, permissions and channel binds |
+  | a video bridge (SFU) / a real messaging call | not run before the pause |
+
+- lintian: 2 errors, 28 warnings. The errors: `embedded-library srtp` (libsrtp inside libwebrtc, the approved
+  bundling: needs a documented override) and `missing-notice-file-for-apache-license` on libwebrtc's Android example
+  (the NOTICE file is there: a false positive to override, or leave the unbuilt Android example out of the component).
+  20 warnings are `debian-changelog-line-too-long` from `backport.sh`'s changelog lines (to rewrap at 80 columns).
+
+**Next steps when resuming with WebKit 2.56:** new pins in `wpewebkit-libwebrtc.sums` for the 2.56 tag; check the three
+patches still apply (or are upstream); the lintian overrides and changelog wrap above; build `+5`-style with the VP8
+patch and rerun the loopback (VP8 must stay VP8), the six Chrome cases, the engine's `connectionState` with `balanced`,
+a video bridge (Jitsi, `tests/webcalls_jitsi.py`) and a real messaging call; then arm64 (the libvpx flag patch matters
+most there); then publish (the component tarball is part of the source package).
+
+## Document-Isolation-Policy (since `+4.1`)
+
+**The problem.** WhatsApp Web in lord-web said "Your browser doesn't support calling"; the call log's page line read
+`crossOriginIsolated no, SharedArrayBuffer no, RTCPeerConnection yes, getUserMedia yes`. Its document is served with
+`Cross-Origin-Embedder-Policy: require-corp`, `Cross-Origin-Opener-Policy: same-origin-allow-popups`,
+`Document-Isolation-Policy: isolate-and-require-corp` and `Origin-Agent-Cluster: ?1` (captured from Chrome,
+2026-11-26). Chrome becomes cross-origin isolated through DIP, which isolates one document in an agent cluster and
+process of its own whatever its COOP. WebKit has no DIP, and COOP `same-origin-allow-popups` is not enough for its
+isolation (that needs COOP `same-origin` with COEP `require-corp`), so `lordos-sharedarraybuffer-coi.patch` never ran.
+
+**The patch** (`lordos-document-isolation-policy.patch`, one function: `obtainCrossOriginOpenerPolicy` in
+`Source/WebCore/loader/CrossOriginOpenerPolicy.cpp`). When a response has
+- `Document-Isolation-Policy` `isolate-and-require-corp` or `isolate-and-credentialless` (a structured-field token; `none`,
+  `Document-Isolation-Policy-Report-Only` and anything else change nothing),
+- an **enforced** `Cross-Origin-Embedder-Policy: require-corp` (WebKit's only enforcing COEP; it doesn't implement
+  `credentialless`, so DIP with COEP `credentialless` is not isolated: isolating without enforcing would be weaker), and
+- COOP `unsafe-none` or `same-origin-allow-popups`, from a potentially trustworthy origin (HTTPS or loopback; the
+  function already returns no policy for any other),
+
+its effective COOP becomes WebKit's `SameOriginPlusCOEP`, exactly what COOP `same-origin` + COEP `require-corp` give.
+Every part of WebKit reads COOP through that one function (the network process's browsing context group switch, the UI
+process's response policy, the web process's `DocumentLoader`), so they all agree: the navigation goes to a **new,
+isolated browsing context group in a web process of its own** (`CrossOriginMode::Isolated`, never reused or cached),
+the only kind of process where `lordos-sharedarraybuffer-coi.patch` turns SharedArrayBuffer on and WebKit allows
+high-precision timers; `crossOriginIsolated` is true in the page and its frames; its dedicated workers run in the
+same process and have SharedArrayBuffer (a buffer shared with one works). The report-only COOP is untouched.
+
+**Why this way, and the trade-off.** Chrome's DIP relies on site isolation: the document gets its own agent cluster
+and process even though cross-origin popups stay in its browsing context group. WPE runs without site isolation, so
+everything in one browsing context group shares one web process; a cross-origin page left there (a popup, its opener)
+would run next to SharedArrayBuffer and fine timers, which is what Spectre-style reads need. COOP `same-origin` is the
+model WebKit already has for keeping every other origin out of such a process, so DIP is mapped onto it rather than
+onto a new, partial isolation:
+- **Stricter than what the site asked, never looser.** From `same-origin-allow-popups` (or `unsafe-none`) the policy
+  only tightens: a popup the page opens to another origin, or the page's own cross-origin opener, loses the
+  `window.opener` link (the popup still opens), as under COOP `same-origin`. In lord-web this costs nothing: it never
+  creates WebKit popups (a new window inside the app's scope loads in the same view, one outside it opens in the
+  browser, WEBAPPS.md), so no messaging web app flow depends on an opener there. Same-origin popups with the same
+  headers keep it.
+- **Subresources are checked as before.** COEP `require-corp` is the document's own header and WebKit enforces it as
+  always: a cross-origin subresource without `Cross-Origin-Resource-Policy` (or CORS) is still blocked, and a
+  cross-origin iframe still needs its own COEP/CORP. Nothing here is relaxed.
+- **Top-level only in effect.** WebKit's `crossOriginIsolated` reads the main frame's COOP, so DIP in an iframe of a
+  page that isn't isolated isolates nothing (Chrome would isolate that iframe alone; WebKit can't without site
+  isolation). The only effect DIP has in such an iframe is stricter: `window.open` from it, cross-origin to the top,
+  gets no opener (`shouldForceNoOpenerBasedOnCOOP`).
+- **A page with COOP `same-origin-allow-popups` + COEP and no DIP stays not isolated**, as before and as in Chrome.
+
+**Checked** by `server/tests/webcalls_check.py --dip` (the build's test, sandbox on), with pages on 127.0.0.1: a page
+served with exactly the app's four headers is cross-origin isolated, has SharedArrayBuffer and Atomics, its dedicated
+worker (served with COEP `require-corp`) has SharedArrayBuffer and writes 42 into a buffer the page shares with it, a
+cross-origin script without CORP is blocked and one with `Cross-Origin-Resource-Policy: cross-origin` loads, and the
+call log's page line ends `DIP isolate-and-require-corp`; COOP `same-origin-allow-popups` + COEP without DIP, and DIP
+without COEP, are not isolated and have no SharedArrayBuffer in the page or its worker; a plain page afterwards still
+has none. lord-web's page line now ends `, DIP <word>`: `none`, `isolate-and-require-corp`,
+`isolate-and-credentialless` or `other` (`webcall_dip_word`, from the main frame's response, never the header's text).
+
+## Service-worker notifications (since `+4.2`)
+
+**The problem.** A web app can show a notification two ways: `new Notification()` from its page, or
+`registration.showNotification()` from its service worker (a "persistent" notification; chat and messaging web apps
+use it, some only when `Notification.maxActions` is at least 1, which WebKit 2.54 doesn't implement). WebKit hands the
+first to the view (`WebKitWebView::show-notification`), which lord-web takes: its sanitizing, its tag replace, LordOS's
+sound rule (`suppress-sound`), the window brought forward on a click, a `notify:` log line. The second reaches
+`WebKitNotificationProvider::show()` with no page (WebKitWebContext's static provider for the service workers'
+`WebNotificationManagerProxy`), which sent it to `org.freedesktop.Notifications` itself from lord-web's process
+(`NotificationService`): no `suppress-sound`, `silent` ignored, nothing of lord-web's. And GLib's WebKit didn't
+implement `focusFromServiceWorker`, so a worker's `clients.focus()` in its `notificationclick` did nothing visible.
+
+**The patch** (`lordos-sw-notifications.patch`, `Source/WebKit/UIProcess/API/glib/`):
+- `WebKitWebContext.cpp` keeps every web view of every context in creation order (added and removed where each
+  context already registers its views). `webkitWebContextGetWebViewForServiceWorkerNotification(sessionID, origin)`
+  returns a view whose page is open, of the same network session (website data store) as the worker, and whose
+  current URL has the worker's origin (`SecurityOriginData`, as WebKit's own `WebProcessProxy::forWebPagesWithOrigin`
+  compares), a visible one first; none for an opaque origin.
+- `WebKitNotificationProvider::show()`: a persistent notification with no page goes to that view's
+  `show-notification`, exactly as a page's notification (the same `WebKitNotification` object). The application's
+  `webkit_notification_clicked()` reaches the worker as `notificationclick` and `webkit_notification_close()` as
+  `notificationclose`, through the service workers' `WebNotificationManagerProxy` to the network process, as a D-Bus
+  click did. With no such view, or when no handler takes it (returns `FALSE`), WebKit's D-Bus notification as before.
+  A tag now replaces only a notification of the **same origin** (the service workers' provider holds every origin's;
+  before, any notification with the tag in that provider); a notification the handler refused leaves the provider's
+  map, so a later one with its tag can't close it.
+- `WebKitUIClient.cpp` implements `focusFromServiceWorker`: the view emits **`lordos-focus-from-service-worker`**
+  (LordOS's, not WebKit's API: no symbol, a signal an application finds with `g_signal_lookup`), and WebKit answers the
+  worker at once, as before, rather than waiting for the view to become visible. WebKit allows `clients.focus()` only
+  while the worker handles a user gesture (`ServiceWorkersUserGestureEnabled`, on by default: `notificationclick`), so
+  a worker can't bring a window forward on its own. lord-web brings its window forward on it (`web_show`), as on a
+  click on a page's notification.
+- Not done: `clients.openWindow()` from a worker. In WebKit it goes to `WebsiteDataStoreClient`, which the GLib port
+  doesn't have at all (a new client and API); in lord-web a click already brings the app's one window forward, and the
+  worker can still `navigate()` that window's client.
+
+What it means for lord-web: no change is needed for the notification itself, its `show-notification` handler
+(`webbus_notify`) applies to both kinds. The same sanitizing, tag replace, sound rule and `notify:` line, and the window
+comes forward on a click. A service-worker notification shown while the app's window is closed and lord-web runs in
+the background still has a view (the hidden one), so it goes through lord-web too; one shown with no lord-web view of
+its origin left (the view navigated to a sign-in on another site) still goes over D-Bus.
+
+**Checked** by `server/tests/webcalls_check.py --swnotify` (the build's test, WebKit's sandbox on, a session bus of its
+own from `dbus-run-session` with `webcalls-check`'s own notification server on it, `dbus-daemon` in the test chroot):
+the view's `show-notification` with title, body and tag, a same-tag replace, the click reaching `notificationclick`,
+`clients.focus()` and its signal, and the D-Bus fallback with its click (results of `+4.2` above). On `+4.1` the same
+worker's notifications went to D-Bus even with the page open, with `[Invalid UTF-8]` as the app name unless the
+application sets one (`g_set_application_name`).
+
+## librice (since `+4`)
+
+WebRTC's ICE (finding a network path between the two sides of a call) needs sockets. WebKit's web process has no
+network in its sandbox (bubblewrap's `--unshare-net`), so with `+3` ICE ran there and found nothing. WebKit's answer
+is librice: with `-DUSE_LIBRICE=ON`, WebCore's ICE agent speaks librice's sans-I/O protocol (`rice-proto`) and every
+socket lives in WebKit's **network process** (`rice-io`), which has the network already; the web process keeps none.
+Approved by the maintainer on 2026-11-25. Debian has no librice, so LordOS builds it:
+
+- `tools/pkg/build-librice.sh [revision]` makes `librice 0.4.3-1~lordos13+<revision>` (`librice0`: `librice-proto.so.0`
+  and `librice-io.so.0`; `librice-dev`: `rice/rice-proto.h`, `rice/rice-io.h`, `rice-proto.pc`, `rice-io.pc`). WebKit
+  2.54 asks for 0.4.2 or later; 0.4.3 is upstream's latest (2026-05-11, Rust 1.85, Debian 13's). `ARCH=arm64` as for
+  WebKit.
+- **Sources, all pinned** in `tools/pkg/librice.sums`: upstream's tag tarball (github.com/ystreet/librice `v0.4.3`);
+  the **vendored crates** (`librice_0.4.3.orig-vendor.tar.xz`: the 291 crates upstream's `Cargo.lock` names, fetched by
+  `cargo vendor --locked` in a chroot, so cargo checks each against the lock file's checksum, then packed
+  reproducibly: made twice on 2026-11-25, the same SHA-256 both times); and cbindgen 0.29.2 with its 72 crates
+  (`librice_0.4.3.orig-cbindgen.tar.xz`; its `.crate` against crates.io's checksum). Only the vendoring step uses the
+  network; the package build runs cargo `--frozen --offline`. Prebuilt binaries in the vendored crates (other systems'
+  import libraries, test fixtures: 398 and 10 files) are removed, so the source package has none.
+- **cbindgen 0.29**: Debian 13's `cargo-c` carries cbindgen 0.27, which doesn't read Rust 2024's `#[unsafe(no_mangle)]`
+  and writes empty headers; the package builds cbindgen 0.29.2 from the third tarball and writes both headers with it
+  (`debian/headers.sh`, keeping the version defines cargo-c adds). It is never installed.
+- `rice-proto` is built `--no-default-features --features capi,openssl`: TURN over TLS through the system's OpenSSL,
+  not a second TLS stack (rustls, aws-lc). `librice-proto.so.0` links `libssl.so.3` and `libcrypto.so.3`, which
+  `libWPEWebKit-2.0.so.1` already links since `+3`.
+- **Licences:** MIT or Apache-2.0 (librice); the vendored crates' own (each crate's `Cargo.toml` → a `debian/copyright`
+  stanza, generated; texts from SPDX's list in `tools/pkg/librice/licenses/` or Debian's common licences). The source
+  package (`.dsc`, the three orig tarballs, `.debian.tar.xz`) is published next to the binaries exactly as WebKit's
+  (below).
+- **Test** (`librice-chroot.sh test`, a clean trixie chroot): the packages install, `pkg-config` gives 0.4.3 for both,
+  and `tools/pkg/librice-test.c` builds against both and runs: `rice_version` 0.4.3 as the header says, an agent with a
+  stream, a UDP socket bound on the loopback by `rice-io`. Result 2026-11-25 (amd64): passes; lintian 0 errors.
+- WPE `+4` Build-Depends on `librice-dev (>= 0.4.3)` and, through its shared libraries, depends on `librice0`;
+  `build-wpewebkit.sh` takes them with `EXTRA_DEBS=<librice's out/>` (installed before the build dependencies and in the
+  test chroot). Publish librice (binaries and source) before or with `+4`.
 
 ## Licence and the source next to the binaries
 

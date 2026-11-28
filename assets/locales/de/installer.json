@@ -128,5 +128,6 @@
   "user.user": "Benutzername",
   "user.userHint": "Kleinbuchstaben, Ziffern, - und _. Er wird Administrator (sudo).",
   "welcome.text": "Dieser Assistent installiert LordOS auf dem Datenträger dieses Computers. Du wählst Sprache, Tastatur, Datenträger und deinen Benutzer. Die Installation löscht den gewählten Datenträger, außer du installierst neben dem Vorhandenen oder wählst die Partitionen selbst.",
-  "welcome.title": "Willkommen bei LordOS"
+  "welcome.title": "Willkommen bei LordOS",
+  "disk.unreadable": "Die Beschreibung eines Datenträgers konnte nicht gelesen werden, daher wird er nicht angezeigt. Suchen Sie erneut; fehlt er weiterhin, melden Sie es bitte."
 }

@@ -712,6 +712,7 @@
   "agent.toolsAutoFailed": "Avtomatik yeniləmə alınmadı ({have} → {want}).",
   "agent.toolsUpdateBtn": "Yenilə",
   "agent.st.needsTools": "Alətlər lazımdır",
+  "agent.st.oldLordos": "İçində LordOS-u yeniləyin",
   "agent.st.needsXclip": "xclip lazımdır",
   "agent.toolsInstalled": "LordOS alətləri maşında quraşdırılıb və işləyir; hər girişdə yenidən başlayır.",
   "agent.timesync": "Saatı təyin et",
@@ -880,6 +881,8 @@
   "un.how.preseed": "Cavablar quraşdırıcının öz başlanğıc fayllarına yazılır, parolunuz yalnız heş kimi, və sistem quraşdırılandan sonra silinir.",
   "un.how.autoinstall": "Cavablar quraşdırıcının oxuduğu kiçik diskə yazılır, parolunuz yalnız heş kimi, və sistem quraşdırılandan sonra disk silinir.",
   "un.how.kickstart": "Cavablar quraşdırıcının oxuduğu kiçik diskə yazılır, parolunuz yalnız heş kimi, və sistem quraşdırılandan sonra disk silinir.",
+  "un.how.kali": "Cavablar quraşdırıcının öz başlanğıc fayllarına yazılır, parolunuz yalnız heş kimi, və sistem quraşdırılandan sonra silinir.",
+  "un.how.lordos": "Cavablar quraşdırıcının oxuduğu kiçik diskə yazılır, parolunuz yalnız heş kimi, və sistem quraşdırılandan sonra disk silinir.",
   "un.image": "{file} faylından quraşdırır, o da istehsalçının imzalanmış siyahısı ilə yoxlanılır",
   "un.review": "Suallarsız: {host} üzərində {user} hesabı",
   "un.reviewOff": "Quraşdırıcının suallarına siz cavab verirsiniz",
@@ -1100,6 +1103,7 @@
   "apps.menu": "Tətbiqlər",
   "apps.needsAgent": "Tətbiqlər rejimi üçün maşının agenti qoşulu olmalıdır",
   "win.appsNeedsTools": "Tətbiqlər rejimi üçün maşında LordOS alətləri ilə LordOS və ya Windows lazımdır",
+  "win.appsOldLordos": "Tətbiqlər rejimi üçün maşının içində LordOS {version} və ya daha yenisi lazımdır. Maşının içində LordOS-u yeniləyin; təkcə LordOS alətləri bunu əlavə edə bilməz.",
   "apps.noApps": "Maşın hələ tətbiqlərini siyahıya almayıb",
   "apps.gone": "Bu pəncərə maşında bağlandı",
   "apps.dropTitle": "Bu faylları maşındakı bu pəncərəyə vermək üçün buraxın",
@@ -2027,5 +2031,7 @@
   "req.row.answers": "Quraşdırma cavabları",
   "req.use.answers": "Machines özü hazırlayır: quraşdırılacaq heç nə yoxdur",
   "req.st.download": "Yaradanda",
-  "req.st.builtin": "Daxili"
+  "req.st.builtin": "Daxili",
+  "cfg.closeOnStop": "Maşın dayananda pəncərəni bağla",
+  "cfg.closeOnStopNote": "Söndürmə və ya Söndür əmrindən sonra. Problem səbəbindən dayanarsa, nə baş verdiyini göstərmək üçün pəncərə açıq qalır."
 }

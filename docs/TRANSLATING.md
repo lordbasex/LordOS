@@ -142,7 +142,7 @@ tests) and we add them.
   language. Keep texts about as short as the English ones: buttons and menus have little room.
 - Be consistent: once you choose a word for Trash, Dock, Files, Settings, Store or Cloud, use it everywhere. The terms
   in `apps.json` and `shell.json` are the glossary for the rest of your translation.
-- **Never translated:** LordOS, Lumo, Lord Flow, Lord Classic and LordBench.
+- **Never translated:** LordOS, Lumo, Flow, Classic and LordBench.
 - No third-party brand or product names (other systems, their apps or features): LordOS uses its own generic names
   (Search, Apps, Night Light, Quick Preview…). `tools/brand-check.mjs`, run by `i18n-check`, fails on them.
 - Use the typographic punctuation of your language (« », „ “, 「」). Dates and numbers come from `format.json`, not

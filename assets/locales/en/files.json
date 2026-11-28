@@ -95,7 +95,7 @@
   "menu.emptyTrash": "Empty Trash",
   "menu.file": "File",
   "menu.forward": "Forward",
-  "menu.getInfo": "Get Info",
+  "menu.getInfo": "Properties",
   "menu.go": "Go",
   "menu.groupBy": "Group by",
   "menu.newFolder": "New Folder",
@@ -342,5 +342,9 @@
   "readOnly.denied": "This folder is read-only: its permissions don't let you change it. To change it, use the Terminal or another app.",
   "fromMachineNoRun": "“{name}” came from the machine {machine}. Files doesn’t open programs or installers from a machine: use Open With if you trust it.",
   "info.from": "From",
-  "info.fromMachine": "The machine {machine}"
+  "info.fromMachine": "The machine {machine}",
+  "skin.address": "Address",
+  "skin.tasks": "File and Folder Tasks",
+  "skin.otherPlaces": "Other Places",
+  "skin.details": "Details"
 }

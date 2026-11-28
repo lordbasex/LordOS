@@ -83,6 +83,15 @@ export function restoreDecision(mode, clean, count) {
   return !clean || mode === 'ask' ? 'ask' : 'run';
 }
 
+// The same session going on in another desktop, not a new one: the theme before was switched away from (its marker
+// "theme", themeReopen), or it failed or was left and lord-server loaded this one instead (lord.themes.fellBack: QA
+// 0.8.9.6.2, its "unclean" marker is no crash and asks nothing).
+export const sameSession = (saved, fellBack) => saved?.clean === 'theme' || !!fellBack;
+// How session restore's marker is saved (lord.settings.save): the session's last word (clean true: logout, power, the
+// end of lord-server) on the disk before it returns; every other write ('queued') durable too, but on lord-server's
+// save worker, never the frame's (GitHub #250, QA 0.8.9.6.2: 94 to 145 ms of fsync on the interface's thread).
+export const markerSave = (clean) => (clean === true ? true : 'queued');
+
 // What a decision (restoreDecision) does with the list: { run } reopens at once, { ask } waits for the person's answer
 // (each entry can be left out). Always: everything but the ask-first apps runs, those are asked about.
 export function restoreSplit(decision, list) {

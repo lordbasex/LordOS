@@ -4,6 +4,7 @@
  * pictures (portalshot.c) and the lending (fplend.c). Run by tests/run_suites.sh under dbus-run-session. */
 #include "../src/ui/portal.h"
 #include "../src/ui/webask.h"
+#include "../src/ui/webalive.h"
 #include "../src/vault/dbus.h"
 #include "../src/fplend.h"
 #include "../src/cast/castproto.h"
@@ -17,12 +18,14 @@ static int fails, passes;
 #define CHECK(x) do { if (!(x)) { printf("FAIL %s:%d: %s\n", __FILE__, __LINE__, #x); fails++; } else passes++; } while (0)
 
 static char last_kind[64], last_json[8192];
-static int emits_cast, emits_shot, emits_taken;
+static int emits_cast, emits_shot, emits_taken, emits_note, emits_note_close;
 void hw_emit(const char *kind, const char *json) {
     snprintf(last_kind, sizeof last_kind, "%s", kind);
     snprintf(last_json, sizeof last_json, "%s", json);
     emits_cast += !strcmp(kind, "portal-cast");
     emits_shot += !strcmp(kind, "portal-shot");
+    emits_note += !strcmp(kind, "notify");
+    emits_note_close += !strcmp(kind, "notify-close");
     emits_taken += !strcmp(kind, "portal-shot-taken");
 }
 int wl_focus_pid(void) { return 0; }
@@ -75,9 +78,22 @@ int fplend_lend(unsigned pid, const char *path, int kind, char *out, size_t n) {
 void webask_attach(DConn *c) { (void)c; }
 void webask_call(DConn *c, const DMsg *m) { (void)c; (void)m; }
 int webask_reply(DConn *c, const DMsg *m) { (void)c; (void)m; return 0; }
+void webalive_attach(DConn *c) { (void)c; }
+void webalive_lost(void) {}
+int webalive_reply(const DMsg *m) { (void)m; return 0; }
 void webask_gone(const char *name) { (void)name; }
 void webask_appeared(const char *name) { (void)name; }
 void webask_lost(void) {}
+/* lumo's org.lordos.Writing1 (ui/writebus.c) is not under test here */
+void writebus_call(DConn *c, const DMsg *m) { (void)c; (void)m; }
+int writebus_reply(DConn *c, const DMsg *m) { (void)c; (void)m; return 0; }
+void writebus_gone(const char *name) { (void)name; }
+void writebus_lost(void) {}
+/* Hands' org.lordos.Hands1 (ui/handsbus.c) is not under test here */
+void handsbus_call(DConn *c, const DMsg *m) { (void)c; (void)m; }
+int handsbus_reply(DConn *c, const DMsg *m) { (void)c; (void)m; return 0; }
+void handsbus_gone(const char *name) { (void)name; }
+void handsbus_lost(void) {}
 
 static DConn app;
 typedef struct { char member[64], path[400], token[64], uri[512], session[400]; uint32_t code, persist; int has_color; double color[3]; } Got;
@@ -275,6 +291,116 @@ static void shot_call(const char *member) {
     call("org.freedesktop.portal.Screenshot", member, "sa{sv}", &b, req, err);
     dw_free(&b);
     pump(150);
+}
+
+/* ---- org.freedesktop.portal.Notification (approved 2026-11-27 with limits) ---- */
+static void note_opt_s(DBuf *b, const char *k, const char *v) { dw_struct(b); dw_str(b, k); dw_variant(b, "s"); dw_str(b, v); }
+static void note_button(DBuf *b, const char *label, const char *action, int target) {
+    size_t a = dw_arr_begin(b, 8);
+    if (label) note_opt_s(b, "label", label);
+    if (action) note_opt_s(b, "action", action);
+    if (target) { dw_struct(b); dw_str(b, "target"); dw_variant(b, "s"); dw_str(b, "evil"); }
+    dw_arr_end(b, a);
+}
+/* AddNotification(id, { title, body, priority, default-action, icon, buttons }) */
+static void note_add(const char *id, const char *title, int buttons, char *err) {
+    DBuf b; dw_init(&b);
+    dw_str(&b, id);
+    size_t a = dw_arr_begin(&b, 8);
+    note_opt_s(&b, "title", title);
+    note_opt_s(&b, "body", "line one\nline two\x07");
+    note_opt_s(&b, "priority", "urgent");
+    note_opt_s(&b, "default-action", "app.open");
+    /* an icon the app sends is read past: the shell draws its export's */
+    dw_struct(&b); dw_str(&b, "icon"); dw_variant(&b, "(sv)"); dw_struct(&b); dw_str(&b, "file"); dw_variant(&b, "s"); dw_str(&b, "/etc/shadow");
+    if (buttons) {
+        dw_struct(&b); dw_str(&b, "buttons"); dw_variant(&b, "aa{sv}");
+        size_t ba = dw_arr_begin(&b, 4);
+        note_button(&b, "Reply", "app.reply", 1);
+        note_button(&b, "Mark\x01 read", "app.read", 0);
+        note_button(&b, "Run", "bad action!", 0);          /* not an action name: dropped */
+        note_button(&b, NULL, "app.nolabel", 0);           /* no label: dropped */
+        note_button(&b, "Four", "app.four", 0);
+        note_button(&b, "Five", "app.five", 0);            /* past three: dropped */
+        dw_arr_end(&b, ba);
+    }
+    dw_arr_end(&b, a);
+    call("org.freedesktop.portal.Notification", "AddNotification", "sa{sv}", &b, NULL, err);
+    dw_free(&b);
+    pump(150);
+}
+static int note_id(void) { const char *p = strstr(last_json, "\"id\":"); return p ? atoi(p + 5) : 0; }
+
+static void test_notification(void) {
+    char err[128];
+    CHECK(prop_version("org.freedesktop.portal.Notification") == 1);
+    /* a Flatpak app's: shown with its verified id, plain text, the default action and three buttons by index */
+    fake_app = "flatpak:org.example.Notes";
+    screen_blocked = 0;
+    emits_note = 0;
+    note_add("chat-1", "Hello\x1b[31m", 1, err);
+    CHECK(!err[0] && emits_note == 1);
+    CHECK(strstr(last_json, "\"flatpak\":\"org.example.Notes\"") && strstr(last_json, "\"portal\":true") && strstr(last_json, "\"urgency\":2"));
+    CHECK(strstr(last_json, "\"title\":\"Hello [31m\"") && strstr(last_json, "line one\\u000aline two "));
+    CHECK(strstr(last_json, "[\"default\",\"\"],[\"0\",\"Reply\"],[\"1\",\"Mark  read\"],[\"2\",\"Four\"]]") != NULL);
+    CHECK(!strstr(last_json, "shadow") && !strstr(last_json, "evil") && !strstr(last_json, "bad action") && !strstr(last_json, "Five"));
+    int nid = note_id();
+    CHECK(nid >= 0x40000000);
+    /* the same id again: it replaces, under the same number */
+    note_add("chat-1", "Again", 0, err);
+    CHECK(emits_note == 2 && note_id() == nid && strstr(last_json, "\"replaces\":true") && strstr(last_json, "\"actions\":[[\"default\",\"\"]]"));
+    /* a button: ActionInvoked(app id, id, its action, []) to that connection; the shell sends only the index */
+    note_add("chat-1", "Buttons", 1, err);
+    portal_note_action((uint32_t)nid, "1");
+    int seen = 0;
+    for (int left = 1500; left > 0 && !seen; left -= 10) {
+        struct pollfd p[2] = { { portal_fd(), POLLIN | (portal_wants_write() ? POLLOUT : 0), 0 }, { app.fd, POLLIN, 0 } };
+        poll(p, 2, 10);
+        portal_dispatch();
+        DMsg m;
+        while (dbus_next(&app, &m) == 1) {
+            if (m.type == DBUS_SIGNAL && m.member && !strcmp(m.member, "ActionInvoked") && m.sig && !strcmp(m.sig, "sssav")) {
+                DRd r; dr_init(&r, &m);
+                const char *a = dr_str(&r, NULL), *i = dr_str(&r, NULL), *act = dr_str(&r, NULL);
+                seen = !r.err && !strcmp(a, "org.example.Notes") && !strcmp(i, "chat-1") && !strcmp(act, "app.read") ? 1 : -1;
+            }
+            dbus_msg_free(&m);
+        }
+    }
+    CHECK(seen == 1);
+    portal_note_action((uint32_t)nid, "1");                  /* used: no second signal, no crash */
+    portal_note_action(0x7ffffff0u, "0");                    /* nobody's */
+    /* RemoveNotification: only the connection that added it */
+    note_add("chat-2", "Two", 0, err);
+    int nid2 = note_id();
+    emits_note_close = 0;
+    DBuf b; dw_init(&b); dw_str(&b, "chat-2");
+    call("org.freedesktop.portal.Notification", "RemoveNotification", "s", &b, NULL, err);
+    dw_free(&b);
+    CHECK(!err[0] && emits_note_close == 1 && note_id() == nid2);
+    /* hostile and outside callers */
+    emits_note = 0;
+    note_add("../x", "bad id", 0, err);
+    CHECK(err[0] && emits_note == 0);
+    char longid[80]; memset(longid, 'a', 70); longid[70] = 0;
+    note_add(longid, "long id", 0, err);
+    CHECK(err[0] && emits_note == 0);
+    dw_init(&b); dw_str(&b, "x");
+    call("org.freedesktop.portal.Notification", "AddNotification", "s", &b, NULL, err);
+    dw_free(&b);
+    CHECK(err[0] && emits_note == 0);                        /* not the spec's shape */
+    fake_app = "desktop:org.example.Native";
+    note_add("n", "native", 0, err);
+    CHECK(emits_note == 0);                                  /* no Flatpak app: refused (it has org.freedesktop.Notifications) */
+    fake_app = NULL;
+    note_add("n", "nobody", 0, err);
+    CHECK(emits_note == 0);
+    fake_app = "flatpak:org.example.Notes";
+    screen_blocked = 1;                                       /* the firewall's "no notifications" */
+    note_add("n", "blocked", 0, err);
+    CHECK(emits_note == 0);
+    screen_blocked = 0;
+    portal_note_closed((uint32_t)nid);
 }
 
 int main(void) {
@@ -548,6 +674,7 @@ int main(void) {
     char cmd[128];
     snprintf(cmd, sizeof cmd, "rm -rf '%s'", home);
     if (system(cmd)) {}
+    test_notification();
     printf("portal-cast-test: %s (%d checks)\n", fails ? "FAILED" : "ok", passes + fails);
     return fails != 0;
 }

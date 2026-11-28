@@ -945,8 +945,58 @@ unsigned ag_hello_caps(const uint8_t *p, size_t n) {
         else if (l == 5 && !memcmp(p + s0, "links", 5)) caps |= AG_HELLO_LINKS;
         else if (l == 6 && !memcmp(p + s0, "notify", 6)) caps |= AG_HELLO_NOTIFY;
         else if (l == 4 && !memcmp(p + s0, "send", 4)) caps |= AG_HELLO_SEND;
+        else if (l == 9 && !memcmp(p + s0, "oldlordos", 9)) caps |= AG_HELLO_OLDLORDOS;
     }
     return caps;
+}
+
+int ag_lordos_older(const char *have, const char *need) {
+    if (!have || !need || *have < '0' || *have > '9') return 0;
+    const char *a = have, *b = need;
+    for (int part = 0; part < 8; part++) {
+        unsigned long x = 0, y = 0;
+        int da = 0, db = 0;
+        while (*a >= '0' && *a <= '9' && da < 9) { x = x * 10 + (unsigned long)(*a++ - '0'); da++; }
+        while (*b >= '0' && *b <= '9' && db < 9) { y = y * 10 + (unsigned long)(*b++ - '0'); db++; }
+        if (!da && !db) return 0;                  /* both ended: the same */
+        if (x != y) return x < y;
+        a += *a == '.'; b += *b == '.';
+        if (!(*a >= '0' && *a <= '9') && !(*b >= '0' && *b <= '9')) return 0;
+    }
+    return 0;
+}
+
+int ag_dpkg_lordos(const char *status, size_t n, char *out, size_t cap) {
+    if (!status || !out || cap < 2) return 0;
+    out[0] = 0;
+    size_t i = 0;
+    while (i < n) {
+        /* one stanza: lines up to an empty line */
+        int mine = 0, inst = 0;
+        char ver[64] = "";
+        while (i < n && status[i] != '\n') {
+            size_t s0 = i;
+            while (i < n && status[i] != '\n') i++;
+            size_t l = i - s0;
+            const char *q = status + s0;
+            if (l == 15 && !memcmp(q, "Package: lordos", 15)) mine = 1;
+            if (l > 8 && !memcmp(q, "Status: ", 8) && l >= 20 && !memcmp(q + l - 12, "ok installed", 12)) inst = 1;
+            if (l > 9 && !memcmp(q, "Version: ", 9) && l - 9 < sizeof ver) { memcpy(ver, q + 9, l - 9); ver[l - 9] = 0; }
+            if (i < n) i++;
+        }
+        if (mine && inst && ver[0]) {
+            size_t k = 0;
+            for (const char *v = ver; *v && k + 1 < cap; v++) {
+                char c = *v;
+                if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '.' || c == '+' || c == '~' || c == '-' || c == ':')) return 0;
+                out[k++] = c;
+            }
+            out[k] = 0;
+            return 1;
+        }
+        while (i < n && status[i] == '\n') i++;
+    }
+    return 0;
 }
 
 int lag_text_ok(const uint8_t *p, size_t n) {

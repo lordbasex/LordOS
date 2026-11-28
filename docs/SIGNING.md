@@ -251,7 +251,7 @@ development state: without a valid signature nothing is loaded.
 - The bundle is **not run**. The refusal is logged (`code: REFUSED themes/default/theme.bundle.js:
   SHA-256 differs from the manifest — this LordOS component was modified and was not loaded` in the
   session log or the journal) and remembered for the session.
-- **A theme:** at session start lord-server falls back to Lord Flow (`default`), then Lord Classic
+- **A theme:** at session start lord-server falls back to Flow (`default`), then Classic
   (`classic`); on a theme switch it keeps the last theme that loaded (since 0.8.5, so two refused
   switches in a row no longer leave the session without a theme). The desktop
   shows a notification: **"This LordOS component was modified and was not loaded"**, naming the file,
@@ -271,7 +271,7 @@ troubleshooting: `sudo /usr/lib/lordos/bin/lord-server --check-code`).
 | | |
 |---|---|
 | ![modified](system-apps-modified.png) | ![recovery](system-apps-recovery.png) |
-| One byte changed in the default theme: the Lord Classic theme loads and says so | Every theme modified: the recovery screen |
+| One byte changed in the default theme: the Classic theme loads and says so | Every theme modified: the recovery screen |
 | ![about verified](system-apps-about-verified-dark.png) | ![about development](system-apps-about-dev-light.png) |
 | About: System app, Verified | About: Development build |
 | ![app recovery](system-apps-app-recovery.png) | |

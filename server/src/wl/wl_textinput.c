@@ -162,6 +162,19 @@ static TextInput *target(void) {
 
 int wl_textinput_composing(void) { return target() != NULL; }
 
+/* The field with the keyboard says it holds a secret (a password or a PIN, hidden or sensitive text): an agent never
+ * types there (hands.h). Only what the app told us through text-input-v3; an app without it can't be known. */
+int wl_textinput_secret(void) {
+    TextInput *ti;
+    if (!inputs.next) return 0;
+    wl_list_for_each(ti, &inputs, link) {
+        if (!ti->entered || !ti->active) continue;
+        if (ti->purpose == ZWP_TEXT_INPUT_V3_CONTENT_PURPOSE_PASSWORD || ti->purpose == ZWP_TEXT_INPUT_V3_CONTENT_PURPOSE_PIN) return 1;
+        if (ti->hint & (ZWP_TEXT_INPUT_V3_CONTENT_HINT_HIDDEN_TEXT | ZWP_TEXT_INPUT_V3_CONTENT_HINT_SENSITIVE_DATA)) return 1;
+    }
+    return 0;
+}
+
 void wl_textinput_send(const char *preedit, int fb, int fe, const char *commit) {
     TextInput *ti = target();
     if (!ti) return;

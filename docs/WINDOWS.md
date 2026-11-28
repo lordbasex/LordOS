@@ -386,12 +386,12 @@ still the Dock's blur.
 
 ## Snapping (0.8.3)
 
-A theme turns it on with `configureWindows({ snap: true })` (Lord Classic and Lord Workspaces do, and Lord Flow since
+A theme turns it on with `configureWindows({ snap: true })` (Classic and Workspaces do, and Flow since
 0.8.8.10, GitHub #182). The person can turn dragging to the edges off in **Settings → Desktop & Dock → Snap windows to
 the screen edges** (`settings.windowSnap`, on by default; `snapAllowed` in `snap.js`, `snapEnabled()` and
 `snapZoneAt()` in `windows.js` return false and null then); `wm.snap`, `wm.snapKey` and the menus' layouts keep
-working. In Lord Flow a maximized window dragged out by its bar (the JS drag in its `Window.jsx`) snaps on release too,
-as in Lord Classic; Lord Flow has no Super+arrows for it (❖ is ⌘ there, and ❖← / ❖→ move the text cursor).
+working. In Flow a maximized window dragged out by its bar (the JS drag in its `Window.jsx`) snaps on release too,
+as in Classic; Flow has no Super+arrows for it (❖ is ⌘ there, and ❖← / ❖→ move the text cursor).
 The geometry is in `sdk/snap.js` (no runtime imports, tested by `server/tests/snap_test.mjs`), the
 window side in `sdk/windows.js`.
 
@@ -420,8 +420,8 @@ window side in `sdk/windows.js`.
   Super+arrows (`snapNext` in `snap.js`), and `w.snapped` (the zone) for a theme that squares the
   corners of a snapped window.
 - **Measured** (VM 119, 1280×800, CPU path, a 960 × 600 Files window dragged in circles for 6 s
-  three times through QMP, about 52 moves per second): Lord Classic 7.5–7.7 ms of work per frame (JS
-  0.35, paint 6.4–6.7) and Lord Flow 13.1–13.4 ms (paint 12.1–12.3, its Dock's blur), both at
+  three times through QMP, about 52 moves per second): Classic 7.5–7.7 ms of work per frame (JS
+  0.35, paint 6.4–6.7) and Flow 13.1–13.4 ms (paint 12.1–12.3, its Dock's blur), both at
   the rate of the input. A drag that keeps crossing the top edge (the preview appearing and going)
   costs 9 ms per frame (JS 1.6). Without the preview polling, 6.3–6.6 ms.
 
@@ -435,11 +435,12 @@ Each app reopens where it was: size, position, maximized and display, per app, i
 - **Snapped, keyboard-lifted:** the normal frame is saved, not the snapped or lifted one. Fullscreen and picture-in-picture save nothing.
 - **Fixed size:** a Linux window with equal minimum and maximum keeps the size it asks for, and only its position is remembered. A second window of an app opens 30 px along from the first.
 - Up to 200 apps are kept, oldest out first. Not on a live system.
+- **Never for the toolkit audit's windows** (`lordos-toolkit-audit*` app ids and X classes, any case; `sdk/shellxmodel.js` `remembersPlace`): they ask for 600x400 and check that they get it, so a size remembered from one run must not come back in the next (docs/TOOLKIT-AUDIT.md).
 
 ## The Window menu, the app menu and Force Quit (0.8.5)
 
-The same menus in both themes, built by the SDK (`sdk/windowmenu.js`, `sdk/appcontrol.js`); Lord Flow
-shows them in its menu bar (Window, the app's name, the crown menu), Lord Classic in each window's own
+The same menus in both themes, built by the SDK (`sdk/windowmenu.js`, `sdk/appcontrol.js`); Flow
+shows them in its menu bar (Window, the app's name, the crown menu), Classic in each window's own
 Window and Help menus (its in-window menu strip, since it has no menu bar).
 
 - **Window menu** (`windowMenuItems`): Minimize, Zoom, Fill, Center, Always on Top (see below); **Move & Resize** with the halves
@@ -449,9 +450,9 @@ Window and Help menus (its in-window menu strip, since it has no menu bar).
   'restore')`); **Move to <display>** for every other display (`wm.moveToDisplay`: a snapped window
   keeps its zone, the rest keep their place relative to the screen); Bring All to Front; and the open
   windows, the one in front checked.
-- **App menu** (`appMenuItems`, Lord Flow: a click on the app's name in the menu bar): About <app> (its
+- **App menu** (`appMenuItems`, Flow: a click on the app's name in the menu bar): About <app> (its
   icon, name, own version and where it comes from; a system window, `apps/appabout`), Settings… (the
-  app's own, ❖,), Hide <app>, Hide Others, Show All and Quit <app> (❖Q). In Lord Classic, About <app>
+  app's own, ❖,), Hide <app>, Hide Others, Show All and Quit <app> (❖Q). In Classic, About <app>
   is in each window's Help menu.
 - **Force Quit…** (the crown menu, a system window `apps/forcequit`) lists the open apps and ends the
   chosen one without asking it (`forceQuit`): a Linux or isolated app's own process gets SIGKILL from
@@ -461,7 +462,7 @@ Window and Help menus (its in-window menu strip, since it has no menu bar).
 
 ## Always on top (since 0.8.9.5)
 
-A window can be kept over every normal window, in every theme (Lord Flow, Lord Classic, Lord Workspaces, Lord Celeste),
+A window can be kept over every normal window, in every theme (Flow, Classic, Workspaces, Celeste),
 because the rule is in the SDK (`sdk/desktopmodel.js`, `stackOrder`):
 
 - **Stacking and focus are apart.** The window list (`windows` in `sdk/windows.js`) is the order the windows were
@@ -481,8 +482,8 @@ because the rule is in the SDK (`sdk/desktopmodel.js`, `stackOrder`):
   always-on-top window is over every normal window, never over a fullscreen one or the shell. Their behaviour didn't
   change.
 - **The person** turns it on and off with **Always on Top** (`shell.window.alwaysOnTop`, `alwaysOnTopItem`,
-  `wm.toggleAbove`): in the Window menu (`windowMenuItems`: Lord Flow's menu bar, Lord Classic's and Celeste's
-  in-window menus, Lord Workspaces' window strip) and in every theme's title-bar menu (the right click on the bar, or on
+  `wm.toggleAbove`): in the Window menu (`windowMenuItems`: Flow's menu bar, Classic's and Celeste's
+  in-window menus, Workspaces' window strip) and in every theme's title-bar menu (the right click on the bar, or on
   an app's own bar, `w.windowMenu`), checked while it is on. Turning it on also brings the window forward.
 - **Apps**: `wm.setLayer(id, 'above' | 'below' | null)`, `wm.layer(id)`, `wm.isAbove(id)`.
 - **X11 apps** (`server/src/wl/xwm.c`): `_NET_WM_STATE_ABOVE` and `_NET_WM_STATE_BELOW` (one excludes the other), asked
@@ -511,9 +512,9 @@ per user in `settings.json` (new keys with defaults, no migration) and apply at 
 
 `sdk/windowbuttons.js` (`windowButtonSizePref`, `buttonSizeScale`: 1, 1.25, 1.5; `scaledBar`) and `useWindowButtons()`
 (`sdk/windowshell.jsx`), which now also returns `size` and `px(n)`. Every theme's `Window.jsx` draws its title bar's
-height, its buttons, their glyphs and their hit areas through `px`: Lord Flow's bar 40 → 50 → 60 px and lights 13 → 16 →
-20 px, Lord Classic's bar 34 → 43 → 51 px and buttons 44 × 34 → 55 × 43 → 66 × 51 px, Lord Workspaces' bar 36 → 45 → 54
-px and buttons 28 → 35 → 42 px, Lord Celeste's bar 38 → 48 → 57 px and lights 13 → 16 → 20 px. Normal returns each
+height, its buttons, their glyphs and their hit areas through `px`: Flow's bar 40 → 50 → 60 px and lights 13 → 16 →
+20 px, Classic's bar 34 → 43 → 51 px and buttons 44 × 34 → 55 × 43 → 66 × 51 px, Workspaces' bar 36 → 45 → 54
+px and buttons 28 → 35 → 42 px, Celeste's bar 38 → 48 → 57 px and lights 13 → 16 → 20 px. Normal returns each
 length exactly as the theme wrote it, so nothing is redrawn differently: `tests/window_requests_scene.mjs` compares a
 fingerprint of every title bar node's style, with nothing saved, against the one taken from the frames before the
 setting existed, in each theme. The window manager learns the new frame through `configureWindows({ chrome })`, which
@@ -542,21 +543,21 @@ resizes it from the corner nearest the pointer, in LordOS's windows and in Linux
   `sdk/moddrag.js`; a taken press reaches no node's handlers and is no click, while the global `pointerdown` listeners
   still hear it (a menu closes, ❖ held for it is not a tap that opens the launcher).
 - **The rules** (`sdk/moddragmodel.js` `modGrabAction`): a fullscreen, minimized or picture-in-picture window, the
-  Overview, a shell panel and the back and forward buttons are left to the app; a window the theme locks (Lord
+  Overview, a shell panel and the back and forward buttons are left to the app; a window the theme locks (
   Workspaces' padlock) and a maximized one asked to resize take the press and do nothing; a maximized window comes out
   of its place once the pointer moves 6 px, at its own size and under the pointer where it was grabbed, and snaps where
   it is dropped, as from its title bar; any other window starts `wm.beginMove` or `wm.beginResize` with the nearest
-  corner, the same path as its title bar and borders, so lord-server follows it in C, snapping applies and Lord
+  corner, the same path as its title bar and borders, so lord-server follows it in C, snapping applies and
   Workspaces' tiler keeps its own rules for a tiled window.
 - Alt is offered, not proposed: some drawing and 3D programs and terminals use Alt with a click for their own tools.
   With ❖ chosen, Alt + click stays the app's, and Ctrl + click still opens the Terminal's links.
 
 ### Show tiling options in the window menu (`windowMenuTiling`)
 
-On by default. Off, the Window menu (`sdk/windowmenu.js`: Lord Flow's menu bar, the in-window menus of Lord Classic,
-Lord Workspaces and Lord Celeste) leaves out **Move & Resize** (halves, quarters, thirds, arrangements, previous size),
-Lord Classic's title bar menu leaves out Snap Left, Snap Right and Snap Layouts, and Lord Workspaces' leaves out its
-layout flyout. Dragging a window to an edge is still Desktop & Dock → Windows' own switch, and Lord Classic's maximize
+On by default. Off, the Window menu (`sdk/windowmenu.js`: Flow's menu bar, the in-window menus of Classic,
+Workspaces and Celeste) leaves out **Move & Resize** (halves, quarters, thirds, arrangements, previous size),
+Classic's title bar menu leaves out Snap Left, Snap Right and Snap Layouts, and Workspaces' leaves out its
+layout flyout. Dragging a window to an edge is still Desktop & Dock → Windows' own switch, and Classic's maximize
 button still opens its layouts on hover.
 
 Checked by `tests/moddrag_model_test.mjs` (the choices, the corners, the rules, the sizes), `tests/window_requests_scene.mjs`

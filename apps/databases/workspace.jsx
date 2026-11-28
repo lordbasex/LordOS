@@ -15,7 +15,7 @@ import { Content } from './content.jsx';
 import { Query } from './query.jsx';
 import { TableInfo } from './info.jsx';
 
-// a small window (a Lord Workspaces tile): below COMPACT_AT the toolbar shows icons without labels, below SIDE_AT the
+// a small window (a Workspaces tile): below COMPACT_AT the toolbar shows icons without labels, below SIDE_AT the
 // tables hide behind a toolbar button, below TIGHT_AT Relations, Triggers, Users, Processes and Console go in a ⋯ menu
 const COMPACT_AT = 900, SIDE_AT = 760, TIGHT_AT = 640;
 

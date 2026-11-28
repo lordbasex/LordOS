@@ -1,4 +1,4 @@
-// workspaces_test.mjs — (0.8.9) Lord Workspaces in a scene: tests/workspaces_scene.mjs bundled with esbuild (as the
+// workspaces_test.mjs — (0.8.9) Workspaces in a scene: tests/workspaces_scene.mjs bundled with esbuild (as the
 // theme is built) together with the whole theme (themes/workspaces/index.jsx, its startShell caught by a shim so the
 // scene renders the shell itself) over a stub `lord` whose screen has three monitors, run, and its checks read. The
 // same runner measures what a change costs in any theme: node tests/workspaces_test.mjs theme_cost_scene.mjs <theme>

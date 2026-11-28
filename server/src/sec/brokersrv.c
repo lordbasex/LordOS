@@ -2,6 +2,8 @@
  * compositor). Atiende los pedidos de cada app .lpk aislada, verifica los permisos
  * (perms.c) y, cuando hace falta consentimiento, le pide a la interfaz que dibuje el aviso del
  * sistema (nunca lo dibuja la app). */
+#include "../hands/hands.h"
+#include "../term/term.h"
 #include "broker_int.h"
 #include "perms.h"
 #include "restrict.h"
@@ -276,6 +278,7 @@ int brokersrv_add(int fd, const char *id, int pid) {
 void brokersrv_set_packaged(int fd) { for (int i = 0; i < MAX_APPS; i++) if (apps[i].used && apps[i].fd == fd) apps[i].packaged = 1; }
 void brokersrv_set_system(int fd) { for (int i = 0; i < MAX_APPS; i++) if (apps[i].used && apps[i].fd == fd) apps[i].sys = 1; }
 int brokersrv_conn_system(int conn) { return conn >= 0 && conn < MAX_APPS && apps[conn].used && apps[conn].sys; }
+int brokersrv_hands_owns(void) { return hands_agent_owns_input(); }
 void brokersrv_shell_event(const char *kind, const char *json) { queue_evt(kind, "%s", json); }
 
 /* The app is already running: ask its process for another window (Dock → «New window»). */
@@ -294,7 +297,8 @@ int brokersrv_quit(const char *id) {
     return sent;
 }
 
-void brokersrv_paste_gesture(const char *app) { bclip_paste_gesture(app, mono_s()); }
+/* an AI agent's key or click is never a paste gesture of the person's (Hands, hands.h) */
+void brokersrv_paste_gesture(const char *app) { if (hands_agent_owns_input()) return; bclip_paste_gesture(app, mono_s()); }
 
 const char *brokersrv_app_of_pid(int pid) {
     if (pid <= 0) return NULL;
@@ -508,6 +512,12 @@ static void status_set(AppConn *a, uint32_t reqid, const char *payload, uint32_t
 
 static void handle(AppConn *a, BrokerHdr *h, char *payload, int *fds, int nfds) {
     int fd = a->fd;
+    if (brokersrv_hands_refuses((int)h->op, hands_agent_owns_input(), hands_active(), term_clipboard_sensitive())) {
+        for (int i = 0; i < nfds; i++) if (fds[i] >= 0) { close(fds[i]); fds[i] = -1; }
+        fprintf(stderr, "broker: %s: a request refused (an AI agent's input, Hands)\n", a->id);
+        send_reply(fd, h->reqid, BST_DENIED, NULL, 0);
+        return;
+    }
     if (h->op == BOP_MAIL) { brokermail_handle((int)(a - apps), fd, h->reqid, a->id, payload, h->len, fds, nfds); return; }
     for (int i = 0; i < nfds; i++) if (fds[i] >= 0) { close(fds[i]); fds[i] = -1; }   /* no other request carries fds */
     switch (h->op) {

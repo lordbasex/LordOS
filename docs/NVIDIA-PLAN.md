@@ -11,15 +11,21 @@ approves (AGENTS.md: every root action needs the same review). Nothing here is c
 test matrix says so; facts marked *to verify* were not checked.
 
 Related: `docs/GPU.md` (lord-server's GPU path), `docs/MACHINES-GPU.md` (Settings → Graphics cards, `gpu-role`),
-`docs/HARDWARE-REPORT.md` (two NVIDIA reports so far: #171, an RTX 3060 on NVIDIA's proprietary driver, desktop composed
-on the CPU; #235, an RTX 5070 Ti on NVIDIA's open kernel modules 620.73.04, desktop smooth, composition not in the report), `docs/DESKTOP-PARITY.md` (`linux-drm-syncobj-v1`).
+`docs/HARDWARE-REPORT.md` (three NVIDIA reports so far: #171, an RTX 3060 on NVIDIA's proprietary driver on 0.8.8.9,
+desktop composed on the CPU because the GPU start got no GL context; #235, an RTX 5070 Ti on NVIDIA's open kernel modules
+620.73.04, desktop smooth, composition not in the report; #276, a GTX 1070 (Pascal) on the proprietary 580.196.11 on
+0.8.9.5-beta, desktop composed on the GPU with NVIDIA's OpenGL ES, smooth; in #276's thread another person, a GTX 960 and
+an RTX 3070 Ti on 550.163.01, saw some apps' windows not show on NVIDIA's driver), `docs/DESKTOP-PARITY.md` (`linux-drm-syncobj-v1`).
 
 ## Part 0 — built now: the experimental status and the compatibility report
 
 - **Settings → Graphics cards** shows on every computer with a GPU (before: only with two or more). An NVIDIA card
   (PCI vendor `10de`) says *"Experimental — not verified on your card model yet"*, has **How to Help Test It** (the Help
-  article `graphics-cards`) and lists its roles **AI and compute (CUDA)** and **Desktop** as *Planned*, with a note
-  saying why; there is no button that pretends to turn them on. Each card shows its driver with its version (`nvidia
+  article `graphics-cards`) and lists its roles: **AI and compute (CUDA)** *Planned*, and **Desktop** *Experimental*
+  (updated 2026-11-27 after #276): on the card that draws the session it shows the session's real composition, *Composed
+  on this card — experimental* or *Composed by the processor* (`nvidiaRoleState` in `sdk/gpureport.js`), with a note
+  that names the reports (#276 on the GPU, #171 on the CPU, apps' windows not showing in #276's thread). There is no
+  button that pretends to turn anything on; the free driver stays the default and NVIDIA's own is the Store's opt-in. Each card shows its driver with its version (`nvidia
   560.35.03 (open)`, `nouveau (Mesa 25.0.7)`, `amdgpu (Mesa …)`).
 - **Send a compatibility report** (any card): `lord.sysinfo.gpuReport()` builds a plain-text report in C
   (`server/src/sysreport/gpureport.c`) from world-readable files only: the cards (PCI ids, pci.ids names, kernel driver,
@@ -216,8 +222,8 @@ An NVIDIA card gets **Driver Options in the Store** (any user; the Store asks fo
 expanded, is new). Settings installs nothing itself. After the install it shows, from the compatibility report's facts
 (Part 0, read-only): the driver and version, open or proprietary modules, *CUDA: Ready* when `libcuda.so.1`,
 `nvidia-smi` and `/dev/nvidia-uvm` are there, and the Secure Boot step when it is pending. *AI and compute (CUDA)* is a
-status read from those facts, so `gpu-role … ai` (Machines' action) doesn't change for NVIDIA. *Desktop* stays
-*Planned* (Part B).
+status read from those facts, so `gpu-role … ai` (Machines' action) doesn't change for NVIDIA. *Desktop* is
+*Experimental* and shows the session's composition (Part 0); making it more than that is Part B.
 
 ### A.8 How the card's notes change
 
@@ -229,7 +235,7 @@ status read from those facts, so `gpu-role … ai` (Machines' action) doesn't ch
 | `older` | cards older than about 2014 need the free driver | *GTX 9xx, GTX 10 and Volta get Debian's driver 550; Kepler and older keep `nouveau` (Debian 13 has no driver for them)* |
 | new `rtx50` | — | RTX 50 needs NVIDIA's repository: Debian 13's 550 doesn't support it |
 | new `branch` | — | Driver updates come from NVIDIA through the Store's updates, held to the branch LordOS tested |
-| desktop | the LordOS desktop hasn't been tested with this driver | Unchanged (Part B) |
+| desktop | the LordOS desktop hasn't been tested with this driver | Since 2026-11-27 (`note.older`): experimental; one community report composed on the card (#276, a GTX 1070 on 580), an earlier one composed by the processor (#171) |
 
 Every text through `t()`, in en, es and pt.
 
@@ -244,8 +250,12 @@ Every text through `t()`, in en, es and pt.
 
 ## Part B — design: NVIDIA drawing the desktop — FOR REVIEW
 
-Today an NVIDIA card shows the desktop with `nouveau` (Mesa) or, on NVIDIA's driver, with the screen composed on the
-CPU (#171: the GPU start ends before a GL context; the report's `GPU start:` reason will tell which step per card).
+Today an NVIDIA card shows the desktop with `nouveau` (Mesa) by default. On NVIDIA's driver the community has seen both
+outcomes: composed on the CPU (#171, an RTX 3060 on 0.8.8.9: the GPU start ended before a GL context) and composed on
+the GPU (#276, a GTX 1070 on 580.196.11 on 0.8.9.5-beta, after explicit sync was built in 0.8.9.5), with a report in
+#276's thread of some apps' windows not showing (a GTX 960 and an RTX 3070 Ti on 550.163.01, not yet its own issue). One
+report is not a matrix: B.3 still decides what is supported. The report's `GPU start:` reason tells which step fails per
+card.
 
 ### B.1 What lord-server needs from NVIDIA's driver
 
@@ -266,8 +276,9 @@ CPU (#171: the GPU start ends before a GL context; the report's `GPU start:` rea
   (`linux-drm-syncobj-v1`)** GL and Vulkan clients and Xwayland flicker or show old frames. This is the hard
   dependency: **the desktop on NVIDIA's driver waits for the explicit-sync design the Wayland work is writing**
   (timeline syncobj import, waiting on each surface's acquire point before sampling it, signalling its release point
-  after the frame's page flip, `DRM_CAP_SYNCOBJ_TIMELINE`). Until that design is approved and built, the desktop on
-  NVIDIA's driver stays composed on the CPU and Settings keeps *Desktop: Planned*.
+  after the frame's page flip, `DRM_CAP_SYNCOBJ_TIMELINE`). Explicit sync was built on 2026-11-22 (0.8.9.5,
+  `docs/GPU.md`); since then one card (#276) composes on the GPU with NVIDIA's driver. Settings shows *Desktop:
+  Experimental* and the session's real composition; nothing more is claimed until the matrix (B.3) has results.
 
 ### B.2 Turning it on, and getting back
 

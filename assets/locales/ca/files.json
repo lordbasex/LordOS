@@ -95,7 +95,7 @@
   "menu.emptyTrash": "Buida la Paperera",
   "menu.file": "Fitxer",
   "menu.forward": "Endavant",
-  "menu.getInfo": "Obtén informació",
+  "menu.getInfo": "Propietats",
   "menu.go": "Ves",
   "menu.groupBy": "Agrupa per",
   "menu.newFolder": "Carpeta nova",
@@ -342,5 +342,9 @@
   "readOnly.denied": "Aquesta carpeta és només de lectura: els seus permisos no et deixen canviar-la. Per canviar-la, fes servir el Terminal o una altra app.",
   "fromMachineNoRun": "«{name}» ve de la màquina {machine}. Fitxers no obre programes ni instal·ladors d'una màquina: fes servir Obre amb si hi confies.",
   "info.from": "Procedència",
-  "info.fromMachine": "La màquina {machine}"
+  "info.fromMachine": "La màquina {machine}",
+  "skin.address": "Adreça",
+  "skin.tasks": "Tasques de fitxers i carpetes",
+  "skin.otherPlaces": "Altres llocs",
+  "skin.details": "Detalls"
 }

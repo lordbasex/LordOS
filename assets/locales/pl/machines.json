@@ -712,6 +712,7 @@
   "agent.toolsAutoFailed": "Automatyczna aktualizacja się nie udała ({have} → {want}).",
   "agent.toolsUpdateBtn": "Zaktualizuj",
   "agent.st.needsTools": "Wymaga narzędzi",
+  "agent.st.oldLordos": "Zaktualizuj w niej LordOS",
   "agent.st.needsXclip": "Wymaga xclip",
   "agent.toolsInstalled": "Narzędzia LordOS są zainstalowane i działają w maszynie; uruchamiają się ponownie przy każdym logowaniu.",
   "agent.timesync": "Ustaw zegar",
@@ -880,6 +881,8 @@
   "un.how.preseed": "Odpowiedzi trafiają do własnych plików startowych instalatora, twoje hasło tylko jako skrót, i są usuwane po zainstalowaniu systemu.",
   "un.how.autoinstall": "Odpowiedzi trafiają na mały dysk odczytywany przez instalator, twoje hasło tylko jako skrót, a dysk jest usuwany po zainstalowaniu systemu.",
   "un.how.kickstart": "Odpowiedzi trafiają na mały dysk odczytywany przez instalator, twoje hasło tylko jako skrót, a dysk jest usuwany po zainstalowaniu systemu.",
+  "un.how.kali": "Odpowiedzi trafiają do własnych plików startowych instalatora, twoje hasło tylko jako skrót, i są usuwane po zainstalowaniu systemu.",
+  "un.how.lordos": "Odpowiedzi trafiają na mały dysk odczytywany przez instalator, twoje hasło tylko jako skrót, a dysk jest usuwany po zainstalowaniu systemu.",
   "un.image": "Instaluje z {file}, sprawdzonego również z podpisaną listą twórcy",
   "un.review": "Bez pytań: konto {user} na {host}",
   "un.reviewOff": "Odpowiadasz na pytania instalatora",
@@ -1100,6 +1103,7 @@
   "apps.menu": "Aplikacje",
   "apps.needsAgent": "Tryb aplikacji wymaga połączonego agenta maszyny",
   "win.appsNeedsTools": "Tryb aplikacji wymaga LordOS lub Windows w maszynie, z narzędziami LordOS",
+  "win.appsOldLordos": "Tryb aplikacji wymaga LordOS {version} lub nowszego w maszynie. Zaktualizuj LordOS w maszynie; same narzędzia LordOS nie wystarczą.",
   "apps.noApps": "Maszyna nie podała jeszcze listy swoich aplikacji",
   "apps.gone": "To okno zamknęło się w maszynie",
   "apps.dropTitle": "Upuść, aby przekazać te pliki temu oknu w maszynie",
@@ -2027,5 +2031,7 @@
   "req.row.answers": "Odpowiedzi instalacji",
   "req.use.answers": "Tworzone przez Machines: nic do instalowania",
   "req.st.download": "Przy tworzeniu",
-  "req.st.builtin": "Wbudowane"
+  "req.st.builtin": "Wbudowane",
+  "cfg.closeOnStop": "Zamknij okno, gdy maszyna się zatrzyma",
+  "cfg.closeOnStopNote": "Po zamknięciu systemu lub Wyłącz. Jeśli zatrzyma się przez problem, okno zostaje otwarte i pokazuje, co się stało."
 }

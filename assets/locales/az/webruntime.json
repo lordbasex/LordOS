@@ -12,5 +12,9 @@
   "inspect.title": "Tərtibatçı alətləri aktivdir",
   "inspect.body": "Brauzerinizdə açıldı və bu pəncərəni bağlayana qədər aktiv qalır.",
   "inspect.open": "Brauzerdə aç",
-  "inspect.failed": "Tərtibatçı alətləri başlamadı"
+  "inspect.failed": "Tərtibatçı alətləri başlamadı",
+  "save.image": "Şəkli saxla",
+  "save.video": "Videonu saxla",
+  "save.audio": "Audionu saxla",
+  "hang.reloaded": "Səhifə cavab vermirdi və yenidən yükləndi"
 }

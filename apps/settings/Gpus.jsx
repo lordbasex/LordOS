@@ -6,14 +6,14 @@
 // spare cards get no option yet (Machines: dedicated comes later). lord.vm.gpus() is read here; root checks everything
 // again (vmgpu_admin.c).
 // NVIDIA (docs/NVIDIA-PLAN.md, approved 2026-11-22 as "experimental, community-verified"): an NVIDIA card says it is
-// experimental, links to the Help article on testing it, and lists its future roles (AI / compute, Desktop) as planned
-// with no button: installing the driver and drawing the desktop with it wait for their admin actions and the
-// explicit-sync design to be approved. "Send a compatibility report" (any card) shows the whole report first
+// experimental, links to the Help article on testing it, and lists its roles with no button: AI / compute is planned;
+// Desktop is experimental, and on the card that draws this session it shows the session's real composition (on the
+// card's GPU, or by the processor). The free driver stays the default; NVIDIA's own is an opt-in from the Store. "Send a compatibility report" (any card) shows the whole report first
 // (lord.sysinfo.gpuReport(), made and scrubbed in C), then opens the GitHub form filled in (sdk/gpureport.js).
 import { View, Text, ScrollView, useTheme, useLocale, Segmented, Button, Stepper, admin, session, useSystemInfo, spacing, typeScale, openUrl, clipboard, toast, help, lordosVersion } from '@lordos/sdk';
 import { useState } from 'react';
 import { GroupBox, SettingRow, ValueRow, Note, Stack, StatusDot, Actions, tint } from './ui.jsx';
-import { readGpuReport, scrubReport, gpuIssueUrl, cardSummary, driverSummary, isNvidia, reportCard, NVIDIA_ROLES } from '../../sdk/gpureport.js';
+import { readGpuReport, scrubReport, gpuIssueUrl, cardSummary, driverSummary, isNvidia, reportCard, NVIDIA_ROLES, nvidiaRoleState } from '../../sdk/gpureport.js';
 
 const INTEL = 0x8086;
 const ROLES = ['unused', 'machines-shared'];
@@ -66,7 +66,10 @@ function MemlockBox({ memlock, isAdmin, onDone }) {
   );
 }
 
-// An NVIDIA card: experimental, how to help, and the planned roles (no buttons: nothing can be turned on yet)
+// what each role's state says (nvidiaRoleState)
+const ROLE_STATE = { planned: 'settings.gpus.planned', experimental: 'settings.gpus.experimental', gpu: 'settings.gpus.composedGpu', cpu: 'settings.gpus.composedCpu' };
+
+// An NVIDIA card: experimental, how to help, and its roles (no buttons: nothing is turned on from here)
 function NvidiaBox({ g, info }) {
   const t = useTheme();
   const { t: tr } = useLocale();
@@ -82,13 +85,17 @@ function NvidiaBox({ g, info }) {
       <Text style={{ fontSize: typeScale.caption, color: t.textDim, textAlign: 'start', lineHeight: 1.35 }}>{tr('settings.gpus.nvExperimentalHint')}</Text>
       {card ? <ValueRow label={tr('settings.gpus.cuda')} value={tr(nv.cuda ? 'settings.gpus.installed' : 'settings.gpus.notInstalled')} /> : null}
       <Text style={{ fontSize: typeScale.callout, fontWeight: 600, color: t.text, textAlign: 'start', paddingTop: spacing.xs }}>{tr('settings.gpus.roles')}</Text>
-      {NVIDIA_ROLES.map(([id, key]) => (
-        <View key={id} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.s, minHeight: 24 }}>
-          <StatusDot color={tint.off} size={8} />
-          <Text style={{ flex: 1, minWidth: 0, fontSize: typeScale.body, color: t.text, textAlign: 'start' }}>{tr(key)}</Text>
-          <Text style={{ fontSize: typeScale.caption, color: t.textDim, textAlign: 'end' }}>{tr('settings.gpus.planned')}</Text>
-        </View>
-      ))}
+      {NVIDIA_ROLES.map(([id, key]) => {
+        const st = nvidiaRoleState(id, card, info);
+        return (
+          <View key={id} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.s, minHeight: 24 }}>
+            <StatusDot color={st === 'gpu' ? tint.ok : st === 'planned' ? tint.off : tint.warn} size={8} />
+            <Text style={{ flex: 1, minWidth: 0, fontSize: typeScale.body, color: t.text, textAlign: 'start' }}>{tr(key)}</Text>
+            <Text style={{ fontSize: typeScale.caption, color: t.textDim, textAlign: 'end' }}>{tr(ROLE_STATE[st])}</Text>
+          </View>
+        );
+      })}
+      <Text style={{ fontSize: typeScale.caption, color: t.textDim, textAlign: 'start', lineHeight: 1.35 }}>{tr('settings.gpus.desktopNvHint')}</Text>
       <Text style={{ fontSize: typeScale.caption, color: t.textDim, textAlign: 'start', lineHeight: 1.35 }}>{tr('settings.gpus.plannedHint')}</Text>
     </View>
   );

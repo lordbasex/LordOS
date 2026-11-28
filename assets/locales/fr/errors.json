@@ -234,6 +234,7 @@
   "fs.moveRemoveFailed": "Copié, mais impossible de supprimer l’original : {errno}",
   "fs.noTrash": "Il n’y a pas de Corbeille pour cet emplacement",
   "fs.notFile": "Ce n’est pas un fichier",
+  "fs.notFolder": "Ce n'est pas un dossier",
   "fs.notInTrash": "Il n’est pas dans la Corbeille",
   "fs.notRegular": "Ce n’est pas un fichier ordinaire (s’agit-il d’un lien ?)",
   "fs.openFailed": "Impossible d’ouvrir le fichier : {errno}",
@@ -243,11 +244,13 @@
   "fs.systemFolder": "Fichiers n’affiche pas les dossiers internes du système (/proc, /sys, /dev et /run)",
   "fs.tooLarge": "Le fichier est trop volumineux (max. {max})",
   "fs.tooManyCopies": "Trop de copies en cours ; réessayez lorsque l’une d’elles sera terminée",
+  "fs.tooManyWatches": "Trop de dossiers sont surveillés (max. {max})",
   "fs.trashBadOrigin": "L’emplacement d’origine n’est pas valide",
   "fs.trashEntryFailed": "Impossible de créer l’entrée dans la Corbeille",
   "fs.trashOriginGone": "Le dossier d’origine n’existe plus",
   "fs.trashOtherDisk": "Il se trouve sur un autre disque que sa Corbeille",
   "fs.trashRestoreExists": "Un fichier portant ce nom existe déjà à l’emplacement d’origine",
+  "fs.watchRemote": "Les changements dans les dossiers cloud et réseau ne peuvent pas être suivis ; le dossier est listé à nouveau à la place",
   "fw.bpfConfig": "impossible de configurer BPF : {errno}",
   "fw.bpfMaps": "impossible de créer les tables BPF : {errno}",
   "fw.bpfMissing": "le programme {program} est manquant",
@@ -963,5 +966,9 @@
   "sentinela.notBlocked": "Ce programme n’est pas dans la liste de blocage.",
   "sentinela.noAppNetwork": "Ce processus n’a pas d’app à lui dont on pourrait bloquer le réseau.",
   "sys.failed": "Un problème est survenu.",
-  "sys.unsupported": "Cette version de LordOS ne peut pas faire cela."
+  "sys.unsupported": "Cette version de LordOS ne peut pas faire cela.",
+  "theme.notAllowed": "{call} n'est pas disponible pour les thèmes de la communauté",
+  "theme.noHost": "La partie LordOS du style de bureau est manquante",
+  "hands.refused": "Vous seul pouvez faire cela : jamais la saisie d'un agent d'IA",
+  "install.diskTooManyParts": "Ce disque a trop de partitions pour que l’installateur puisse les lister"
 }

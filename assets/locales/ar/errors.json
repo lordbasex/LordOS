@@ -234,6 +234,7 @@
   "fs.moveRemoveFailed": "نُسخ، لكن تعذّرت إزالة الأصل: {errno}",
   "fs.noTrash": "لا توجد سلة مهملات لهذا الموقع",
   "fs.notFile": "ليس ملفًا",
+  "fs.notFolder": "ليس مجلدًا",
   "fs.notInTrash": "ليس في سلة المهملات",
   "fs.notRegular": "ليس ملفًا عاديًا (هل هو رابط؟)",
   "fs.openFailed": "تعذّر فتح الملف: {errno}",
@@ -243,11 +244,13 @@
   "fs.systemFolder": "لا تعرض «الملفات» مجلدات النظام الداخلية (/proc و/sys و/dev و/run)",
   "fs.tooLarge": "الملف كبير جدًا (الحد الأقصى {max})",
   "fs.tooManyCopies": "عمليات نسخ كثيرة قيد التنفيذ؛ حاول مجددًا عندما تنتهي إحداها",
+  "fs.tooManyWatches": "تتم مراقبة عدد كبير جدًا من المجلدات (الحد الأقصى {max})",
   "fs.trashBadOrigin": "الموقع الأصلي غير صالح",
   "fs.trashEntryFailed": "تعذّر إنشاء إدخال سلة المهملات",
   "fs.trashOriginGone": "المجلد الأصلي لم يعد موجودًا",
   "fs.trashOtherDisk": "إنه على قرص مختلف عن سلة مهملاته",
   "fs.trashRestoreExists": "يوجد بالفعل ملف بهذا الاسم في الموقع الأصلي",
+  "fs.watchRemote": "لا يمكن متابعة التغييرات في مجلدات السحابة والشبكة؛ يُعاد سرد المجلد بدلًا من ذلك",
   "fw.bpfConfig": "تعذّر إعداد BPF: {errno}",
   "fw.bpfMaps": "تعذّر إنشاء خرائط BPF: {errno}",
   "fw.bpfMissing": "البرنامج {program} غير موجود",
@@ -967,5 +970,9 @@
   "sentinela.notBlocked": "هذا البرنامج ليس في قائمة الحظر.",
   "sentinela.noAppNetwork": "ليس لهذه العملية تطبيق خاص بها يمكن حظر شبكته.",
   "sys.failed": "حدث خطأ ما.",
-  "sys.unsupported": "لا يستطيع هذا الإصدار من LordOS فعل ذلك."
+  "sys.unsupported": "لا يستطيع هذا الإصدار من LordOS فعل ذلك.",
+  "theme.notAllowed": "{call} غير متاح لسمات المجتمع",
+  "theme.noHost": "جزء LordOS من نمط سطح المكتب مفقود",
+  "hands.refused": "يمكنك أنت فقط القيام بهذا: لا يمكن ذلك أبدًا بإدخال وكيل ذكاء اصطناعي",
+  "install.diskTooManyParts": "يحتوي هذا القرص على أقسام أكثر من أن يتمكن المثبّت من عرضها"
 }

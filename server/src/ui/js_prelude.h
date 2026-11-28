@@ -7,7 +7,12 @@
  * (the order they were set), each at most once per tick; one set while the tick runs waits for the
  * next tick, as does one cleared before its turn. minAt is the earliest deadline, so a tick with
  * nothing due returns without looking at the timers: it is exact except after clearing the
- * earliest one (stale), and then it is computed again before it is used. */
+ * earliest one (stale), and then it is computed again before it is used.
+ *
+ * Each timer and animation frame keeps the origin of the run that set it (lord.__origin, js.c; hands.h
+ * HANDS_ORIGIN_*) and its callback runs as it (lord.__originSet): an interval the desktop set at its start is the
+ * shell's own even right after an AI agent's click, a timer the agent's click set is the agent's. Both natives are
+ * taken here and deleted from lord before any bundle runs (absent in a test's fake lord: nothing is set then). */
 #ifndef LORD_JS_PRELUDE_H
 #define LORD_JS_PRELUDE_H
 
@@ -19,10 +24,13 @@ static const char prelude[] =
     "const out = p => (...a) => lord.log(p + a.map(fmt).join(' '));\n"
     "g.console = { log: out(''), info: out(''), debug: out(''), warn: out('[warn] '), error: out('[error] ') };\n"
     "g.performance = { now: () => lord.now() };\n"
+    "const originOf = typeof lord.__origin === 'function' ? lord.__origin : () => 1;\n"
+    "const runAs = typeof lord.__originSet === 'function' ? lord.__originSet : () => {};\n"
+    "try { delete lord.__origin; delete lord.__originSet; } catch (e) {}\n"
     "let nextId = 1; const timers = new Map();\n"
     "let minAt = Infinity, stale = false;\n"
     "const add = (fn, ms, args, repeat) => { const id = nextId++; ms = Math.max(0, +ms || 0);\n"
-    "  const at = lord.now() + ms; timers.set(id, { id, fn, args, at, ms, repeat });\n"
+    "  const at = lord.now() + ms; timers.set(id, { id, fn, args, at, ms, repeat, o: originOf() });\n"
     "  if (at < minAt) minAt = at; return id; };\n"
     "g.setTimeout = (fn, ms, ...a) => add(fn, ms, a, false);\n"
     "g.setInterval = (fn, ms, ...a) => add(fn, ms, a, true);\n"
@@ -33,7 +41,7 @@ static const char prelude[] =
     "const lowest = () => { let m = Infinity; for (const t of timers.values()) if (t.at < m) m = t.at; minAt = m; stale = false; };\n"
     "g.queueMicrotask = fn => { Promise.resolve().then(fn); };\n"
     "let frames = new Map(), frameId = 1;\n"
-    "g.requestAnimationFrame = fn => { const id = frameId++; frames.set(id, fn); return id; };\n"
+    "g.requestAnimationFrame = fn => { const id = frameId++; frames.set(id, { fn, o: originOf() }); return id; };\n"
     "g.cancelAnimationFrame = id => { frames.delete(id); };\n"
     "g.__lordTick = now => {\n"
     "  if (stale) lowest();\n"
@@ -47,6 +55,7 @@ static const char prelude[] =
     "    for (const t of due) {\n"
     "      if (!timers.has(t.id)) continue;\n"
     "      if (t.repeat) { t.at = now + Math.max(t.ms, 1); if (t.at < minAt) minAt = t.at; } else timers.delete(t.id);\n"
+    "      runAs(t.o);\n"
     "      try { t.fn(...t.args); } catch (e) { console.error('timer:', e); }\n"
     "    }\n"
     "  }\n"
@@ -55,7 +64,7 @@ static const char prelude[] =
     "};\n"
     "g.__lordWantsFrame = () => frames.size > 0;\n"
     "g.__lordFrame = now => { const f = frames; frames = new Map();\n"
-    "  for (const fn of f.values()) { try { fn(now); } catch (e) { console.error('raf:', e); } } };\n"
+    "  for (const x of f.values()) { runAs(x.o); try { x.fn(now); } catch (e) { console.error('raf:', e); } } };\n"
     "})();\n";
 
 #endif

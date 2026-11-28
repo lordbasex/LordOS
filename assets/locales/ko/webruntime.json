@@ -12,5 +12,9 @@
   "inspect.title": "개발자 도구가 켜져 있음",
   "inspect.body": "브라우저에서 열렸으며 이 윈도우를 닫을 때까지 켜져 있습니다.",
   "inspect.open": "브라우저에서 열기",
-  "inspect.failed": "개발자 도구를 시작할 수 없습니다"
+  "inspect.failed": "개발자 도구를 시작할 수 없습니다",
+  "save.image": "이미지 저장",
+  "save.video": "동영상 저장",
+  "save.audio": "오디오 저장",
+  "hang.reloaded": "페이지가 응답하지 않아 다시 불러왔습니다"
 }

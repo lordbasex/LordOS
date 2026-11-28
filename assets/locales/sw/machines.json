@@ -712,6 +712,7 @@
   "agent.toolsAutoFailed": "Usasishaji wa kiotomatiki haukufanya kazi ({have} → {want}).",
   "agent.toolsUpdateBtn": "Sasisha",
   "agent.st.needsTools": "Inahitaji zana",
+  "agent.st.oldLordos": "Sasisha LordOS ndani yake",
   "agent.st.needsXclip": "Inahitaji xclip",
   "agent.toolsInstalled": "Zana za LordOS zimesakinishwa na zinafanya kazi kwenye mashine; zinaanza tena kila unapoingia.",
   "agent.timesync": "Weka Saa",
@@ -880,6 +881,8 @@
   "un.how.preseed": "Majibu yanaenda kwenye faili za kuanzia za kisakinishi chenyewe, nenosiri lako kama hashi tu, na yanaondolewa mfumo ukishasakinishwa.",
   "un.how.autoinstall": "Majibu yanaenda kwenye diski ndogo ambayo kisakinishi kinasoma, nenosiri lako kama hashi tu, na diski inaondolewa mfumo ukishasakinishwa.",
   "un.how.kickstart": "Majibu yanaenda kwenye diski ndogo ambayo kisakinishi kinasoma, nenosiri lako kama hashi tu, na diski inaondolewa mfumo ukishasakinishwa.",
+  "un.how.kali": "Majibu yanaenda kwenye faili za kuanzia za kisakinishi chenyewe, nenosiri lako kama hashi tu, na yanaondolewa mfumo ukishasakinishwa.",
+  "un.how.lordos": "Majibu yanaenda kwenye diski ndogo ambayo kisakinishi kinasoma, nenosiri lako kama hashi tu, na diski inaondolewa mfumo ukishasakinishwa.",
   "un.image": "Inasakinisha kutoka {file}, pia imekaguliwa dhidi ya orodha iliyotiwa sahihi na mtengenezaji wake",
   "un.review": "Bila maswali: akaunti {user} kwenye {host}",
   "un.reviewOff": "Unajibu maswali ya kisakinishi",
@@ -1100,6 +1103,7 @@
   "apps.menu": "Programu",
   "apps.needsAgent": "Hali ya programu inahitaji wakala wa mashine, akiwa ameunganishwa",
   "win.appsNeedsTools": "Hali ya programu inahitaji LordOS au Windows kwenye mashine, pamoja na zana za LordOS",
+  "win.appsOldLordos": "Hali ya programu inahitaji LordOS {version} au mpya zaidi ndani ya mashine. Sasisha LordOS kwenye mashine; zana za LordOS pekee hazitoshi.",
   "apps.noApps": "Mashine bado haijaorodhesha programu zake",
   "apps.gone": "Dirisha hili lilifungwa ndani ya mashine",
   "apps.dropTitle": "Achilia ili kuipa dirisha hili la mashine faili hizi",
@@ -2027,5 +2031,7 @@
   "req.row.answers": "Majibu ya usakinishaji",
   "req.use.answers": "Hutengenezwa na Machines yenyewe: hakuna cha kusakinisha",
   "req.st.download": "Wakati wa kuunda",
-  "req.st.builtin": "Iliyojengwa ndani"
+  "req.st.builtin": "Iliyojengwa ndani",
+  "cfg.closeOnStop": "Funga dirisha mashine ikisimama",
+  "cfg.closeOnStopNote": "Baada ya kuzima au Zima. Ikisimama kwa sababu ya tatizo, dirisha hubaki wazi kuonyesha kilichotokea."
 }

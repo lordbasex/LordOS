@@ -146,6 +146,9 @@
     sdk.widgetPicker.set({ display: sdk.mainDisplay() });
     await sleep(1200);
     click(byText(SH['widgets.note.name'] || 'Sticky note'));
+    await sleep(1200);
+    // the catalog's sticky note asks first: a new note or one already made (NoteChooser)
+    click(all(T.new || 'New Note').pop());
     await sleep(1500);
     const w = notesOnDesk().find((x) => x.id !== newest);
     step('the catalog puts a sticky note on the desktop', !!w);

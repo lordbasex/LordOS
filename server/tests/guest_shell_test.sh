@@ -49,7 +49,7 @@ def check(ok, what):
 hello = None
 for k, p in frames():
     if k == 1: hello = p.decode(); break
-check(hello is not None and ' shell' in hello and ' links notify' in hello and hello.startswith('lordos-guest 10'), 'hello: ' + str(hello))
+check(hello is not None and ' shell' in hello and ' links notify' in hello and hello.startswith('lordos-guest 11'), 'hello: ' + str(hello))
 c.sendall(frame(1, b'lord-vm 2 clipboard clipx clipreq elevated links'))
 env = dict(os.environ, XDG_RUNTIME_DIR=run, HOME=home)
 time.sleep(0.3)

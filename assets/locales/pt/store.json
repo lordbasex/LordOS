@@ -167,6 +167,7 @@
     "other": "Atualizam {count}"
   },
   "remove": "Remover",
+  "removeAsk": "Remover {name}?",
   "rescue.ask": "Nenhuma conta deste computador é administradora. Se você sabe a senha do root, pode tornar esta conta administradora. Só tem efeito depois de reiniciar o computador.",
   "rescue.button": "Tornar-me administrador",
   "rescue.noSudo": "Nenhuma conta deste computador é administradora e o pacote sudo não está instalado. Como root, execute apt install sudo e tente de novo aqui.",
@@ -233,7 +234,7 @@
   },
   "suggest.nvidiaDriver.detail": "Agora ela usa o nouveau, o driver livre incluído no LordOS. O driver do fabricante ({packages}) costuma dar melhor desempenho 3D e melhor gerenciamento de energia.",
   "suggest.nvidiaDriver.note.nouveau": "Até você instalá-lo, o driver livre nouveau continua em uso; remover o pacote volta para ele.",
-  "suggest.nvidiaDriver.note.older": "Placas anteriores a cerca de 2014 não são suportadas por esta versão do driver; nelas, mantenha o driver livre. O desktop do LordOS ainda não foi testado com este driver.",
+  "suggest.nvidiaDriver.note.older": "Placas anteriores a cerca de 2014 não são suportadas por esta versão do driver; nelas, mantenha o driver livre. A área de trabalho do LordOS com este driver é experimental: um relato da comunidade a mostra composta na placa (uma GTX 1070 com o driver 580); um anterior era composto pelo processador.",
   "suggest.nvidiaDriver.note.secureBoot": "O driver é compilado para o seu kernel neste computador (DKMS) e de novo após cada atualização do kernel. Com a Inicialização segura ativada, você precisa registrar a chave de assinatura dele na próxima reinicialização, ou o driver não carrega.",
   "suggest.nvidiaDriver.title": "Driver gráfico proprietário",
   "suggest.nvidiaDriver.unavailable": "O driver do fabricante precisa dos componentes contrib e non-free do Debian, e os dois não estão habilitados nas fontes de pacotes deste computador. O driver livre, nouveau, continua funcionando.",

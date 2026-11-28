@@ -234,6 +234,7 @@
   "fs.moveRemoveFailed": "Se copió, pero no se pudo quitar el original: {errno}",
   "fs.noTrash": "No hay Papelera para ese lugar",
   "fs.notFile": "No es un archivo",
+  "fs.notFolder": "No es una carpeta",
   "fs.notInTrash": "No está en la Papelera",
   "fs.notRegular": "No es un archivo común (¿es un enlace?)",
   "fs.openFailed": "No se pudo abrir el archivo: {errno}",
@@ -243,11 +244,13 @@
   "fs.systemFolder": "Archivos no muestra las carpetas internas del sistema (/proc, /sys, /dev y /run)",
   "fs.tooLarge": "El archivo es demasiado grande (máx. {max})",
   "fs.tooManyCopies": "Hay demasiadas copias en curso; probá de nuevo cuando termine una",
+  "fs.tooManyWatches": "Se están vigilando demasiadas carpetas (máx. {max})",
   "fs.trashBadOrigin": "El lugar original no es válido",
   "fs.trashEntryFailed": "No se pudo crear la entrada de la Papelera",
   "fs.trashOriginGone": "La carpeta original ya no existe",
   "fs.trashOtherDisk": "Está en otro disco que su Papelera",
   "fs.trashRestoreExists": "Ya hay un archivo con ese nombre en el lugar original",
+  "fs.watchRemote": "No se pueden seguir los cambios en carpetas de la nube o de red; la carpeta se vuelve a listar en su lugar",
   "fw.bpfConfig": "no se pudo configurar BPF: {errno}",
   "fw.bpfMaps": "no se pudieron crear los mapas BPF: {errno}",
   "fw.bpfMissing": "falta el programa {program}",
@@ -963,5 +966,9 @@
   "sentinela.notBlocked": "Ese programa no está en la lista de bloqueo.",
   "sentinela.noAppNetwork": "Este proceso no tiene una app propia cuya red se pueda bloquear.",
   "sys.failed": "Algo salió mal.",
-  "sys.unsupported": "Esta versión de LordOS no puede hacer eso."
+  "sys.unsupported": "Esta versión de LordOS no puede hacer eso.",
+  "theme.notAllowed": "{call} no está disponible para los temas de la comunidad",
+  "theme.noHost": "Falta la parte de LordOS del estilo de escritorio",
+  "hands.refused": "Solo vos podés hacer esto: nunca la entrada de un agente de IA",
+  "install.diskTooManyParts": "Este disco tiene demasiadas particiones para que el instalador pueda listarlas"
 }

@@ -24,7 +24,8 @@ typedef struct {
     uint8_t overflow_hidden, pointer_none, text_align, object_fit, nowrap;   /* pointer_none: POINTER_* */
     uint8_t dir;                /* DIR_INHERIT / DIR_LTR / DIR_RTL (CSS direction) */
     uint8_t wrap;               /* flexWrap: 'wrap' (children that don't fit move to another line) */
-    uint8_t mono;               /* fontFamily: 0 'sans-serif' (Inter), 1 'monospace' (JetBrains Mono), 2 'brand' (Plus Jakarta Sans) */
+    uint8_t mono;               /* fontFamily: 0 'sans-serif' (Inter), 1 'monospace' (JetBrains Mono), 2 'brand' (Plus Jakarta Sans),
+                                 * 3 'theme' (the theme's font, TEXT_THEME) */
     uint8_t cursor;             /* cursor (CSS): CUR_* from cursor.h; 0 = the parent's */
     float grow, shrink;
     Dim basis, width, height, min_w, min_h, max_w, max_h;
@@ -60,6 +61,9 @@ typedef struct StyleExt {
     Dim inset_inline[2];            /* insetInlineStart / insetInlineEnd (auto = unset) */
     float radius_corner[8];         /* top-left, top-right, bottom-right, bottom-left, top-start, top-end, bottom-start, bottom-end */
     Dim origin_x, origin_y;         /* transformOrigin, 50% 50% by default */
+    /* wavyColor: a wavy line across the box's width, centred in its height (a misspelled word's underline,
+     * docs/SPELLING.md); its amplitude is the box's height less its thickness, its wavelength 4 px */
+    uint32_t wavy;
     /* not style: the edges resolved for the node's direction (layout.c node_resolve_edges), physical L, T, R, B */
     struct {
         float mg[4], pd[4], bw[4];
@@ -106,6 +110,9 @@ typedef struct Node {
     float *crop;                /* NODE_MEDIA: the part of the source's picture it shows (x, y, w, h in picture pixels;
                                  * NULL the whole picture): Machines' apps mode, one window of the guest (media/mview.c) */
     uint8_t protect;            /* protected window: the protected fill in every capture (media/capture.c) */
+    uint8_t theme_own;          /* made by a community theme's View, Text or Image (js_theme.c): the only nodes it may restyle */
+    uint8_t hands_deny;         /* handsDeny: an AI agent never reads, clicks or sees it (hands/hands.h; Settings → AI → Hands) */
+    uint8_t hands_black;        /* black in the AI agent's screenshot being taken now (hands/handsmark.c sets and clears it) */
     uint8_t rtl;                /* effective direction (computed in layout) */
     uint8_t own_tf, has_tf;     /* it has a scale/rotate; it or an ancestor has one (tf is set) */
     uint8_t layout_ok, layout_rtl;  /* its subtree is laid out for its current w × h and direction */
@@ -148,12 +155,15 @@ typedef struct {
     Box dlast;                      /* ui.damage as damage_add left it: if it differs, it was set directly */
     double damage_px;               /* pixels repainted in the last frame */
     int quit_requested;             /* lord.quit() */
+    int quit_by_theme;              /* lord.quit() from a community theme's code (js_theme.c): not the person's end */
     uint8_t rtl;                    /* interface direction (Arabic, Hebrew… language) */
     char theme_request[1024];       /* lord.themes.use(): bundle to load */
     char theme_failed[1024];        /* last bundle that failed to load */
     char theme_failed_why[1024];    /* why (the exception, or the verified-code check): Settings → Appearance's report */
     int theme_failed_code;          /* it was the verified-code check: tried again once a newer manifest is in use */
     unsigned theme_failed_gen;      /* codesig_generation() when it was refused */
+    int theme_fell_back;            /* the theme running now was loaded because the one before failed or was left (main.c):
+                                     * that one's "unclean" session marker is no crash (lord.themes.fellBack, read once) */
     uint64_t serial;                /* the last node's serial (node_new) */
 } Ui;
 
@@ -164,6 +174,8 @@ void  style_defaults(Style *s);
 Node *node_new(int type);
 Node *node_get(int id);
 int   paint_node_covered(const Node *n);   /* its box hidden behind something opaque painted after it (paint.c) */
+int   paint_node_hidden(const Node *n);    /* the same with the union of every opaque node after it (a moving wallpaper) */
+int   paint_blurs_over(const Node *n, Box *out, int max);   /* backdrop-blurred nodes painted over it, cut to its box */
 /* The node with this id only if it is still the one that had this serial when it was looked up: NULL once that node
  * is destroyed, even if its id now belongs to another node. */
 Node *node_ref(int id, uint64_t serial);
@@ -245,7 +257,12 @@ int   text_init_mem(const unsigned char *data, size_t size);
 #define TEXT_MONO 1000.0f
 /* Weight + TEXT_BRAND: the brand face of the LordOS wordmark (Plus Jakarta Sans, docs/brand/README.md). */
 #define TEXT_BRAND 2000.0f
-#define TEXT_WEIGHT(s) ((s)->font_weight + ((s)->mono == 2 ? TEXT_BRAND : (s)->mono ? TEXT_MONO : 0))
+/* Weight + TEXT_THEME: the theme's font (fontFamily: 'theme', a style pack's installed family: text_set_theme_font);
+ * Inter while the theme has none. */
+#define TEXT_THEME 3000.0f
+#define TEXT_WEIGHT(s) ((s)->font_weight + ((s)->mono == 3 ? TEXT_THEME : (s)->mono == 2 ? TEXT_BRAND : (s)->mono ? TEXT_MONO : 0))
+/* The theme's font: an installed font's regular and bold files (NULL: none, Inter). Returns 0 when loaded. */
+int   text_set_theme_font(const char *regular, int regular_index, const char *bold, int bold_index);
 float text_line_height(float size, float line_h);
 /* While painting a scaled display (paint.c): sizes passed to text_draw are physical, line breaks
  * and positions follow the logical metrics (size / scale), so text wraps exactly where layout said. */
@@ -338,6 +355,10 @@ typedef struct { Box b; float x, y, k, dx, dy; int index; } PaintViewBox;
 extern PaintViewBox paint_views[PAINT_VIEWS_MAX];
 extern int paint_nviews;
 extern int paint_blur_cache_on;
+/* main.c: 1 while a GPU display is painted that no remote viewer or recording reads: a frosted node over a GPU-drawn
+ * moving wallpaper is blurred by the GPU (paint.c frost_source); paint_frost_gpu counts those nodes painted so */
+extern int paint_gpu_frost;
+extern long paint_frost_gpu;
 extern void (*damage_hook)(Box b);      /* node.c damage_add: set by paint.c during its damage walk */
 void paint_blur_cache_reset(void);
 void  paint_layer_view(int index);  /* the display with most of the window being moved */
@@ -417,6 +438,11 @@ Node *hit_test(Node *root, float x, float y);
  * the screen that leaves the compositor is painted in this mode or is a copy of one that was (docs/PRIVACY.md
  * "Protected windows"): this is the one place where a protected window's pixels are left out. */
 extern int paint_capture_mode;
+/* An AI agent's screenshot (main.c hands_shot, docs/HANDS.md): the nodes handsmark.c marked (hands_black) are painted
+ * solid black over their whole box, the agent's own cursor (this node id) is left out, and a window captured alone is
+ * refused only when the window itself (or what holds it) is protected: a protected node inside it is painted as the
+ * protected fill, like everything an agent mustn't see, instead of refusing the whole window. */
+extern int paint_hands_capture, paint_hands_cursor;
 /* A protected window in a capture: opaque and neutral (r = g = b), never the window's own pixels; a lock and the label in
  * the ink colour when the box has room. */
 #define PAINT_PROTECT_FILL 0xff2e2e2eu

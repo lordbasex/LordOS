@@ -76,7 +76,7 @@
 # --notes VERSION=SECTION takes the notes of lordos VERSION from CHANGELOG.md section SECTION (for
 # example 0.8.1~staging1=Unreleased). By default the section is "VERSION" or "VERSION-<suffix>".
 #
-# The private key lives ONLY on the maintainer's machine, next to the release key:
+# The private key lives ONLY on the maintainer's LordOS machine, next to the release key:
 #   ~/.config/lordos-release/apt-gnupg   (a GnuPG home, mode 0700; LORDOS_APT_GNUPGHOME overrides)
 # Never copy it to a VM, a server or the repository. The public key is
 # packaging/keys/lordos-archive-keyring.gpg (shipped in the lordos package) and the script refuses to

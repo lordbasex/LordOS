@@ -96,7 +96,7 @@
 #include <time.h>
 #include <unistd.h>
 
-#define VERSION "10"
+#define VERSION "11"
 #define PORT "/dev/virtio-ports/org.lordos.agent"
 #define CLIP_MAX AG_TEXT_MAX
 
@@ -364,8 +364,29 @@ static int stop_hook(void) {
     return 0;
 }
 
+/* (tools 11) the guest runs a LordOS older than apps mode needs (AG_APPS_LORDOS): its lord-server has no window
+ * endpoint, so the hello says "oldlordos" while there is none, and Machines says to update LordOS in the machine
+ * instead of "needs the tools". Read once from dpkg's status file (the installed lordos package's Version) */
+static int old_lordos = -1;
+static int lordos_too_old(void) {
+    if (old_lordos >= 0) return old_lordos;
+    old_lordos = 0;
+    int f = open("/var/lib/dpkg/status", O_RDONLY | O_CLOEXEC);
+    if (f < 0) return 0;
+    struct stat st;
+    if (fstat(f, &st) || !S_ISREG(st.st_mode) || st.st_size <= 0 || st.st_size > 64 * 1024 * 1024) { close(f); return 0; }
+    char *b = malloc((size_t)st.st_size);
+    size_t got = 0;
+    if (b) while (got < (size_t)st.st_size) { ssize_t r = read(f, b + got, (size_t)st.st_size - got); if (r <= 0) break; got += (size_t)r; }
+    close(f);
+    char ver[64];
+    if (b && ag_dpkg_lordos(b, got, ver, sizeof ver)) old_lordos = ag_lordos_older(ver, AG_APPS_LORDOS);
+    free(b);
+    return old_lordos;
+}
+
 static void say_hello(int fd) {
-    char h[160];
+    char h[176];
 #ifndef LG_NO_PERF
     static const char perf_word[] = " perf";
 #else
@@ -375,7 +396,8 @@ static void say_hello(int fd) {
     int lord = tool_n && tools[0] == T_LORD;          /* lord-server's clipboard: text only, no X offer */
     snprintf(h, sizeof h, "lordos-guest " VERSION "%s%s%s%s%s shell%s", !tool_n ? " noclip" : lord ? " clipboard" : " clipboard clipx",
              tool_n && !lord && xc_fd() >= 0 ? " clipreq" : "",
-             wfd >= 0 ? " windows" : "", stop_hook() ? " stopping" : "", perf_word, gshell_listen_fd() >= 0 ? " links notify send" : "");
+             wfd >= 0 ? " windows" : lordos_too_old() ? " oldlordos" : "", stop_hook() ? " stopping" : "", perf_word,
+             gshell_listen_fd() >= 0 ? " links notify send" : "");
     send_frame(fd, AGK_HELLO, (const uint8_t *)h, (uint32_t)strlen(h));
 }
 

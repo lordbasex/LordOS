@@ -5,13 +5,13 @@
   "description": "Calculator with keyboard input",
   "size": [
     300,
-    430
+    480
   ],
   "dock": true,
   "permissions": [],
   "category": "Utility",
   "minSize": [
     260,
-    380
+    420
   ]
 }

@@ -57,14 +57,17 @@ The releases page is the project's public changelog: every release is documented
    once `web/content/downloads.json` names an ISO newer than the card's tag ([VIRTUALIZATION.md](VIRTUALIZATION.md),
    3.9, "The LordOS card").
 
-   **Web apps' Browser identity** (0.8.8.9): set `WEBPAGE_CHROME_MAJOR`, `WEBPAGE_EDGE_MAJOR` and `WEBPAGE_FIREFOX_MAJOR`
-   in `server/src/web/webpage.h` to the current stable desktop majors (Chrome's from the Chrome Releases blog, Edge's
+   **Web apps' Browser identity** (0.8.8.9): set `WEBPAGE_CHROME_FULL` (Chrome's whole stable version, e.g.
+   `158.0.8127.36`: the Client Hints and `navigator.userAgentData` send it, `webua.h`), `WEBPAGE_CHROME_MAJOR` (its
+   first number; `build/webua-test` fails when they disagree), `WEBPAGE_EDGE_MAJOR` and `WEBPAGE_FIREFOX_MAJOR`
+   in `server/src/web/webpage.h` to the current stable desktop versions (Chrome's from the Chrome Releases blog, Edge's
    from its Stable channel release notes, Firefox's from its release notes) and update the strings quoted in `docs/WEBAPPS.md` ("Browser identity") and in the
    changelog entry if they changed. A stale major is what makes sites treat a browser as outdated. `build/webapp-test`
    checks only that the numbers are plausible, never the date, so this step is the only reminder.
 2. **Tag.** `git tag -a v<version> -m "LordOS <version>"` on that commit, and push the tag.
 3. **Sign the system code, then build** from the tag.
-   - On the maintainer's machine (where the release key lives): `npm run build`, then
+   - On the maintainer's LordOS machine (where the release key and the archive key live; since 0.8.9.6.2 no Mac
+     is involved, and the scripts need only Debian's tools): `npm run build`, then
      `tools/release/sign-code.sh`. It regenerates `code-manifest.json` (the SHA-256 of every theme
      bundle, the app host and the system apps) and writes `code-manifest.sig` with the release key,
      checked against `tools/release/lordos-release.pub.pem` ([SIGNING.md](SIGNING.md), "Verified system
@@ -108,7 +111,7 @@ The releases page is the project's public changelog: every release is documented
    list: `build.sh`, `build-ova.sh` and `build-img.sh` write `<image>.sources.tsv` next to it (below, "Source
    code"); put each one in the release folder with its image, so `SHA256SUMS` covers it too. A release with no new
    images has none.
-5. **Sign.** On the maintainer's machine, `tools/release/sign-release.sh <release-dir>`: it writes
+5. **Sign.** On the maintainer's LordOS machine, `tools/release/sign-release.sh <release-dir>`: it writes
    `SHA256SUMS` and `SHA256SUMS.sig` and checks them against the public key
    ([SIGNING.md](SIGNING.md), "Release files"). Then copy `tools/release/lordos-release.pub.pem`
    into the folder too (it is not covered by `SHA256SUMS`: it is checked by its fingerprint).
@@ -121,7 +124,7 @@ The releases page is the project's public changelog: every release is documented
    releases (0.8.8.8: the Mac build is 0.8.6's, Windows and Linux 0.8.8.6's), fix those links by hand. It
    lists no row for `lordos-web` or `lordos-disk-formats`.
 7. **The APT repository** (what installed systems update from; [UPDATES.md](UPDATES.md)). On the
-   maintainer's Mac, where the archive key lives (never on a VM):
+   maintainer's LordOS machine, where the archive key lives (never on a VM):
 
    ```sh
    # staging first: the same .debs, the notes from this version's CHANGELOG section
@@ -172,7 +175,7 @@ The releases page is the project's public changelog: every release is documented
 
    **The signed list on lordos.org** (every release; Machines' LordOS card reads it there first, because GitHub's
    release downloads sometimes answer 403 on their signed redirect: [VIRTUALIZATION.md](VIRTUALIZATION.md), 3.9, "The
-   LordOS card"). On the maintainer's Mac:
+   LordOS card"). On the maintainer's LordOS machine:
 
    ```sh
    tools/release/publish-lists.sh v<version> <release-dir>
@@ -263,7 +266,9 @@ images they describe are covered by it, and the lists only name public sources.
 ## The labels of hardware reports
 
 The `hardware-report` issue form and its workflow (`.github/workflows/hardware-report.yml`, on `main`) label each
-report from fixed lists (`ALL_LABELS` in `tools/hwreport/lib.mjs`, 33 labels). Create them once, by hand, before the
+report from fixed lists (`ALL_LABELS` in `tools/hwreport/lib.mjs`, 42 labels: since the toolkit audit, also
+`toolkit:<combination>-fail` for a report whose optional "toolkits" section has a combination that crashed or scored
+under 80 %, docs/TOOLKIT-AUDIT.md). Create them once, by hand, before the
 workflow reaches `main`: the form can only apply `hardware-report` if the repository already has it. It takes an
 account with write access to the repository and `gh auth login` done; `gh label create --force` updates a label
 that already exists, so it can be run again. `server/tests/hwreport_test.mjs` fails if this list and the code differ.
@@ -277,12 +282,15 @@ for l in hardware-report \
     gpu:intel gpu:amd gpu:nvidia gpu:virtual gpu:broadcom gpu:arm gpu:vivante gpu:qualcomm gpu:other gpu:none \
     cpu:intel cpu:amd cpu:arm cpu:riscv cpu:other \
     live installed \
-    boot:internal boot:usb boot:sd boot:emmc boot:optical boot:network; do
+    boot:internal boot:usb boot:sd boot:emmc boot:optical boot:network \
+    toolkit:gtk3-wayland-fail toolkit:gtk3-x11-fail toolkit:gtk4-wayland-fail toolkit:gtk4-x11-fail \
+    toolkit:qt5-wayland-fail toolkit:qt5-xcb-fail toolkit:qt6-wayland-fail toolkit:qt6-xcb-fail toolkit:x11-xwayland-fail; do
   gh label create "$l" --repo "$R" --force
 done
 ```
 
-Check with `gh label list --repo lordbasex/LordOS --limit 100`. Done for 0.8.7: 33 labels created.
+Check with `gh label list --repo lordbasex/LordOS --limit 100`. Done for 0.8.7: 33 labels created. The 9
+`toolkit:*` labels are new (in development): run the loop again before the release that ships the toolkit audit.
 with a fake fetch), never on a real issue, because workflows for `issues` events run from the default branch.
 
 ## Voice packages
@@ -328,12 +336,12 @@ LORDOS_APT_DIR=<scratch> tools/release/apt-repo.sh build staging …` (publish a
 reads the tested-hardware snapshot from the `lordos-hwdata` package, so newly accepted reports reach installed
 systems without a LordOS release: the daily update check notices one available update and Store → Updates →
 *Update all* installs it; the panel reads the files again the next time it opens, with no restart. Everything
-runs on the maintainer's Mac except building the `.deb` (it needs `dpkg-deb`: a build VM, or a `debian:trixie`
-container):
+runs on the maintainer's LordOS machine, building the `.deb` too (it needs `dpkg-deb`, which Debian has; a build VM
+or a `debian:trixie` container also works):
 
 1. **Accept the reports.** Commit them to `web/content/hardware/reports/` (and `index.json`) on `main`, and add the
    machine to [HARDWARE-REPORT.md](HARDWARE-REPORT.md) (its table, the comparison counts and "Last updated").
-2. **Sign.** On the Mac: `tools/release/sign-hwsnapshot.sh`. It rebuilds `assets/hwreport/snapshot.json` from
+2. **Sign.** On the maintainer's machine: `tools/release/sign-hwsnapshot.sh`. It rebuilds `assets/hwreport/snapshot.json` from
    the reports, signs it with the release key into `snapshot.json.sig` and prints the package version: the date
    of the newest report as `YYYY.MM.DD`. If that version is already in the repository with another snapshot
    (a report was removed or corrected without a newer one), build it with `HWDATA_SERIAL=1` (then 2…), which

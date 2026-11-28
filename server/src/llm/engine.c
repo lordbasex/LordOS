@@ -1,6 +1,7 @@
 /* engine.c — Sentinela's local model engine, started on demand in its sandbox (see engine.h and docs/SENTINELA.md). */
 #include "engine.h"
 #include "llmjail.h"
+#include "writing.h"
 #include "../sec/json.h"
 
 #include <dirent.h>
@@ -18,6 +19,8 @@
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/syscall.h>
+#include <stdint.h>
+#include <sys/random.h>
 #include <sys/un.h>
 #include <sys/wait.h>
 #include <time.h>
@@ -26,8 +29,8 @@
 #define QUEUE 8
 #define RESULTS 16
 
-enum { J_ANALYZE = 1, J_FACTS, J_INVESTIGATE, J_TRANSLATE };
-typedef struct { int id, kind; char model[64]; char *system, *user; int pid; unsigned long long start; } Job;
+enum { J_ANALYZE = 1, J_FACTS, J_INVESTIGATE, J_TRANSLATE, J_WRITE };
+typedef struct { int id, kind; char model[64]; char *system, *user; int pid; unsigned long long start; int action; char target[16]; } Job;
 typedef struct { int id; char *json; } Result;
 
 static struct {
@@ -45,8 +48,31 @@ static struct {
     double last_used;
     int idle_ms;
     char model_dir[PATH_MAX], engine[PATH_MAX], launcher[PATH_MAX], dpkg_info[PATH_MAX];
+    /* (0.8.9.6.2) the writing job being streamed: its id, the text so far, and the one cancelled */
+    int wr_id, cancel_id;
+    char *wr_text;
+    /* (0.8.9.6.2) where it computes: the person's choice (M_*), the running (or last) engine's backend (LLMJAIL_*),
+     * what its log said (the device, integrated or not, the layers on the GPU, out of memory), the GPUs given up on
+     * this session (FB_* per backend, until the choice changes), and why the last start didn't use one */
+    int mode, mode_gen, run_gen, backend, has_run;
+    char device[96];
+    int layers, layers_total, oom;
+    unsigned log_gen;
+    int failed[3];
+    int fallback;
+    char ggml_dir[PATH_MAX], dev_dir[PATH_MAX];
+    /* (0.8.9.6.2) the processor threads: the person's setting (0 automatic), the running (or last) engine's count, and
+     * a restart asked for while the engine was idle (llm_set_threads) */
+    int threads_set, run_threads, restart_now;
 } E = { .mu = PTHREAD_MUTEX_INITIALIZER, .cv = PTHREAD_COND_INITIALIZER, .pid = -1, .dirfd = -1, .state = "off",
-        .idle_ms = LLM_IDLE_MS, .model_dir = LLM_MODEL_DIR, .engine = LLM_ENGINE, .dpkg_info = "/var/lib/dpkg/info" };
+        .idle_ms = LLM_IDLE_MS, .model_dir = LLM_MODEL_DIR, .engine = LLM_ENGINE, .dpkg_info = "/var/lib/dpkg/info",
+        .ggml_dir = LLM_GGML_DIR, .dev_dir = "/dev" };
+
+enum { M_AUTO, M_CPU, M_GPU };
+enum { FB_NONE_YET, FB_START, FB_MEMORY, FB_UNTESTED, FB_NOGPU };
+static const char *const BACKEND_WORD[3] = { "cpu", "vulkan", "cuda" };
+static const char *const MODE_WORD[3] = { "auto", "cpu", "gpu" };
+static const char *const FALLBACK_WORD[5] = { NULL, "start", "memory", "untested", "none" };
 
 static double now_ms(void) {
     struct timespec ts;
@@ -64,6 +90,46 @@ void llm_set_paths(const char *model_dir, const char *engine, const char *launch
 }
 
 void llm_set_idle_ms(int ms) { E.idle_ms = ms > 0 ? ms : LLM_IDLE_MS; }
+
+void llm_set_gpu_paths(const char *ggml_dir, const char *dev_dir) {
+    pthread_mutex_lock(&E.mu);
+    if (ggml_dir) snprintf(E.ggml_dir, sizeof E.ggml_dir, "%s", ggml_dir);
+    if (dev_dir) snprintf(E.dev_dir, sizeof E.dev_dir, "%s", dev_dir);
+    pthread_mutex_unlock(&E.mu);
+}
+
+int llm_set_backend(const char *mode) {
+    int m = -1;
+    for (int i = 0; i < 3; i++) if (mode && !strcmp(mode, MODE_WORD[i])) m = i;
+    if (m < 0) { errno = EINVAL; return -1; }
+    pthread_mutex_lock(&E.mu);
+    if (E.mode != m) {
+        E.mode = m;
+        E.mode_gen++;                       /* the running engine is restarted at the next job */
+        memset(E.failed, 0, sizeof E.failed);
+        E.fallback = FB_NONE_YET;
+        /* (0.8.9.6.2, BUG-5 of the QA) an idle one now, as a thread count's change does: Settings → AI says where the
+         * Brain runs from what the engine reports, so it follows the choice at once instead of at the next job */
+        if (E.pid > 0 && !E.nq && !strcmp(E.state, "ready")) { E.restart_now = 1; pthread_cond_signal(&E.cv); }
+    }
+    pthread_mutex_unlock(&E.mu);
+    return 0;
+}
+
+int llm_set_threads(int n) {
+    if (n < 0) { errno = EINVAL; return -1; }
+    int cpus = llmjail_cpus();
+    pthread_mutex_lock(&E.mu);
+    int was = llmjail_threads_for(E.threads_set, cpus), now = llmjail_threads_for(n, cpus);
+    E.threads_set = n;
+    if (was != now) {
+        E.mode_gen++;                       /* a running engine is restarted at its next job */
+        /* an idle one now, by the engine's thread (a busy one finishes its job first) */
+        if (E.pid > 0 && !E.nq && !strcmp(E.state, "ready")) { E.restart_now = 1; pthread_cond_signal(&E.cv); }
+    }
+    pthread_mutex_unlock(&E.mu);
+    return 0;
+}
 
 /* ---- what may run ---- */
 
@@ -92,6 +158,49 @@ int llm_available(void) {
     if (launcher_path(l, sizeof l) || stat(l, &a) || !prog_ok(&a, 0)) return 0;
     /* the engine: root's; a test's own copy may be the user's */
     return !stat(E.engine, &b) && prog_ok(&b, strcmp(E.engine, LLM_ENGINE) ? 0 : 1);
+}
+
+/* (0.8.9.6.2) a GPU backend can be tried: its ggml module is installed (in the backend folder, owned by root or the user,
+ * writable by no one else: llama.cpp loads it from there) and its device is there (a render node for Vulkan, NVIDIA's
+ * control node for CUDA). Whether the card really works only the engine's start tells. */
+static int module_ok(const char *dir, const char *name) {
+    char p[PATH_MAX];
+    struct stat st;
+    if (snprintf(p, sizeof p, "%s/%s", dir, name) >= (int)sizeof p || stat(p, &st)) return 0;
+    return S_ISREG(st.st_mode) && !(st.st_mode & 022) && (st.st_uid == 0 || st.st_uid == getuid());
+}
+
+static int has_render_node(const char *dev) {
+    char p[PATH_MAX + 8];
+    snprintf(p, sizeof p, "%s/dri", dev);
+    DIR *d = opendir(p);
+    if (!d) return 0;
+    int found = 0;
+    for (struct dirent *de; !found && (de = readdir(d));) {
+        if (strncmp(de->d_name, "renderD", 7) || !de->d_name[7]) continue;
+        char q[PATH_MAX + 300];
+        struct stat st;
+        snprintf(q, sizeof q, "%s/%s", p, de->d_name);
+        found = !stat(q, &st) && S_ISCHR(st.st_mode);
+    }
+    closedir(d);
+    return found;
+}
+
+static int gpu_avail(int backend) {
+    char g[PATH_MAX], dev[PATH_MAX];
+    pthread_mutex_lock(&E.mu);
+    snprintf(g, sizeof g, "%s", E.ggml_dir);
+    snprintf(dev, sizeof dev, "%s", E.dev_dir);
+    pthread_mutex_unlock(&E.mu);
+    if (backend == LLMJAIL_VULKAN) return module_ok(g, "libggml-vulkan.so") && has_render_node(dev);
+    if (backend == LLMJAIL_CUDA) {
+        char p[PATH_MAX + 16];
+        struct stat st;
+        snprintf(p, sizeof p, "%s/nvidiactl", dev);
+        return module_ok(g, "libggml-cuda.so") && !stat(p, &st) && S_ISCHR(st.st_mode);
+    }
+    return 1;
 }
 
 int llm_model_id_ok(const char *id) {
@@ -299,7 +408,92 @@ static int http(const char *method, const char *path, const char *body, int time
     return 0;
 }
 
-static int spawn_engine(const char *model, char **err) {
+/* (0.8.9.6.2) the engine's log (its stderr, a pipe): read on a thread of its own for as long as the engine runs, so it
+ * never blocks on a full pipe. Only a few lines are understood, as untrusted text: the device's name (printable ASCII,
+ * up to its first " (", at most 80 characters), the layers put on the GPU, and the GPU running out of memory. With LORD_LLM_LOG=1 every line is copied to
+ * lord-server's stderr. */
+static void device_name(const char *s, const char *end) {
+    char n[sizeof E.device];
+    size_t k = 0;
+    int open_ = 0, close_ = 0;
+    for (; s < end && *s && k < 80; s++) {
+        if (s[0] == ' ' && s[1] == '(') break;
+        if (*s >= 0x20 && *s < 0x7f && *s != '"' && *s != '\\') {
+            n[k++] = *s;
+            open_ += *s == '(';
+            close_ += *s == ')';
+        }
+    }
+    /* "Intel(R) UHD Graphics 630" keeps its own parentheses; the one closing the log's "(name)" goes */
+    while (k && (n[k - 1] == ' ' || (n[k - 1] == ')' && close_ > open_))) close_ -= n[--k] == ')';
+    n[k] = 0;
+    snprintf(E.device, sizeof E.device, "%s", n);
+}
+
+/* "using device Vulkan0 (AMD Radeon RX 580 Series (RADV POLARIS10)) (0000:01:00.0) - 7726 MiB free",
+ * "offloaded 29/29 layers to GPU", and the GPU's allocation failures */
+static void log_line(const char *l, unsigned gen) {
+    pthread_mutex_lock(&E.mu);
+    if (gen != E.log_gen) { pthread_mutex_unlock(&E.mu); return; }
+    const char *v;
+    static const char *const dev0[3] = { NULL, "using device Vulkan0 (", "using device CUDA0 (" };
+    if (E.backend != LLMJAIL_CPU && (v = strstr(l, dev0[E.backend]))) {
+        v += strlen(dev0[E.backend]);
+        device_name(v, v + strlen(v));
+    }
+    if ((v = strstr(l, "offloaded "))) {
+        int a = -1, b = -1;
+        if (sscanf(v, "offloaded %d/%d layers to GPU", &a, &b) == 2 && a >= 0 && b > 0 && a <= b && b < 10000) { E.layers = a; E.layers_total = b; }
+    }
+    if (E.backend != LLMJAIL_CPU && (strstr(l, "ErrorOutOfDeviceMemory") || strstr(l, "out of memory") || strstr(l, "failed to allocate")))
+        E.oom = 1;
+    pthread_mutex_unlock(&E.mu);
+}
+
+typedef struct { int fd; unsigned gen; } LogArg;
+
+static void *log_reader(void *arg) {
+    LogArg a = *(LogArg *)arg;
+    free(arg);
+    const char *lg = getenv("LORD_LLM_LOG");
+    int echo = lg && !strcmp(lg, "1");
+    char buf[4096], line[1024];
+    size_t ln = 0;
+    for (;;) {
+        ssize_t n = read(a.fd, buf, sizeof buf);
+        if (n < 0 && errno == EINTR) continue;
+        if (n <= 0) break;
+        for (ssize_t i = 0; i < n; i++) {
+            if (buf[i] != '\n') { if (ln < sizeof line - 1) line[ln++] = buf[i]; continue; }
+            line[ln] = 0;
+            log_line(line, a.gen);
+            if (echo) fprintf(stderr, "llama-server: %s\n", line);
+            ln = 0;
+        }
+    }
+    close(a.fd);
+    return NULL;
+}
+
+static int start_log(int fd) {
+    LogArg *a = malloc(sizeof *a);
+    if (!a) return -1;
+    pthread_mutex_lock(&E.mu);
+    a->fd = fd;
+    a->gen = ++E.log_gen;
+    pthread_mutex_unlock(&E.mu);
+    pthread_t th;
+    pthread_attr_t at;
+    pthread_attr_init(&at);
+    pthread_attr_setdetachstate(&at, PTHREAD_CREATE_DETACHED);
+    pthread_attr_setstacksize(&at, 64 * 1024);
+    int r = pthread_create(&th, &at, log_reader, a);
+    pthread_attr_destroy(&at);
+    if (r) { free(a); return -1; }
+    return 0;
+}
+
+static int spawn_engine(const char *model, int backend, char **err) {
     struct stat ms, es;
     char l[PATH_MAX];
     *err = "llm.noEngine";
@@ -314,7 +508,8 @@ static int spawn_engine(const char *model, char **err) {
     }
     int dfd = runtime_dir();
     int devnull = open("/dev/null", O_RDWR | O_CLOEXEC);
-    if (dfd < 0 || devnull < 0) {
+    int lp[2] = { -1, -1 };
+    if (dfd < 0 || devnull < 0 || pipe2(lp, O_CLOEXEC)) {
         *err = "llm.start";
         if (dfd >= 0) close(dfd);
         if (devnull >= 0) close(devnull);
@@ -324,10 +519,10 @@ static int spawn_engine(const char *model, char **err) {
     }
     unlinkat(dfd, "engine.sock", 0);
     /* every source above the targets, so one dup2 never overwrites another's source */
-    int *fds[] = { &mfd, &dfd, &efd, &devnull };
-    for (int i = 0; i < 4; i++) {
+    int *fds[] = { &mfd, &dfd, &efd, &devnull, &lp[1] };
+    for (int i = 0; i < 5; i++) {
         int hi = fcntl(*fds[i], F_DUPFD_CLOEXEC, 10);
-        if (hi < 0) { close(mfd); close(dfd); close(efd); close(devnull); *err = "llm.start"; return -1; }
+        if (hi < 0) { close(mfd); close(dfd); close(efd); close(devnull); close(lp[0]); close(lp[1]); *err = "llm.start"; return -1; }
         close(*fds[i]);
         *fds[i] = hi;
     }
@@ -335,6 +530,7 @@ static int spawn_engine(const char *model, char **err) {
     posix_spawn_file_actions_init(&fa);
     posix_spawn_file_actions_adddup2(&fa, devnull, 0);
     posix_spawn_file_actions_adddup2(&fa, devnull, 1);
+    posix_spawn_file_actions_adddup2(&fa, lp[1], 2);          /* the engine's log, read by log_reader */
     posix_spawn_file_actions_adddup2(&fa, mfd, LLMJAIL_MODEL_FD);
     posix_spawn_file_actions_adddup2(&fa, dfd, LLMJAIL_DIR_FD);
     posix_spawn_file_actions_adddup2(&fa, efd, LLMJAIL_ENGINE_FD);
@@ -348,11 +544,22 @@ static int spawn_engine(const char *model, char **err) {
     posix_spawnattr_setsigdefault(&at, &all);
     posix_spawnattr_setpgroup(&at, 0);
     posix_spawnattr_setflags(&at, POSIX_SPAWN_SETSIGMASK | POSIX_SPAWN_SETSIGDEF | POSIX_SPAWN_SETPGROUP);
-    char *envp[4];
+    char *envp[6];
     int ne = 0;
+    /* who lord-llm's parent must be: it dies with this process (PR_SET_PDEATHSIG) and refuses to start without it */
+    char parent_env[40];
+    snprintf(parent_env, sizeof parent_env, "LORD_LLM_PARENT=%d", (int)getpid());
+    envp[ne++] = parent_env;
     if (getenv("LORDOS_SESSIOND")) envp[ne++] = "LORDOS_SESSIOND=1";      /* cgroup_enter asks lord-sessiond */
-    const char *log = getenv("LORD_LLM_LOG");
-    if (log && !strcmp(log, "1")) envp[ne++] = "LORD_LLM_LOG=1";
+    static const char *const be_env[3] = { "LORD_LLM_BACKEND=cpu", "LORD_LLM_BACKEND=vulkan", "LORD_LLM_BACKEND=cuda" };
+    envp[ne++] = (char *)be_env[backend];
+    /* the processor threads, a number lord-llm checks again (1..its online cores) */
+    pthread_mutex_lock(&E.mu);
+    int threads = llmjail_threads_for(E.threads_set, llmjail_cpus());
+    pthread_mutex_unlock(&E.mu);
+    char th_env[32];
+    snprintf(th_env, sizeof th_env, "LORD_LLM_THREADS=%d", threads);
+    envp[ne++] = th_env;
     envp[ne] = NULL;
     char *argv[] = { "lord-llm", NULL };
     pid_t pid;
@@ -362,12 +569,26 @@ static int spawn_engine(const char *model, char **err) {
     close(devnull);
     close(efd);
     close(mfd);
-    if (r) { close(dfd); *err = "llm.start"; return -1; }
+    close(lp[1]);
+    if (r) { close(lp[0]); close(dfd); *err = "llm.start"; return -1; }
     pthread_mutex_lock(&E.mu);
     E.pid = pid;
     E.dirfd = dfd;
     snprintf(E.model, sizeof E.model, "%s", model);
+    E.backend = backend;
+    E.run_threads = threads;
+    E.has_run = 1;
+    E.run_gen = E.mode_gen;
+    E.device[0] = 0;
+    E.layers = E.layers_total = 0;
+    E.oom = 0;
     pthread_mutex_unlock(&E.mu);
+    if (start_log(lp[0])) {                                 /* nobody would read its log: not started */
+        close(lp[0]);
+        engine_kill();
+        *err = "llm.start";
+        return -1;
+    }
     return 0;
 }
 
@@ -442,62 +663,163 @@ static char *errjson(const char *code) {
     return o;
 }
 
-static char *run_analyze(Job *j) {
-    char *err = "llm.start";
-    double t0 = now_ms(), started = t0;
+/* (0.8.9.6.2) the backend the next start uses: the processor when chosen; else CUDA, then Vulkan, each only when
+ * installed, its device there and not given up on this session; else the processor (fallback says why) */
+static int pick_backend(void) {
     pthread_mutex_lock(&E.mu);
-    int same = E.pid > 0 && !strcmp(E.model, j->model);
+    int mode = E.mode, fc = E.failed[LLMJAIL_CUDA], fv = E.failed[LLMJAIL_VULKAN];
     pthread_mutex_unlock(&E.mu);
-    if (!same) {
-        engine_kill();
+    if (mode == M_CPU) return LLMJAIL_CPU;
+    int ac = gpu_avail(LLMJAIL_CUDA), av = gpu_avail(LLMJAIL_VULKAN);
+    if (ac && !fc) return LLMJAIL_CUDA;
+#if defined(__aarch64__)
+    /* the Raspberry Pi's GPU (V3D) isn't known to run the engine well: "auto" keeps the processor there, "gpu" tries it */
+    if (mode == M_AUTO && av && !fv) {
         pthread_mutex_lock(&E.mu);
-        E.state = "starting";
+        E.fallback = FB_UNTESTED;
         pthread_mutex_unlock(&E.mu);
-        if (spawn_engine(j->model, &err) || wait_ready(&err)) {
+        return LLMJAIL_CPU;
+    }
+#endif
+    if (av && !fv) return LLMJAIL_VULKAN;
+    /* the processor: say why (no GPU, or the one given up on and its reason) */
+    pthread_mutex_lock(&E.mu);
+    E.fallback = av ? fv : ac ? fc : FB_NOGPU;
+    pthread_mutex_unlock(&E.mu);
+    return LLMJAIL_CPU;
+}
+
+static void give_up(int backend, int why) {
+    pthread_mutex_lock(&E.mu);
+    if (backend != LLMJAIL_CPU) E.failed[backend] = why;
+    E.fallback = why;
+    pthread_mutex_unlock(&E.mu);
+}
+
+/* the engine with this job's model, started when it isn't running (or the choice of where changed); NULL, or the
+ * error's JSON. A GPU that can't start it is given up on and the next backend is tried, the processor last. */
+static char *ensure_engine(Job *j, double *started) {
+    char *err = "llm.start";
+    pthread_mutex_lock(&E.mu);
+    int same = E.pid > 0 && !strcmp(E.model, j->model) && E.run_gen == E.mode_gen;
+    pthread_mutex_unlock(&E.mu);
+    if (same) return NULL;
+    engine_kill();
+    pthread_mutex_lock(&E.mu);
+    E.state = "starting";
+    E.fallback = FB_NONE_YET;
+    pthread_mutex_unlock(&E.mu);
+    for (;;) {
+        int be = pick_backend();
+        err = "llm.start";
+        if (!spawn_engine(j->model, be, &err) && !wait_ready(&err)) {
+            if (be == LLMJAIL_CPU) break;
+            /* the log's line about the layers comes before the engine answers; its reader may lag */
+            int layers = -1;
+            for (int i = 0; i < 20 && layers < 0; i++) {
+                pthread_mutex_lock(&E.mu);
+                layers = E.layers_total ? E.layers : -1;
+                pthread_mutex_unlock(&E.mu);
+                if (layers < 0) { struct timespec ts = { 0, 25 * 1000000L }; nanosleep(&ts, NULL); }
+            }
+            /* a card with no room for a single layer isn't worth it */
+            if (layers != 0) break;
             engine_kill();
+            give_up(be, FB_MEMORY);
+            continue;
+        }
+        engine_kill();
+        if (be == LLMJAIL_CPU || !strcmp(err, "llm.stopped") || !strcmp(err, "llm.noModel") || !strcmp(err, "llm.noEngine")) {
             pthread_mutex_lock(&E.mu);
             E.state = "off";
             pthread_mutex_unlock(&E.mu);
             return errjson(err);
         }
-        started = now_ms();
+        give_up(be, FB_START);
     }
+    *started = now_ms();
+    return NULL;
+}
+
+/* (0.8.9.6.2) after a request failed: a GPU engine that died or ran out of the card's memory is given up on (the
+ * caller runs the job once more, on the next backend); 1 when that happened */
+static int gpu_gave_up(void) {
     pthread_mutex_lock(&E.mu);
-    E.state = "busy";
+    int be = E.backend, oom = E.oom;
+    pid_t pid = E.pid;
     pthread_mutex_unlock(&E.mu);
-    char *body = request_body(j->system, j->user, j->kind);
-    int status = 0;
-    char *ans = NULL;
-    size_t an = 0;
-    int r = body ? http("POST", "/v1/chat/completions", body, LLM_REPLY_MS, &status, &ans, &an) : -1;
-    int timed_out = r && errno == ETIMEDOUT;
-    free(body);
-    pthread_mutex_lock(&E.mu);
-    E.state = "ready";
-    E.last_used = now_ms();
-    pthread_mutex_unlock(&E.mu);
-    if (r || status != 200) { free(ans); if (timed_out) engine_kill(); return errjson(timed_out ? "llm.timeout" : "llm.answer"); }
-    JDoc d;
-    char *out = NULL;
-    if (json_parse(ans, an, &d, NULL, 0)) { free(ans); return errjson("llm.answer"); }
-    const JVal *ch = json_get(d.root, "choices");
-    const JVal *c0 = ch && ch->type == J_ARR ? ch->kid : NULL;
-    const JVal *msg = c0 ? json_get(c0, "message") : NULL;
-    const char *content = msg ? json_str(msg, "content") : NULL;
-    const JVal *usage = json_get(d.root, "usage");
-    int tokens = usage ? (int)json_num(usage, "completion_tokens", 0) : 0;
-    if (content && strlen(content) <= LLM_CONTENT_MAX) {
-        size_t cap = strlen(content) * 6 + 160;
-        out = malloc(cap);
-        if (out) {
-            int k = snprintf(out, cap, "{\"ok\":true,\"ms\":%.0f,\"startMs\":%.0f,\"tokens\":%d,\"content\":", now_ms() - t0, started - t0, tokens);
-            size_t q = json_quote(out + k, cap - (size_t)k - 2, content);
-            snprintf(out + k + q, cap - (size_t)k - q, "}");
+    if (be == LLMJAIL_CPU || pid <= 0) return 0;
+    int dead = 0;
+    for (int i = 0; i < 10 && !dead; i++) {
+        dead = waitpid(pid, NULL, WNOHANG) == pid;
+        if (!dead) { struct timespec ts = { 0, 50 * 1000000L }; nanosleep(&ts, NULL); }
+    }
+    /* the out-of-memory line comes through the log's reader, which may lag the death: a moment more for it */
+    for (int i = 0; i < 10 && !oom; i++) {
+        pthread_mutex_lock(&E.mu);
+        oom = E.oom;
+        pthread_mutex_unlock(&E.mu);
+        if (!oom && dead) { struct timespec ts = { 0, 25 * 1000000L }; nanosleep(&ts, NULL); }
+        else break;
+    }
+    if (!dead && !oom) return 0;
+    if (dead) {
+        pthread_mutex_lock(&E.mu);
+        E.pid = -1;
+        pthread_mutex_unlock(&E.mu);
+    }
+    engine_kill();
+    give_up(be, oom ? FB_MEMORY : FB_START);
+    return 1;
+}
+
+static char *run_analyze(Job *j) {
+    for (int attempt = 0;; attempt++) {
+        double t0 = now_ms(), started = t0;
+        char *e = ensure_engine(j, &started);
+        if (e) return e;
+        pthread_mutex_lock(&E.mu);
+        E.state = "busy";
+        pthread_mutex_unlock(&E.mu);
+        char *body = request_body(j->system, j->user, j->kind);
+        int status = 0;
+        char *ans = NULL;
+        size_t an = 0;
+        int r = body ? http("POST", "/v1/chat/completions", body, LLM_REPLY_MS, &status, &ans, &an) : -1;
+        int timed_out = r && errno == ETIMEDOUT;
+        free(body);
+        pthread_mutex_lock(&E.mu);
+        E.state = "ready";
+        E.last_used = now_ms();
+        pthread_mutex_unlock(&E.mu);
+        if (r || status != 200) {
+            free(ans);
+            if (timed_out) engine_kill();
+            else if (!attempt && gpu_gave_up()) continue;      /* the GPU failed it: once more on the next backend */
+            return errjson(timed_out ? "llm.timeout" : "llm.answer");
         }
+        JDoc d;
+        char *out = NULL;
+        if (json_parse(ans, an, &d, NULL, 0)) { free(ans); return errjson("llm.answer"); }
+        const JVal *ch = json_get(d.root, "choices");
+        const JVal *c0 = ch && ch->type == J_ARR ? ch->kid : NULL;
+        const JVal *msg = c0 ? json_get(c0, "message") : NULL;
+        const char *content = msg ? json_str(msg, "content") : NULL;
+        const JVal *usage = json_get(d.root, "usage");
+        int tokens = usage ? (int)json_num(usage, "completion_tokens", 0) : 0;
+        if (content && strlen(content) <= LLM_CONTENT_MAX) {
+            size_t cap = strlen(content) * 6 + 160;
+            out = malloc(cap);
+            if (out) {
+                int k = snprintf(out, cap, "{\"ok\":true,\"ms\":%.0f,\"startMs\":%.0f,\"tokens\":%d,\"content\":", now_ms() - t0, started - t0, tokens);
+                size_t q = json_quote(out + k, cap - (size_t)k - 2, content);
+                snprintf(out + k + q, cap - (size_t)k - q, "}");
+            }
+        }
+        json_free(&d);
+        free(ans);
+        return out ? out : errjson("llm.answer");
     }
-    json_free(&d);
-    free(ans);
-    return out ? out : errjson("llm.answer");
 }
 
 /* the person's click: the facts from JS, then what evidence.c reads of the program (fenced as data), then the model;
@@ -527,11 +849,119 @@ static char *run_investigate(Job *j) {
     return o;
 }
 
+/* (0.8.9.6.2) "✨ AI" on selected text: the fixed request (writing.c), the answer streamed into E.wr_text so the shell
+ * shows it as it comes (llm_peek); cancelled by llm_cancel or llm_stop */
+static char *run_write_once(Job *j, int attempt) {
+    double t0 = now_ms(), started = t0;
+    char *e = ensure_engine(j, &started);
+    if (e) return e;
+    uint8_t r[8] = { 0 };
+    char nonce[17];
+    if (getrandom(r, sizeof r, 0) != (ssize_t)sizeof r) return errjson("llm.failed");
+    for (int i = 0; i < 8; i++) snprintf(nonce + 2 * i, 3, "%02x", r[i]);
+    char *body = wr_request(j->action, j->target, j->user, nonce);
+    if (!body) return errjson("llm.failed");
+    pthread_mutex_lock(&E.mu);
+    E.state = "busy";
+    pthread_mutex_unlock(&E.mu);
+    int fd = sock_connect();
+    char head[256];
+    size_t bl = strlen(body);
+    int hl = snprintf(head, sizeof head, "POST /v1/chat/completions HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n"
+                                         "Content-Type: application/json\r\nContent-Length: %zu\r\n\r\n", bl);
+    int ok = fd >= 0;
+    const char *parts[2] = { head, body };
+    size_t lens[2] = { (size_t)hl, bl };
+    for (int i = 0; ok && i < 2; i++)
+        for (size_t off = 0; ok && off < lens[i];) {
+            ssize_t w = send(fd, parts[i] + off, lens[i] - off, MSG_NOSIGNAL);
+            if (w < 0 && errno == EINTR) continue;
+            if (w <= 0) ok = 0; else off += (size_t)w;
+        }
+    free(body);
+    WrStream *st = malloc(sizeof *st);
+    const char *why = ok && st ? NULL : "llm.answer";
+    if (st) wr_stream_init(st);
+    double end = now_ms() + LLM_REPLY_MS;
+    size_t got = 0;
+    char buf[8192];
+    while (!why) {
+        int left = (int)(end - now_ms());
+        if (left <= 0) { why = "llm.timeout"; break; }
+        pthread_mutex_lock(&E.mu);
+        int stop = E.stop_now || E.cancel_id == j->id;
+        pthread_mutex_unlock(&E.mu);
+        if (stop) { why = "llm.cancelled"; break; }
+        struct pollfd p = { .fd = fd, .events = POLLIN };
+        int pr = poll(&p, 1, left > 250 ? 250 : left);
+        if (pr < 0 && errno == EINTR) continue;
+        if (pr <= 0) continue;
+        ssize_t n = recv(fd, buf, sizeof buf, 0);
+        if (n < 0 && errno == EINTR) continue;
+        if (n <= 0) { if (!st->done && !(st->phase == 4 && st->tn)) why = "llm.answer"; break; }
+        got += (size_t)n;
+        if (got > LLM_ANSWER_MAX * 4) { why = "llm.answer"; break; }
+        int fr = wr_stream_feed(st, buf, (size_t)n);
+        pthread_mutex_lock(&E.mu);
+        char *copy = strdup(st->text);
+        if (copy) { free(E.wr_text); E.wr_text = copy; }
+        pthread_mutex_unlock(&E.mu);
+        if (fr < 0) why = "llm.answer";
+        if (fr > 0) break;
+    }
+    if (fd >= 0) close(fd);
+    pthread_mutex_lock(&E.mu);
+    E.state = "ready";
+    E.last_used = now_ms();
+    if (E.cancel_id == j->id) E.cancel_id = 0;
+    pthread_mutex_unlock(&E.mu);
+    if (why && !strcmp(why, "llm.timeout")) engine_kill();
+    /* the GPU failed it before a word came: once more on the next backend (run_write) */
+    if (why && !attempt && strcmp(why, "llm.timeout") && strcmp(why, "llm.cancelled") && st && !st->tn && gpu_gave_up()) {
+        free(st);
+        return NULL;
+    }
+    char *out = NULL;
+    if (!why && st) {
+        size_t cap = st->tn * 6 + 160;
+        out = malloc(cap);
+        if (out) {
+            int k = snprintf(out, cap, "{\"ok\":true,\"ms\":%.0f,\"startMs\":%.0f,\"truncated\":%s,\"content\":", now_ms() - t0,
+                             started - t0, st->truncated ? "true" : "false");
+            size_t q = json_quote(out + k, cap - (size_t)k - 2, st->text);
+            snprintf(out + k + q, cap - (size_t)k - q, "}");
+        }
+    }
+    free(st);
+    return out ? out : errjson(why ? why : "llm.answer");
+}
+
+static char *run_write(Job *j) {
+    char *r = run_write_once(j, 0);
+    return r ? r : run_write_once(j, 1);
+}
+
 static void *worker(void *arg) {
     (void)arg;
     for (;;) {
         pthread_mutex_lock(&E.mu);
         while (!E.nq) {
+            /* (0.8.9.6.2) the thread count changed while the engine was idle: started again with the new one now, so
+             * the next job doesn't wait for it; its idle time keeps counting from its last answer */
+            if (E.restart_now) {
+                E.restart_now = 0;
+                if (E.pid > 0 && !E.stop_now && !strcmp(E.state, "ready") && E.run_gen != E.mode_gen && E.model[0]) {
+                    Job rj = { .kind = J_ANALYZE };
+                    snprintf(rj.model, sizeof rj.model, "%s", E.model);
+                    double used = E.last_used, started = 0;
+                    pthread_mutex_unlock(&E.mu);
+                    char *e = ensure_engine(&rj, &started);
+                    pthread_mutex_lock(&E.mu);
+                    if (e) free(e);                 /* "off" now: the next job tries again */
+                    else { E.state = "ready"; E.last_used = used; }
+                    continue;
+                }
+            }
             if (E.stop_now || (E.pid > 0 && now_ms() - E.last_used > E.idle_ms && !strcmp(E.state, "ready"))) {
                 E.stop_now = 0;
                 pthread_mutex_unlock(&E.mu);
@@ -565,7 +995,17 @@ static void *worker(void *arg) {
         snprintf(info, sizeof info, "%s", E.dpkg_info);
         pthread_mutex_unlock(&E.mu);
         char *res = NULL;
-        if (j.kind == J_ANALYZE || j.kind == J_TRANSLATE) res = run_analyze(&j);
+        if (j.kind == J_WRITE) {
+            pthread_mutex_lock(&E.mu);
+            E.wr_id = j.id;
+            free(E.wr_text);
+            E.wr_text = strdup("");
+            pthread_mutex_unlock(&E.mu);
+            res = run_write(&j);
+            pthread_mutex_lock(&E.mu);
+            E.wr_id = 0;
+            pthread_mutex_unlock(&E.mu);
+        } else if (j.kind == J_ANALYZE || j.kind == J_TRANSLATE) res = run_analyze(&j);
         else if (j.kind == J_INVESTIGATE) res = run_investigate(&j);
         else res = llm_facts_json(j.pid, j.start, info, getenv("HOME"));
         if (!res) res = errjson("llm.failed");
@@ -644,6 +1084,52 @@ int llm_submit_translate(const char *model, const char *system, const char *text
     return id;
 }
 
+int llm_submit_write(const char *model, const char *action, const char *target, const char *text) {
+    int a = wr_action(action);
+    size_t tl = text ? strlen(text) : 0;
+    if (!llm_model_id_ok(model) || !a || tl == 0 || tl > LLM_WRITE_MAX || (a == WR_TRANSLATE && !wr_language(target))) { errno = EINVAL; return -1; }
+    Job j = { .kind = J_WRITE, .action = a };
+    snprintf(j.model, sizeof j.model, "%s", model);
+    if (a == WR_TRANSLATE) snprintf(j.target, sizeof j.target, "%s", target);
+    j.user = strdup(text);
+    if (!j.user) { errno = ENOMEM; return -1; }
+    int id = submit(&j);
+    if (id < 0) free(j.user);
+    return id;
+}
+
+char *llm_peek(int id) {
+    char *o = NULL;
+    pthread_mutex_lock(&E.mu);
+    int queued = 0;
+    for (int i = 0; i < E.nq; i++) if (E.q[i].id == id) queued = 1;
+    if (id > 0 && E.wr_id == id) {
+        const char *t = E.wr_text ? E.wr_text : "";
+        size_t cap = strlen(t) * 6 + 48;
+        if ((o = malloc(cap))) {
+            int k = snprintf(o, cap, "{\"state\":\"writing\",\"text\":");
+            size_t q = json_quote(o + k, cap - (size_t)k - 2, t);
+            snprintf(o + k + q, cap - (size_t)k - q, "}");
+        }
+    } else if (queued) o = strdup(strcmp(E.state, "off") && strcmp(E.state, "starting") ? "{\"state\":\"queued\"}" : "{\"state\":\"starting\"}");
+    pthread_mutex_unlock(&E.mu);
+    return o;
+}
+
+void llm_cancel(int id) {
+    pthread_mutex_lock(&E.mu);
+    for (int i = 0; i < E.nq; i++)
+        if (E.q[i].id == id) {
+            free(E.q[i].system);
+            free(E.q[i].user);
+            memmove(E.q + i, E.q + i + 1, sizeof E.q[0] * (size_t)(E.nq - i - 1));
+            E.nq--;
+            break;
+        }
+    if (id > 0 && E.wr_id == id) E.cancel_id = id;
+    pthread_mutex_unlock(&E.mu);
+}
+
 int llm_submit_facts(int pid, unsigned long long start) {
     if (pid <= 0) { errno = EINVAL; return -1; }
     Job j = { .kind = J_FACTS, .pid = pid, .start = start };
@@ -659,12 +1145,28 @@ char *llm_take(int id) {
 }
 
 char *llm_state_json(void) {
-    char *o = malloc(256);
+    int gv = gpu_avail(LLMJAIL_VULKAN), gc = gpu_avail(LLMJAIL_CUDA), cpus = llmjail_cpus();
+    char *o = malloc(1024);
     if (!o) return NULL;
     pthread_mutex_lock(&E.mu);
     double idle = E.pid > 0 && E.last_used > 0 ? now_ms() - E.last_used : 0;
-    if (E.model[0]) snprintf(o, 256, "{\"state\":\"%s\",\"model\":\"%s\",\"pid\":%d,\"idleMs\":%.0f,\"queued\":%d}", E.state, E.model, (int)E.pid, idle, E.nq);
-    else snprintf(o, 256, "{\"state\":\"%s\",\"model\":null,\"pid\":%d,\"idleMs\":0,\"queued\":%d}", E.state, (int)E.pid, E.nq);
+    int n;
+    if (E.model[0]) n = snprintf(o, 1024, "{\"state\":\"%s\",\"model\":\"%s\",\"pid\":%d,\"idleMs\":%.0f,\"queued\":%d", E.state, E.model, (int)E.pid, idle, E.nq);
+    else n = snprintf(o, 1024, "{\"state\":\"%s\",\"model\":null,\"pid\":%d,\"idleMs\":0,\"queued\":%d", E.state, (int)E.pid, E.nq);
+    n += snprintf(o + n, 1024 - (size_t)n, ",\"mode\":\"%s\",\"gpus\":{\"vulkan\":%s,\"cuda\":%s}", MODE_WORD[E.mode],
+                  gv ? "true" : "false", gc ? "true" : "false");
+    n += snprintf(o + n, 1024 - (size_t)n, ",\"cpus\":%d,\"threadsAuto\":%d,\"threads\":%d,\"runThreads\":%d", cpus,
+                  llmjail_threads_auto(cpus), llmjail_threads_for(E.threads_set, cpus), E.has_run ? E.run_threads : 0);
+    if (E.has_run) {
+        n += snprintf(o + n, 1024 - (size_t)n, ",\"backend\":\"%s\",\"device\":", BACKEND_WORD[E.backend]);
+        if (E.backend != LLMJAIL_CPU && E.device[0]) n += (int)json_quote(o + n, 1024 - (size_t)n, E.device);
+        else n += snprintf(o + n, 1024 - (size_t)n, "null");
+        n += snprintf(o + n, 1024 - (size_t)n, ",\"layers\":%d,\"layersTotal\":%d", E.layers, E.layers_total);
+    } else {
+        n += snprintf(o + n, 1024 - (size_t)n, ",\"backend\":null,\"device\":null,\"layers\":0,\"layersTotal\":0");
+    }
+    if (E.fallback) snprintf(o + n, 1024 - (size_t)n, ",\"fallback\":\"%s\"}", FALLBACK_WORD[E.fallback]);
+    else snprintf(o + n, 1024 - (size_t)n, ",\"fallback\":null}");
     pthread_mutex_unlock(&E.mu);
     return o;
 }

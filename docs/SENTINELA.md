@@ -118,7 +118,7 @@ minimal environment and three descriptors, never a path:
 - fd 5: `/usr/bin/llama-server` opened `O_PATH`, owned by root, not writable by others.
 
 lord-llm checks them, closes everything else, lowers itself (nice 15, `SCHED_BATCH`, idle I/O), enters
-`lordos-sentinela.scope` (cgroup: at most 2 cores, memory at most the model's size plus 1.5 GB; without a delegated
+`lordos-sentinela.scope` (cgroup: at most as many cores as the engine's threads, memory at most the model's size plus 1.5 GB; without a delegated
 cgroup, an address-space limit of the model's size plus 4 GB), sets `umask 0177`, moves into the runtime folder and
 applies `llmjail_apply` (`server/src/llm/llmjail.c`):
 
@@ -128,7 +128,12 @@ applies `llmjail_apply` (`server/src/llm/llmjail.c`):
 2. **Landlock:** `/usr` readable but not executable; only the engine's file (fd 5) and the dynamic loader executable;
    the model (fd 3) readable; `/sys/devices/system/cpu`, `/etc/ld.so.cache`, `/dev/null`, `/dev/urandom`; in the
    runtime folder only making and removing a socket. TCP bind and connect denied (ABI 4); abstract Unix sockets and
-   signals scoped to itself (ABI 6). No GPU device: the engine runs on the CPU only (`-ngl 0 -dev none`).
+   signals scoped to itself (ABI 6). No GPU device on the processor (`-ngl 0 -dev none`). (0.8.9.6.2, in development,
+   awaiting approval; docs/AI.md "The Brain on the GPU") Only with a GPU backend, which lord-server chooses and names
+   in `LORD_LLM_BACKEND`: Vulkan adds the render nodes `/dev/dri/renderD128`–`191` (DRM's major only; read, write,
+   ioctls), `/dev/dri` listed, `/etc/vulkan` and `/sys/dev/char`, `/sys/devices`, `/sys/bus/pci`, `/sys/class/drm`
+   read, never `/dev/dri/card*`; CUDA adds `/dev/nvidiactl`, `/dev/nvidia<N>`, `/dev/nvidia-uvm(-tools)`,
+   `/proc/driver/nvidia` and the same `/sys`.
    **Required, fail closed:** Landlock ABI 6 (Linux 6.12, LordOS's kernel) with files, TCP and the scoping, and every
    rule the engine depends on (`/usr`, the loader, the engine, the model, the runtime folder). If any of it can't be
    applied, lord-llm exits with code 3 before running anything: no engine, and Sentinela keeps its rule alerts without
@@ -143,12 +148,23 @@ applies `llmjail_apply` (`server/src/llm/llmjail.c`):
    `rt_tgsigqueueinfo` only with its own pid (the filter is built in lord-llm, whose pid the engine keeps), no `tkill`,
    `pidfd_open` or `pidfd_send_signal`. Fails closed too.
 
-Then it `execveat`s the engine with fixed arguments: `-m /proc/self/fd/3 --host engine.sock -t 2 -tb 2
---threads-http 2 -c 4096 -np 1 --no-webui --no-slots -ngl 0 -dev none -cram 0 --offline --reasoning off --no-warmup`.
+Then it `execveat`s the engine with fixed arguments: `-m /proc/self/fd/3 --host engine.sock -t N -tb N
+--threads-http 2 -c 4096 -np 1 --no-webui --no-slots -cram 0 --offline --reasoning off --no-warmup`, then `-ngl 0 -dev
+none` on the processor, or (0.8.9.6.2) `-ngl auto -dev Vulkan0 -lv 4` / `-ngl auto -dev CUDA0 -lv 4` on a GPU. N is
+`LORD_LLM_THREADS` (0.8.9.6.2, the person's count from Settings → AI, checked by lord-llm: 1..the online cores, else
+it exits 2; [AI.md](AI.md) "The engine's threads"). Its
+stderr is a pipe lord-server reads (the device and the layers it used, out-of-memory lines); with `LORD_LLM_LOG=1` in
+lord-server's environment every line is copied to lord-server's own log.
 The engine's socket is `engine.sock` in the 0700 folder, mode 0600. lord-server connects through
 `/proc/self/fd/<folder>/engine.sock` and talks only to the process it started (`SO_PEERCRED` pid and uid). It speaks
 one HTTP/1.1 request per connection, reads at most 256 KB of answer with a 3-minute limit, and hands JS only the
 model's text (at most 4 KB).
+
+The same engine serves Writing (✨ AI on selected text, and the `lumo` command through lord-server's
+`org.lordos.Writing1`; [AI.md](AI.md) "Writing"): one queue, one job at a time, its prompts fixed in
+`server/src/llm/writing.c`. Its threads in a cgroup of as many cores, at low priority, keep it in the background
+while the person works; with the old fixed two threads, on a busy 20-thread machine a correction of one sentence took
+5–8 s with the 1.7B model and 15–20 s with the 4B one.
 
 The engine starts when an analysis is needed (about 1 s for the 1.7B model from a warm disk), and is stopped 2 minutes
 after its last answer (`LLM_IDLE_MS`) or when Sentinela is turned off, giving its memory back.
@@ -273,6 +289,14 @@ processes. Nothing happens until that click.
   person's language (asked in the system text and on the summary's last line). The result also says what was read
   (`evidence`: kind, interpreter, bytes, sent, hash, libraries, strings; `evidenceOf` keeps only those fields), shown
   under the answer ("Lumo read the shell script (2 KB)").
+- **The rules' floor** (QA of 0.8.9.6.2: Qwen3 1.7B called a fake `sshd` running from the home folder "low risk"):
+  what Sentinela's own rules already see is decided in code, not by the model (`investigationFindings`). A name that
+  imitates a system or kernel process on a program that isn't the system's (`imitates`, the imitation trigger) makes
+  the risk at least **high**; a program deleted or replaced while it runs outside the system folders, at least
+  **medium**. The finding is the summary's second line ("Sentinela's rule found: …", which the system text says is
+  LordOS's own and must not be contradicted), and `applyRiskFloor` raises a lower answer to it whatever the model says
+  (a raised answer that suggested nothing suggests End). Get Info then shows the rule's own sentence under the answer
+  ("Its name is that of a system or kernel process, but its program lives in your home folder.").
 - **Actions** run only on the person's click, under the answer, the suggested one highlighted: **End** (TERM), **Pause**
   (STOP) — `lord.monitor.signal`, the user's own unprotected processes —, **Block its network** (the app's existing
   `no-network` firewall restriction; only for a process in an app's scope), and **Blocklist** (below), which asks first.
@@ -327,11 +351,13 @@ fanotify capability (`CAP_SYS_ADMIN`), the per-user list protocol, and the fail-
 ## Limits
 
 - Analyses only when a rule fires; at most 4 events handled per 10-second tick; the engine queue holds 8 jobs.
-- The engine: 2 threads, low priority, the memory cap above.
+- The engine: the person's processor threads (Settings → AI, "Procesador: núcleos para el Cerebro"; automatic = half
+  the cores, 1..16), low priority, the memory cap above.
 - On battery: alerts without analysis.
 - Measured on the development PC (8 cores, the CPU only, 2 threads, while the fake miner used 2 cores): Qwen3 1.7B
   answered in 8.5–11.4 s cold (engine start about 1 s) and 7.5–9 s warm, about 17 tokens/s generating and 70 tokens/s
-  reading the prompt.
+  reading the prompt. (0.8.9.6.2) On the RX 580 through Vulkan: 0.85 s warm and 3.5 s cold, about 98 tokens/s
+  generating; the 4B model 1.8 s warm (docs/AI.md, "Measured").
 
 ## Interfaces
 
@@ -345,10 +371,19 @@ fanotify capability (`CAP_SYS_ADMIN`), the per-user list protocol, and the fail-
   `machinesWatched()` and `lord.vm.stats`' new fields are the machine rules' ("Machines").
 - SDK: `sdk/sentinela.js` (the service, `startSentinela` from `startShell`), `sdk/sentinelamodel.js` (pure logic),
   `sdk/llmcatalog.js`, `sdk/sentinelaglyph.js`. Settings → AI → Sentinela: `apps/settings/Sentinela.jsx`.
+- (0.8.9.6.2) Settings → Artificial intelligence is a store around Lumo ([AI.md](AI.md)): Sentinela is one of the
+  functions of the one brain (read only), with a card that says whether it is on and opens its page ("‹ Artificial
+  intelligence › Sentinela", the same `{ section: 'ai', page: 'sentinela' }` links). The models and the engine are the
+  **Brain** capability's cards (install, remove, use; *Translate with Lumo* to try one).
 - Strings: `assets/locales/<lang>/sentinela.json` in every language, and `errors.llm.*`, `errors.sentinela.*`.
 
 ## Tests
 
+- (0.8.9.6.2) `build/llm-engine-test` also: with a fake ggml folder and device folder, Vulkan chosen and its device
+  name and layers read from the log, the render node and its DRM ioctl reachable only under Vulkan, `card0` and
+  NVIDIA's node never, the processor's sandbox unchanged when chosen, CUDA first when its module and node are there, a
+  module writable by others not used, and the fallbacks (a GPU that fails to start, has no room, or runs out of memory
+  mid-answer, a streamed answer too) with their reasons; a hostile device name is cleaned.
 - `build/llm-engine-test` (`make test`): lord-llm runs `build/llm-fake-engine` in the real sandbox. It must not be able
   to open TCP, UDP, IPv6, netlink or packet sockets, a Unix datagram socket, `connect` to the system bus, read
   `/etc/passwd` or `/home`, write `/tmp`, run `/bin/sh`, signal its parent or a child of its own (`kill`, `tgkill`,
@@ -390,7 +425,7 @@ fanotify capability (`CAP_SYS_ADMIN`), the per-user list protocol, and the fail-
 
 - Cancelling a model download: `pkg-install` has no cancel today, and adding one is a change on the root side
   (`admin.c`), which needs its own review.
-- The network trigger (per-process connections), checking packaged programs against dpkg's checksums, the GPU
-  (Vulkan) for the engine, and the "Live statistics" board of the mockups.
+- The network trigger (per-process connections), checking packaged programs against dpkg's checksums, and the "Live
+  statistics" board of the mockups. (The GPU for the engine is in development: docs/AI.md "The Brain on the GPU".)
 - arm64 (Raspberry Pi): the `llama.cpp` package is built for arm64 too and the sandbox knows its loader, but Sentinela's
   analysis has only been run on amd64 so far. Its rules and notifications don't depend on the engine.

@@ -12,5 +12,9 @@
   "inspect.title": "A fejlesztői eszközök be vannak kapcsolva",
   "inspect.body": "Megnyíltak a böngészőjében, és bekapcsolva maradnak, amíg be nem zárja ezt az ablakot.",
   "inspect.open": "Megnyitás böngészőben",
-  "inspect.failed": "A fejlesztői eszközök nem indultak el"
+  "inspect.failed": "A fejlesztői eszközök nem indultak el",
+  "save.image": "Kép mentése",
+  "save.video": "Videó mentése",
+  "save.audio": "Hang mentése",
+  "hang.reloaded": "Az oldal nem válaszolt, ezért újra betöltődött"
 }

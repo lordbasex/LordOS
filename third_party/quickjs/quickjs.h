@@ -446,6 +446,14 @@ void JS_ComputeMemoryUsage(JSRuntime *rt, JSMemoryUsage *s);
 size_t JS_GetMallocSize(JSRuntime *rt); /* LordOS patch */
 /* LordOS patch: the running JS stack as text, without running JavaScript (interrupt handlers) */
 int JS_GetStackText(JSContext *ctx, char *buf, int size, int max_frames);
+/* LordOS patch: 1 when a bytecode function of `realm` is anywhere on the running JS stack (a community theme's code,
+   server/src/ui/js_theme.c), without running JavaScript */
+int JS_StackHasRealm(JSContext *ctx, JSContext *realm);
+/* LordOS patch: 2 a bytecode function of `realm`, 1 untrusted (a native of it, bound, proxy, native with data), 0 trusted */
+int JS_IsFunctionOfRealm(JSContext *ctx, JSValueConst func_obj, JSContext *realm);
+/* LordOS patch: the untrusted realm whose jobs run tainted, and calls made on its behalf (+1 before, -1 after) */
+void JS_SetUntrustedRealm(JSRuntime *rt, JSContext *realm);
+void JS_RealmTaint(JSRuntime *rt, int delta);
 void JS_DumpMemoryUsage(FILE *fp, const JSMemoryUsage *s, JSRuntime *rt);
 
 /* atom support */
@@ -948,6 +956,10 @@ JSValue JS_GetModuleNamespace(JSContext *ctx, JSModuleDef *m);
 
 typedef JSValue JSJobFunc(JSContext *ctx, int argc, JSValueConst *argv);
 int JS_EnqueueJob(JSContext *ctx, JSJobFunc *job_func, int argc, JSValueConst *argv);
+/* LordOS patch: queued by LordOS's own code for itself (React's render after a state update), never inheriting the
+   untrusted realm's taint from the call that queued it; JS_ExecutePendingJob still taints it when one of its arguments
+   is a function that isn't a trusted realm's bytecode */
+int JS_EnqueueTrustedJob(JSContext *ctx, JSJobFunc *job_func, int argc, JSValueConst *argv);
 
 JS_BOOL JS_IsJobPending(JSRuntime *rt);
 int JS_ExecutePendingJob(JSRuntime *rt, JSContext **pctx);

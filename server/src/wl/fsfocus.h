@@ -22,10 +22,18 @@ static inline int fsf_hidden(FsfRect win, FsfRect fs, int whole) {
 
 /* 1 if the fullscreen window takes the keys instead of the window wanted (asked for by wl_set_focus, or holding
  * them at a key press in wl_key): never instead of itself; instead of a window hidden under it; and instead of no
- * window only while the pointer is on its display (one display: as before; another display: the desktop there). */
+ * window (a LordOS window or the desktop) only when that was chosen with the pointer on its display (one display:
+ * always, as before; another display: never, wherever the pointer goes afterwards). ptr_on_fs is where the pointer
+ * was when "no window" was chosen (wl.c none_on_fs), not where it is at each key: a LordOS window chosen on another
+ * display lost the keys to the fullscreen window as soon as the pointer rested on the fullscreen display again
+ * (BUG-30 of the ws170 QA). */
 static inline int fsf_take(int want_is_fs, int want_none, int want_hidden, int ptr_on_fs) {
     if (want_is_fs) return 0;
     return want_none ? ptr_on_fs : want_hidden;
 }
+
+/* The pointer side for "no window": where it was when that was chosen (chosen: 1 on the fullscreen display, 0 on
+ * another, -1 not chosen since this fullscreen began), else where it is now. */
+static inline int fsf_none_ptr(int chosen, int now) { return chosen >= 0 ? chosen : now; }
 
 #endif

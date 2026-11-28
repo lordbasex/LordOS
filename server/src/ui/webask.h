@@ -16,11 +16,14 @@
  * (webbadge.h keeps who was checked); the count is clamped to 0..9999 and goes to the shell as the "webapps-badge"
  * event { app, profile, count }; a lord-web that leaves the bus gets a 0.
  *
- *   org.lordos.WebApps1.Menu(s app, s profile, as items) → s item
+ *   org.lordos.WebApps1.Menu(s app, s profile, as items, u checked, s text) → s item   (or the older (s, s, as))
  *
  * A right click in a web app's page (docs/WEBAPPS.md, "Editing"): lord-web asks for a menu at the pointer. The items
- * are names from webedit.h's closed list (never text), checked, with the same pid check as Ask; the shell gets the
- * "webapps-menu" event { id, app, profile, items } and lord.webapps.menuAnswer(id, item) brings back the chosen
+ * are names from webedit.h's closed list (never text), checked, with the same pid check as Ask; checked is a mask of
+ * the positions that show a check mark (Loop, Show Controls); text is the selection's few words for "Search the web
+ * for “…”", cleaned here again (websearch_snippet: no control or bidi characters, at most 30 characters) and sent only
+ * when the menu has that item. The shell gets the "webapps-menu" event { id, app, profile, items, checked: [names],
+ * text } and lord.webapps.menuAnswer(id, item) brings back the chosen
  * item, or "" when the menu closed. A new menu from the same lord-web closes the one before ("webapps-menu-gone").
  *
  * The other way, lord-server to lord-web: org.lordos.WebApp1.Edit(s command) on its bus name, from the shell's Edit
@@ -56,6 +59,10 @@ int  webask_menu_answer(int id, const char *item);
 /* The Edit menu: org.lordos.WebApp1.Edit(command) to that app and profile's lord-web, no reply wanted; command is
  * one of webedit.h's names. 0 sent, -1 no bus, a bad id or an unknown command. */
 int  webask_edit(const char *app, const char *profile, const char *command);
+/* ✨ AI's Replace (docs/AI.md "Writing"): the person's click in the shell's panel sends text (cleaned again, at most
+ * 4,000 characters) to that app and profile's lord-web as WriteReplace; lord-web inserts it only from lord-server and
+ * only where the menu's selection still is, in a focused text field that isn't a password */
+int  webask_write_replace(const char *app, const char *profile, const char *text);
 /* The desktop's mode, from the theme (lord.portal.set): kept for the next lord-web's environment and, when it
  * changed, told to every running one (SetColorScheme, no reply wanted). */
 void webask_scheme(int dark);

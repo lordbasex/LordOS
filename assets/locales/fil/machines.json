@@ -712,6 +712,7 @@
   "agent.toolsAutoFailed": "Hindi gumana ang awtomatikong update ({have} → {want}).",
   "agent.toolsUpdateBtn": "I-update",
   "agent.st.needsTools": "Kailangan ang mga tool",
+  "agent.st.oldLordos": "I-update ang LordOS sa loob",
   "agent.st.needsXclip": "Kailangan ang xclip",
   "agent.toolsInstalled": "Naka-install at tumatakbo ang LordOS tools sa machine; muli itong nagsisimula sa bawat pag-sign in.",
   "agent.timesync": "Itakda ang Orasan",
@@ -880,6 +881,8 @@
   "un.how.preseed": "Napupunta ang mga sagot sa sariling start file ng installer, ang password mo bilang hash lang, at inaalis ang mga ito kapag na-install na ang system.",
   "un.how.autoinstall": "Napupunta ang mga sagot sa isang maliit na disk na binabasa ng installer, ang password mo bilang hash lang, at inaalis ang disk kapag na-install na ang system.",
   "un.how.kickstart": "Napupunta ang mga sagot sa isang maliit na disk na binabasa ng installer, ang password mo bilang hash lang, at inaalis ang disk kapag na-install na ang system.",
+  "un.how.kali": "Napupunta ang mga sagot sa sariling start file ng installer, ang password mo bilang hash lang, at inaalis ang mga ito kapag na-install na ang system.",
+  "un.how.lordos": "Napupunta ang mga sagot sa isang maliit na disk na binabasa ng installer, ang password mo bilang hash lang, at inaalis ang disk kapag na-install na ang system.",
   "un.image": "Nag-i-install mula sa {file}, sinuri rin laban sa naka-sign na listahan ng gumawa nito",
   "un.review": "Walang tanong: account na {user} sa {host}",
   "un.reviewOff": "Ikaw ang sasagot sa mga tanong ng installer",
@@ -1100,6 +1103,7 @@
   "apps.menu": "Mga Application",
   "apps.needsAgent": "Kailangan ng apps mode ang agent ng machine na nakakonekta",
   "win.appsNeedsTools": "Kailangan ng apps mode ang LordOS o Windows sa machine, kasama ang mga tool ng LordOS",
+  "win.appsOldLordos": "Kailangan ng apps mode ang LordOS {version} o mas bago sa loob ng machine. I-update ang LordOS sa machine; hindi sapat ang mga tool ng LordOS lang.",
   "apps.noApps": "Hindi pa inililista ng machine ang mga app nito",
   "apps.gone": "Nagsara ang window na ito sa machine",
   "apps.dropTitle": "Bitawan para ibigay ang mga file na ito sa window na ito sa machine",
@@ -2027,5 +2031,7 @@
   "req.row.answers": "Mga sagot sa pag-install",
   "req.use.answers": "Ginagawa mismo ng Machines: walang i-install",
   "req.st.download": "Sa paggawa",
-  "req.st.builtin": "Built-in"
+  "req.st.builtin": "Built-in",
+  "cfg.closeOnStop": "Isara ang window kapag huminto ang makina",
+  "cfg.closeOnStopNote": "Pagkatapos ng shutdown o I-off. Kung huminto ito dahil sa problema, mananatiling bukas ang window para ipakita ang nangyari."
 }

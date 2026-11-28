@@ -6,7 +6,7 @@
 import {
   View, Text, TextInput, Button, useTheme, useAppWindow, useKeyboard, addListener, wm, fs, clipboard, pdf, print, DocImage, releaseImage,
   formatNumber, direction, t as tr, Toolbar, ToolbarButton, ToolbarGroup, ToolbarSpacer, SearchField, EmptyState, useFilesDrop, FilesDropHint,
-  useSidebar, SidebarOverlay,
+  useSidebar, SidebarOverlay, SkinRegion, useSkinned, commandBar, pickCommand,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { PageCache } from './cache.js';
@@ -103,6 +103,7 @@ export default function PdfViewer() {
   const [invert, setInvert] = useState(() => th.mode === 'dark' && !!saved?.invert);
   const [side, setSide] = useState(saved?.side ?? 'thumbs');         // null | 'thumbs' | 'outline'
   const sb = useSidebar(640);                                         // a narrow window's sidebar (over the pages)
+  const skinned = useSkinned('pdf');                                   // (0.8.9.6.2) app skins: the toolbar as a command bar
   // the View menu's Thumbnails and Outline: in a narrow window they show or hide the sidebar over the pages
   const sideOn = (k) => side === k && (!sb.narrow || sb.shown);
   const pickSide = (k) => {
@@ -595,9 +596,21 @@ export default function PdfViewer() {
   const inkColors = tool === 'highlight' || tool === 'ink';
   const findW = winW < 600 ? (inkColors ? 0 : 110) : winW < 760 ? 130 : 180;
   const pageLabel = n ? tr('pdf.pageOf', { page: page + 1, count: n }) : '';
+  // the pages, the annotations, the search and printing stay the viewer's; a skin asks for its tools by id
+  const pbar = skinned ? commandBar({ title: pageLabel, commands: [
+    { id: 'sidebar', label: tr('pdf.tool.sidebar'), active: narrowWin ? sb.shown : !!side, group: 'view' },
+    { id: 'zoomOut', label: tr('pdf.zoom.out'), disabled: !doc, group: 'zoom' }, { id: 'zoomIn', label: tr('pdf.zoom.in'), disabled: !doc, group: 'zoom' },
+    { id: 'rotate', label: tr('pdf.rotateRight'), disabled: !doc, group: 'zoom' },
+    ...['select', 'highlight', 'ink', 'note'].map((k) => ({ id: k, label: tr(`pdf.tool.${k}`), active: tool === k, disabled: !doc, group: 'tools' })),
+    { id: 'invert', label: tr('pdf.invert'), active: invert, disabled: !doc, group: 'out' }, { id: 'print', label: tr('pdf.menu.print'), disabled: !doc, group: 'out' },
+  ] }) : null;
+  const prun = { sidebar: () => (narrowWin ? sb.toggle() : setSide((x) => (x ? null : 'thumbs'))), zoomOut: () => zoomStep(-1), zoomIn: () => zoomStep(1), rotate: () => rotate(1),
+    select: () => setTool('select'), highlight: () => setTool('highlight'), ink: () => setTool('ink'), note: () => setTool('note'), invert: () => setInvert((v) => !v), print: doPrint };
+  const pvm = pbar ? { app: 'pdf', ...pbar, actions: { command: (id) => { const c = pickCommand(pbar, id); if (c) prun[c](); } } } : null;
   return (
     <View {...drop.props} style={{ flex: 1 }}>
       {/* toolbar: icon-only items with tooltips, as in Preview; the narrow window drops what is also in the menus */}
+      <SkinRegion app="pdf" region="toolbar" model={pvm}>
       <Toolbar style={{ gap: 6 }}>
         <ToolbarButton icon="◫" title={tr('pdf.tool.sidebar')} active={narrowWin ? sb.shown : !!side}
           onClick={() => (narrowWin ? sb.toggle() : setSide((s) => (s ? null : 'thumbs')))} />
@@ -633,6 +646,7 @@ export default function PdfViewer() {
         {winW >= 760 && <ToolbarButton icon="⎙" title={tr('pdf.menu.print')} onClick={doPrint} disabled={!doc} />}
         {findW ? <FindField th={th} query={query} setQuery={setQuery} hits={hits} onFind={runFind} onNext={nextHit} focusReq={findRef} disabled={!doc} width={findW} /> : null}
       </Toolbar>
+      </SkinRegion>
       <View style={{ flex: 1, flexDirection: 'row' }}>
         {side && doc && !narrowWin && (
           <Sidebar side={side} setSide={setSide} doc={doc} sizes={sizes} page={page} onPage={goPage} cache={thumbs.current} rot={rot} invert={invert} rev={rev} th={th} />

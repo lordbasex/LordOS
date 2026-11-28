@@ -6,12 +6,13 @@
 //   runningApps()          every app with a window, for Force Quit
 //   forceQuit(key)         ends an app that stopped answering (see below)
 //   recentItems(n)         the recent files as menu items (Recent Items in the crown menu)
-//   storeUpdates()         how many package updates are waiting (the crown menu's Store item)
+//   storeUpdates()         how many package updates are waiting (the crown menu's Store item; the last count, read
+//                          off the first render and at most once a minute: storeUpdatesCount, storeUpdatesChanged())
 //
 //   hideApp, hideOthers, toggleShowDesktop, appSettingsItem   what the keyboard shortcuts call too
 //
-// Lord Flow shows the app menu under the app's name in its menu bar and the rest in the crown menu;
-// Lord Classic offers About in each window's Help menu. About <app> and Force Quit are system windows
+// Flow shows the app menu under the app's name in its menu bar and the rest in the crown menu;
+// Classic offers About in each window's Help menu. About <app> and Force Quit are system windows
 // of their own (apps/appabout, apps/forcequit), the same in every theme.
 import { windows, wm, getApp, appMenus, onActiveDesktop, activeDesktop } from './windows.js';
 import { launcherIdOf, quitApp } from './dock.js';
@@ -22,6 +23,7 @@ import { COLOR_SCHEMES, colorSchemeOf, USER_AGENTS, userAgentOf } from './webapp
 import * as fs from './fs.js';
 import { t, appName } from './i18n.js';
 import { compareNames } from './collate.js';
+import { lazyCount } from './lazycount.js';
 
 // the theme's own panels; a Linux window also runs under a built-in app id, but it is an app
 const isShellPanel = (w) => !!getApp(w.id)?.builtin && !String(w.id).startsWith('linux#');
@@ -74,8 +76,7 @@ export function webHelpItems(winId) {
 }
 
 // A web app's Appearance (Automatic, Light, Dark): the light or dark preference its pages are told; open windows follow
-// at once (lord.webapps.setColorScheme). The same choice as in Settings → Web apps. Not in the app menu until
-// WPEPlatform brings light and dark per app (webappsmodel.js, COLOR_SCHEMES_AVAILABLE); kept for then.
+// at once (lord.webapps.setColorScheme). The same choice as in Settings → Web apps; in the app menu since 0.8.9.6.2.
 export function webAppearanceItem(winId) {
   const web = webAppOfWindow(wm.get(winId));
   if (!web) return null;
@@ -119,12 +120,13 @@ export function appMenuItems(winId) {
   const g = appGroup(winId);
   if (!g) return [];
   const settingsItem = appSettingsItem(winId);
-  // the Appearance submenu (webAppearanceItem) comes back with WPEPlatform
+  const appearance = webAppearanceItem(winId);      // a web app's Light / Dark (0.8.9.6.2: lord-web on WPEPlatform)
   const identity = webUserAgentItem(winId);
   return [
     { label: t('shell.app.about', { app: g.name }), onClick: () => wm.open('appabout', { new: true, args: { key: g.key, win: winId } }) },
     '-',
     { label: t('shell.app.settings'), hint: '❖,', disabled: !settingsItem, onClick: () => settingsItem?.onClick() },
+    ...(appearance ? [appearance] : []),
     ...(identity ? [identity] : []),
     '-',
     { label: t('shell.app.hide', { app: g.name }), hint: '❖H', onClick: () => hideApp(winId) },
@@ -170,11 +172,23 @@ export function forceQuit(key) {
 
 export function recentItems(n = 10) {
   let list = [];
-  try { list = fs.recent(n, 30) || []; } catch (e) { list = []; }
+  try { list = fs.recentCached(n, 30) || []; } catch (e) { list = []; }
   if (!list.length) return [{ label: t('shell.recent.none'), disabled: true }];
   return list.slice(0, n).map((f) => ({ label: f.name || fs.basename(f.path), onClick: () => openFileWithApps(f.path, f.name) }));
 }
 
-export function storeUpdates() {
-  try { return typeof lord !== 'undefined' && lord.pkg && typeof lord.pkg.upgrades === 'function' ? (lord.pkg.upgrades() || []).length : 0; } catch (e) { return 0; }
+// The count is read off the shell's first render and then at most once a minute (lazycount.js), on one of lord-server's
+// workers (lord.pkg.upgradeCountAsync): the menu bar builds the crown menu on every render, and lord.pkg.upgrades() on
+// the interface's thread opens the package index and dpkg's status (655 ms of the first __lordTick on the Raspberry Pi,
+// QA 0.8.9.6.2). storeUpdatesCount is a store of it: what shows the number subscribes.
+function readUpgradeCount() {
+  if (typeof lord === 'undefined' || !lord.pkg) return 0;
+  if (typeof lord.pkg.upgradeCountAsync === 'function') {
+    try { return fs.workerReply(lord.pkg.upgradeCountAsync()).then((r) => Number(r.count) || 0); } catch (e) { /* below */ }
+  }
+  return typeof lord.pkg.upgrades === 'function' ? (lord.pkg.upgrades() || []).length : 0;
 }
+const upgradesCount = lazyCount(readUpgradeCount);
+export const storeUpdatesCount = { get: () => upgradesCount.get(), subscribe: (fn) => upgradesCount.subscribe(fn) };
+export function storeUpdates() { return upgradesCount.get(); }
+export function storeUpdatesChanged() { upgradesCount.invalidate(); }

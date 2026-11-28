@@ -14,6 +14,8 @@ THEME=$ROOT/themes/default/theme.bundle.js
 [ -x build/lord-server ] && [ -x build/lord-vm ] && [ -x build/lord-vm-testpaths ] && [ -x build/lord-vmunpack ] && [ -f "$THEME" ] || { echo "skipped: needs build/lord-server, lord-vm, lord-vm-testpaths, lord-vmunpack and the default theme"; exit 77; }
 for t in qemu-img qemu-io xz tar python3 sha512sum unshare node; do command -v $t >/dev/null 2>&1 || { echo "skipped: needs $t"; exit 77; }; done
 [ -r /dev/kvm ] && [ -w /dev/kvm ] || { echo "skipped: needs /dev/kvm"; exit 77; }
+# the groups are Whonix's, amd64 only: lord-vm refuses them on another architecture (a Raspberry Pi 5)
+[ "$(uname -m)" = x86_64 ] || { echo "skipped: needs an x86-64 host (Whonix is amd64 only)"; exit 77; }
 [ -f /usr/lib/lordos/assets/machines/systems.json ] && [ -d /var/lib/lordos/machines/images ] || { echo "skipped: needs the installed catalog and image store to mount over"; exit 77; }
 unshare -Urm true 2>/dev/null || { echo "skipped: needs user and mount namespaces"; exit 77; }
 D=$(mktemp -d "${TMPDIR:-/var/tmp}/lgmh.XXXXXX") || exit 1

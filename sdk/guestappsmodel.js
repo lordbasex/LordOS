@@ -87,11 +87,12 @@ export function parseGuestAppId(id) {
 }
 
 // Whether a machine's apps are in the launcher: its saved list (meta.guestApps), the person's switch (meta.launcherApps:
-// absent means on once the machine has a list), never a machine locked for anonymity or a member of a group (a Whonix
+// only `true` shows them, since 0.8.9.6.2: absent is off, so a machine's apps never mix with this computer's own unless
+// the person turns it on in Configure; before it was on once the machine had a list), never a machine locked for anonymity or a member of a group (a Whonix
 // member: its agent is off and nothing of its guest may show outside its window); the caller leaves out the unreadable
 export function showsGuestApps(m, meta) {
   if (!m || !meta || m.profileLock || m.groupDir) return false;
-  if (meta.launcherApps === false) return false;
+  if (meta.launcherApps !== true) return false;
   return Array.isArray(meta.guestApps) && meta.guestApps.length > 0;
 }
 
@@ -119,6 +120,35 @@ export function guestLauncherItems(machines, metaOf, { active = () => false, loc
   }
   return out;
 }
+
+// The entries kept in settings.json (guestLauncherKept), so the launcher has them at login without asking Machines
+// (docs/VIRTUALIZATION.md, "The shell and the machines"): what guestLauncherItems gave with nothing counted as running,
+// checked again as it is read back (each field as guestLauncherItems makes it, the id its own). null: never kept.
+export const GUEST_KEPT_MAX = 512;
+export function keptGuestItems(v) {
+  if (!Array.isArray(v)) return null;
+  const out = [];
+  const ids = new Set();
+  for (const it of v) {
+    if (out.length >= GUEST_KEPT_MAX) break;
+    if (!it || typeof it !== 'object' || it.kind !== 'machine') continue;
+    const mid = typeof it.mid === 'string' && MID.test(it.mid) ? it.mid : '';
+    const token = cleanGuestToken(it.token);
+    const name = cleanGuestText(it.name, GUEST_NAME_SHOWN * 4), machine = cleanGuestText(it.machine, GUEST_NAME_SHOWN * 4);
+    const dir = typeof it.dir === 'string' && it.dir.startsWith('/') && it.dir.endsWith('.lordvm') ? it.dir : '';
+    if (!mid || !token || !name || !machine || !dir) continue;
+    const id = guestAppId(mid, token);
+    if (it.id !== id || ids.has(id)) continue;
+    ids.add(id);
+    out.push({ id, name, machine, mid, dir, token, kind: 'machine' });
+  }
+  return out;
+}
+// the kept entries the launcher shows: none of a machine that runs (its apps are its apps mode windows then)
+export const shownGuestItems = (kept, activeDirs) => {
+  const on = new Set(Array.isArray(activeDirs) ? activeDirs : []);
+  return (Array.isArray(kept) ? kept : []).filter((it) => !on.has(it.dir));
+};
 
 // What a machine's window does with a launch the launcher asked for, given the guest's current list (apps mode's, [] until
 // the guest sent one) and how long it has waited: 'launch' (the exact token is in the guest's own list), 'missing' (the

@@ -1,0 +1,5 @@
+/* LordOS's GTK 4 theme (LordOS-dark): GTK 4's own dark style. The LordOS portal names this theme (gtk-theme) in dark
+ * mode; without a gtk-4.0 folder here GTK 4 fell back to its light default, and a plain GTK 4 app stayed light on a dark
+ * desktop (BUG-29 of the ws170 QA). libadwaita apps ignore gtk-theme and follow the portal's color-scheme by themselves.
+ * The accent stays GTK 4's: it reads the portal's accent-color on its own. */
+@import url("resource:///org/gtk/libgtk/theme/Default/Default-dark.css");

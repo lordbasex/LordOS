@@ -11,7 +11,7 @@ Pense num leitor sentado ao seu lado que só lê o que você aponta. Ele não an
 ## Onde você encontra
 
 - **Fala em todo app com texto.** *Editar → Fala* no Editor de Texto e no Terminal (nas Notas, em Ver), e o mesmo no menu do clique direito do Editor de Texto, do Terminal e das Notas: *Iniciar fala*, *Parar fala* e *Salvar como áudio…*. Iniciar fala lê a seleção, ou o texto todo quando nada está selecionado.
-- **Apps Linux também.** Um app Linux ganha um menu *Editar* com Fala na barra de menus (no Lord Classic, na faixa de menus da janela), que lê o que você selecionou nele.
+- **Apps Linux também.** Um app Linux ganha um menu *Editar* com Fala na barra de menus (no Classic, na faixa de menus da janela), que lê o que você selecionou nele.
 - **Um pequeno reprodutor.** Enquanto lê, uma pílula mostra a onda da voz em cores, com ler de novo, pausar e continuar, parar e fechar. Você pode arrastá-lo para qualquer lugar, até para outra tela, e a próxima leitura abre ali.
 - **Salvar como áudio…** pergunta onde salvar com o diálogo de sempre e grava um arquivo WAV.
 - **Fala ao vivo** (❖⇧Esc): uma caixa onde você digita, pressiona Enter e é dito com a voz escolhida. As frases recentes ficam embaixo, só na memória, para dizer de novo. Ajuda quem não pode ou prefere não falar.

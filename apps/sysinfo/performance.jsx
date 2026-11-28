@@ -8,7 +8,7 @@
 // change since the previous run of the same kind, and the boot times per version. Nothing is sent
 // anywhere; Save writes the JSON to Documents.
 import {
-  View, Text, ScrollView, Button, useTheme, useLocale, GroupBox, FormRow, Segmented, formatNumber, spacing, typeScale, fs, userDirs, wm, admin, session,
+  View, Text, ScrollView, Button, useTheme, useLocale, GroupBox, FormRow, Segmented, formatNumber, formatDate, formatTime, spacing, typeScale, fs, userDirs, wm, admin, session,
   useNarrow,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useState } from 'react';
@@ -16,7 +16,10 @@ import { CATEGORIES, DESKTOP_CATEGORIES, ratio, categoryRatios, comparableRefere
 import { startScene } from './scene.jsx';
 import { compatibility } from './model.js';
 
-// A small window (a tile of Lord Workspaces): narrower label columns, the comparison under a measurement's name. index.jsx
+// a date and time in the interface's language and region (BUG-25 of the ws170 QA: toLocaleString() gave the US format)
+export const dateTime = (d) => `${formatDate(d, 'short')} ${formatTime(d, { seconds: true })}`;
+
+// A small window (a tile of Workspaces): narrower label columns, the comparison under a measurement's name. index.jsx
 // uses the same width for its rows, its tabs (a drop-down) and Hardware's list (behind a button).
 export const NARROW_AT = 700;
 
@@ -261,7 +264,7 @@ function Result({ res, report }) {
     <View style={{ gap: spacing.l }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.s }}>
         <Text style={{ flex: 1, fontSize: typeScale.callout, color: t.textDim, textAlign: 'start' }}>
-          {tr('sysinfo.perf.ranAt', { mode: tr(`sysinfo.perf.mode.${res.mode}`), time: new Date(res.at * 1000).toLocaleString(), s: formatNumber(res.seconds, 0) })}
+          {tr('sysinfo.perf.ranAt', { mode: tr(`sysinfo.perf.mode.${res.mode}`), time: dateTime(new Date(res.at * 1000)), s: formatNumber(res.seconds, 0) })}
           {res.status !== 'done' ? ` · ${tr(`sysinfo.perf.status.${res.status}`)}${res.stopReason ? ` (${tr(`sysinfo.perf.why.${res.stopReason}`)})` : ''}` : ''}</Text>
         <Button label={tr('sysinfo.report.save')} onClick={save} />
       </View>

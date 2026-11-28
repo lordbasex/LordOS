@@ -1,0 +1,741 @@
+{
+ "format": 1,
+ "repository": "lordbasex/LordOS-themes",
+ "themes": [
+  {
+   "id": "default",
+   "folder": "flow",
+   "name": "Flow",
+   "description": "Menu bar, magnifying dock, app launcher and Control Center.",
+   "author": "Federico Pereira",
+   "email": "fpereira@iperfex.com",
+   "organization": "IPERFEX",
+   "license": "MIT",
+   "version": "0.8.9.6.2",
+   "minLordOS": "0.8.9.6.2",
+   "verified": true,
+   "official": true,
+   "files": [
+    {
+     "path": "assets/aurora.png",
+     "size": 335725,
+     "sha256": "d4457697a6cf2ad02aeb75621532f69eb480e831ae61ec1f593d0e783bda7caa"
+    },
+    {
+     "path": "assets/graphite.png",
+     "size": 200496,
+     "sha256": "c32248109151cb89db38d0850ce2c83e52a55cb149de94b7aecd29638ae337c5"
+    },
+    {
+     "path": "assets/ocean.png",
+     "size": 259372,
+     "sha256": "3b5af4b34ae8e242b68c65b21bb551cc48c652ac32798cd918966075140c0785"
+    },
+    {
+     "path": "assets/sunset.png",
+     "size": 303241,
+     "sha256": "bd923e1af3d6eb166e6ddbd0158c20323f67c6b4d9676d1781d1d53586ecf34c"
+    },
+    {
+     "path": "assets/thumbs/aurora.jpg",
+     "size": 2762,
+     "sha256": "a167f776df0027733008d5cf8680967b34bea0b8dad31f931c2c7abac2c27e1c"
+    },
+    {
+     "path": "assets/thumbs/graphite.jpg",
+     "size": 1810,
+     "sha256": "57eb56d207738d4750acbe984475b40200b50a6f026e12ce4c3427da47de40d1"
+    },
+    {
+     "path": "assets/thumbs/ocean.jpg",
+     "size": 2620,
+     "sha256": "b8b0ff589cc0e0da69a8b4b54f8c40e3b68b19eccb1ecd0c717db46244175c47"
+    },
+    {
+     "path": "assets/thumbs/sunset.jpg",
+     "size": 2589,
+     "sha256": "73f001e9a906517af7a0a28c2ac221ad922291d60b5007438b1ffc13528caba7"
+    },
+    {
+     "path": "components/ControlCenter.jsx",
+     "size": 20506,
+     "sha256": "08d457036ac0adfb6a0fafba0d9336bbe62d100bcc12bcc757534bd51ca412fb"
+    },
+    {
+     "path": "components/Dock.jsx",
+     "size": 25882,
+     "sha256": "87f70f5d6156b4a447550248833ca14c1487cc23921750072ac8c1732834c44d"
+    },
+    {
+     "path": "components/Launchpad.jsx",
+     "size": 4759,
+     "sha256": "53b9f28c963410c569e2aa01ad25e633cd14abc5a08da09578e45e9c59a4e522"
+    },
+    {
+     "path": "components/Menu.jsx",
+     "size": 12727,
+     "sha256": "274b9d2c437d9334df987e31475292d6478b4bff220627a883f125045a1bd4ea"
+    },
+    {
+     "path": "components/MenuBar.jsx",
+     "size": 14824,
+     "sha256": "cb6c7a2a90096333af5cb45b36a20616d1302deefb8a26b864d4ef4ec0d4182d"
+    },
+    {
+     "path": "components/NotificationCenter.jsx",
+     "size": 9384,
+     "sha256": "1d68cbe6df48a11ea9b538637f58312b273ee172db7aa313140928fd3bcffb87"
+    },
+    {
+     "path": "components/Window.jsx",
+     "size": 9026,
+     "sha256": "a80a805eef20b5f118040fb16f88eaf315f324e800ba4f74cf2f148c3909b89d"
+    },
+    {
+     "path": "index.jsx",
+     "size": 17729,
+     "sha256": "2a514494713a10f0aaefcdb4f3262f4337cf858171124f2f03f518eae5cde476"
+    },
+    {
+     "path": "minimize.js",
+     "size": 741,
+     "sha256": "a356b01a04dff06686c978e909e15caeade74ce1788fee562ccf893e1b2f516f"
+    },
+    {
+     "path": "theme.json",
+     "size": 217,
+     "sha256": "4197bfaee83146aea11cad4cda8354ee3de56cfad9f31d52726296108d0f17b7"
+    },
+    {
+     "path": "tokens.js",
+     "size": 3193,
+     "sha256": "f40e74831db5ee0c33b4fd1fb14ebcaf65eda943e45b17d1544cc6a4eac5003c"
+    }
+   ],
+   "docs": [
+    {
+     "path": "LICENSE",
+     "size": 1082,
+     "sha256": "cacaa7d9ddccc070415bf3ddb81c2f5931876b35e7aa2e8a02a6db848cb420c4"
+    },
+    {
+     "path": "PROVENANCE.md",
+     "size": 1082,
+     "sha256": "7179025825032d6a17d335780cd8ad4357ac64b86e5cb7d0534c679bb49bd5af"
+    },
+    {
+     "path": "README.md",
+     "size": 1480,
+     "sha256": "9bddbe43358d1cd11f1964e8356aed9ee81e9465fe11f2ff5a0b531f15709ad7"
+    }
+   ],
+   "screenshots": [
+    {
+     "path": "screenshots/desktop.png",
+     "size": 2395891,
+     "sha256": "4bf8e25243402833ba3cdfcfc08f05625b8884cbf254e9d2cc3cf4fa58569101",
+     "w": 1280,
+     "h": 800,
+     "caption": "The desktop: menu bar, Dock and wallpaper"
+    },
+    {
+     "path": "screenshots/sidebar.png",
+     "size": 1122046,
+     "sha256": "3f67c82f9d881ab40585b07c83a3a7794bdbe60dd8f478ffff23a4f0cfb39a2b",
+     "w": 1280,
+     "h": 800,
+     "caption": "Characters: a sidebar, a search field and a selection"
+    },
+    {
+     "path": "screenshots/windows.png",
+     "size": 1106278,
+     "sha256": "0b8f2efd94e1fa72a93a1d77bf956106b2db740bf4e33cf20e1aa15e01fce8b0",
+     "w": 1280,
+     "h": 800,
+     "caption": "Text Editor in front, Calculator behind"
+    }
+   ]
+  },
+  {
+   "id": "classic",
+   "folder": "classic",
+   "name": "Classic",
+   "description": "A centered taskbar with a start menu, quick settings, a notification panel, window snapping and a task view.",
+   "author": "Federico Pereira",
+   "email": "fpereira@iperfex.com",
+   "organization": "IPERFEX",
+   "license": "MIT",
+   "version": "0.8.9.6.2",
+   "minLordOS": "0.8.9.6.2",
+   "verified": true,
+   "official": true,
+   "files": [
+    {
+     "path": "components/Menu.jsx",
+     "size": 6276,
+     "sha256": "5f31326178d90df3e84b0211e5fd58038921682cd8458f5b00f3999c7e67d429"
+    },
+    {
+     "path": "components/NotificationCenter.jsx",
+     "size": 8923,
+     "sha256": "95da2ae34475ceeafc0b832b9c712da8d1511b68acea66be3ca2469bd6be3e7b"
+    },
+    {
+     "path": "components/QuickSettings.jsx",
+     "size": 9720,
+     "sha256": "70472ae4ba63baed8cadd864d44990fa93611b567ff14bd946587df9888e5d64"
+    },
+    {
+     "path": "components/StartMenu.jsx",
+     "size": 21787,
+     "sha256": "affd3bfd9db9a565dd5b3be015bcfa57beca077cb9373e07d410123741485363"
+    },
+    {
+     "path": "components/Taskbar.jsx",
+     "size": 21229,
+     "sha256": "db6b18d071128c0be258d1be640fdac3887c13e1962d9d050ffbc3cb504d1075"
+    },
+    {
+     "path": "components/Window.jsx",
+     "size": 17128,
+     "sha256": "d0c76a2c88c32c71e735e687489671b3eba48c76a421c38a9f06edddbe7991e6"
+    },
+    {
+     "path": "glyphs.jsx",
+     "size": 10021,
+     "sha256": "fcdccf5760051636eae1fbda72ea9ccec0b28443bc39a26d45584d0aa66f49ec"
+    },
+    {
+     "path": "index.jsx",
+     "size": 17075,
+     "sha256": "e0a0eaefcfc219f53f392d445f926ba7cbef0128d23316f813c6093bc269d06b"
+    },
+    {
+     "path": "placement.js",
+     "size": 2720,
+     "sha256": "81816455ed741f03312c0834b8dc448a050be9aace0038e5e7e0cebe473c9f6a"
+    },
+    {
+     "path": "taskbarfit.js",
+     "size": 2814,
+     "sha256": "8b416fa5e703e535364a8655f2974feb26e6103af94493f9d5de013b3187c199"
+    },
+    {
+     "path": "theme.json",
+     "size": 269,
+     "sha256": "d0620e0fe48b15d63fd70de11bf815080e228b2032470b44e786722c13a8d025"
+    },
+    {
+     "path": "tokens.js",
+     "size": 3221,
+     "sha256": "72f6ac3dc747883539be8465d87be1ff85ac63ee9407880054e7bcaff6330e5e"
+    }
+   ],
+   "docs": [
+    {
+     "path": "LICENSE",
+     "size": 1082,
+     "sha256": "cacaa7d9ddccc070415bf3ddb81c2f5931876b35e7aa2e8a02a6db848cb420c4"
+    },
+    {
+     "path": "PROVENANCE.md",
+     "size": 1127,
+     "sha256": "041d194d7e0dc0a6fc613451b86c3f26601310efb1562bcde9f93a0f3e12078a"
+    },
+    {
+     "path": "README.md",
+     "size": 1644,
+     "sha256": "2a9c6ebe261721e046f9615790bb3ab84095da50fd4d3f20d1d9be72b070ca18"
+    }
+   ],
+   "screenshots": [
+    {
+     "path": "screenshots/desktop.png",
+     "size": 2443120,
+     "sha256": "fe8c5c48e90daacf4942f65b7cf5b8530b0d7c3e09d54f749c389bd8a5a0fbe5",
+     "w": 1280,
+     "h": 800,
+     "caption": "The desktop: a centered taskbar"
+    },
+    {
+     "path": "screenshots/sidebar.png",
+     "size": 1171414,
+     "sha256": "7ad0fca0ab0a1d72fb313d6433d672d35273d1b0682907b824475711c3011d55",
+     "w": 1280,
+     "h": 800,
+     "caption": "Characters: a sidebar, a search field and a selection"
+    },
+    {
+     "path": "screenshots/windows.png",
+     "size": 1162378,
+     "sha256": "127c49e258b23271416b262aa6f1f37a168ebdb53ce46361650dba731256297b",
+     "w": 1280,
+     "h": 800,
+     "caption": "Text Editor in front, Calculator behind"
+    }
+   ]
+  },
+  {
+   "id": "workspaces",
+   "folder": "workspaces",
+   "name": "Workspaces",
+   "description": "Activities with their own apps and layouts, a Context Spine, tiling per display and three effects styles.",
+   "author": "Federico Pereira",
+   "email": "fpereira@iperfex.com",
+   "organization": "IPERFEX",
+   "license": "MIT",
+   "version": "0.8.9.6.2",
+   "minLordOS": "0.8.9.6.2",
+   "verified": true,
+   "official": true,
+   "files": [
+    {
+     "path": "barfocus.js",
+     "size": 2448,
+     "sha256": "336e9d67413e126c85ccb49cd4eba880cf7cce46a1bfc141fc7bb21e73744d75"
+    },
+    {
+     "path": "components/ActivityEditor.jsx",
+     "size": 7845,
+     "sha256": "785e8ee5b63a1d20b80e45828b3e53494607e5ddf3a0f01eceb10ee862313427"
+    },
+    {
+     "path": "components/AppWindows.jsx",
+     "size": 11471,
+     "sha256": "b7227a631a75a728e48eb20be53e48a7f1803f7f68817b9b27eb2a8f018afb83"
+    },
+    {
+     "path": "components/BarButton.jsx",
+     "size": 2403,
+     "sha256": "764099c7b9cdbeb3b8e92605721b1c0d02e428e689828b44a8e1a75f192d93cb"
+    },
+    {
+     "path": "components/ControlCenter.jsx",
+     "size": 25439,
+     "sha256": "ecf5b962d6598ff7f9d64ef7bd624b8dbb519e659ef4536c55862e496b8c2917"
+    },
+    {
+     "path": "components/GroupFrame.jsx",
+     "size": 25294,
+     "sha256": "6818ac1064f8d22f33a39742ce9b30ac9fb864cab5115ef10791563ac55d14ff"
+    },
+    {
+     "path": "components/Search.jsx",
+     "size": 9120,
+     "sha256": "72d88ef150eedc9c438c3ceb8da6568e4b6c27952f0d023b957e436e9cd2367b"
+    },
+    {
+     "path": "components/ShortcutsHelp.jsx",
+     "size": 8155,
+     "sha256": "397bd8a2a1a329056570a470af523dc77cbf94fc611d740af6e359165e4f8097"
+    },
+    {
+     "path": "components/SnapAssist.jsx",
+     "size": 2588,
+     "sha256": "219831ff00b8b3ca65948442c276daec83fdbdaae5cbfe73520300682e905514"
+    },
+    {
+     "path": "components/SnapTargets.jsx",
+     "size": 7955,
+     "sha256": "dfa95a496d5997da723b2cbfba945c423b6470c075da81db0c48c1a980c34787"
+    },
+    {
+     "path": "components/Spine.jsx",
+     "size": 5701,
+     "sha256": "331bfc703e2fd83d8c5e0dc7cb3dada5d677643b7e17dfd276a6747bcd94382f"
+    },
+    {
+     "path": "components/Surface.jsx",
+     "size": 1358,
+     "sha256": "70c35208ac7ccbf458cce3cdbc2a304d8aba7645fa32edcf834cd2e889cd5bd0"
+    },
+    {
+     "path": "components/TopBar.jsx",
+     "size": 24012,
+     "sha256": "65add2862c37df2e7a50077b879efab5c42e89f2b2071ba7ae8376e82235a326"
+    },
+    {
+     "path": "components/Window.jsx",
+     "size": 16355,
+     "sha256": "7d5963e59199548c38d516b436fdba49fbde4a704cd00921bbf211ca483a638c"
+    },
+    {
+     "path": "glyphs.jsx",
+     "size": 13537,
+     "sha256": "a83f0e10752106989720c6eaa9c4bbbd89e56ac617a8245d332c5030942b3779"
+    },
+    {
+     "path": "index.jsx",
+     "size": 31408,
+     "sha256": "7732028bd1ccc76efa38a0d917eca0a060ec63cf081ef34c936061db502626f2"
+    },
+    {
+     "path": "magnet.js",
+     "size": 5578,
+     "sha256": "002ef3f650a441e1fe3e4297c4a3d09588a85b67c2eb21f0c447de289bd05527"
+    },
+    {
+     "path": "model/activities.js",
+     "size": 11665,
+     "sha256": "616901dbf13b90ba6048233b88b9ba26629cb7ca07e1cf145e75a51dd8da3e49"
+    },
+    {
+     "path": "model/geometry.js",
+     "size": 5526,
+     "sha256": "af047e0a7876c0fcf7ec866f6cb1137b44792cd7da932a185214df5eb3bd833b"
+    },
+    {
+     "path": "model/launches.js",
+     "size": 5407,
+     "sha256": "32c565554996b69e0099624343176627b21664043cf4c8f9f481d9458475a861"
+    },
+    {
+     "path": "model/layouts.js",
+     "size": 15365,
+     "sha256": "2ed6aa65c0cfa8d8e391a0315e3804649993818a14a8ab73aa94bed4ad1fb14e"
+    },
+    {
+     "path": "model/magnet.js",
+     "size": 3570,
+     "sha256": "cf690dccc2f4c856134e6107547fbaa75cdddc5e7ab0f431cac0546d4e052b91"
+    },
+    {
+     "path": "model/topband.js",
+     "size": 2354,
+     "sha256": "542b9a8a1bbc4c09d656b64b2c72df3075d4c2800ccba2b022427d35a2f4d766"
+    },
+    {
+     "path": "motion.js",
+     "size": 2880,
+     "sha256": "47973076cf98ce08c9915930182029ee2c7f741875e095e63030365a5ffba85a"
+    },
+    {
+     "path": "state.js",
+     "size": 9319,
+     "sha256": "9e00dbd22e829e409c98cd881e306c4a08e6b2e9662e39ff8626a496ce90bfc6"
+    },
+    {
+     "path": "theme.json",
+     "size": 1223,
+     "sha256": "d9db463ae1ce71da9b6d8e87ed6361d9e5e09585ab1a9da2cb08ab02675c73f1"
+    },
+    {
+     "path": "tiler.js",
+     "size": 27688,
+     "sha256": "2db1f544315f058925c9d7e414da8a4ca2ee80bdc79ffd4039c4884f3417a56f"
+    },
+    {
+     "path": "tokens.js",
+     "size": 10315,
+     "sha256": "d589cefb571f62e3ffa18d8cb7b9af9faf73b5fa6fe7d831d8d6ec7a57d7bdc7"
+    }
+   ],
+   "docs": [
+    {
+     "path": "LICENSE",
+     "size": 1082,
+     "sha256": "cacaa7d9ddccc070415bf3ddb81c2f5931876b35e7aa2e8a02a6db848cb420c4"
+    },
+    {
+     "path": "PROVENANCE.md",
+     "size": 1165,
+     "sha256": "8311848feab526623c7af5fa00a2c78082de9bdd564b6fd8378a21a8a5889220"
+    },
+    {
+     "path": "README.md",
+     "size": 1799,
+     "sha256": "f7ae93e408f3abeaa9e29af4bb938a8f2a06bd7a2f8cb0fe638c196f2d095d77"
+    }
+   ],
+   "screenshots": [
+    {
+     "path": "screenshots/desktop.png",
+     "size": 1695370,
+     "sha256": "8c7e4d89261e0642af56bf22e7e3932799f8eb6543167ffff51364b1b67699c2",
+     "w": 1280,
+     "h": 800,
+     "caption": "The desktop: the activity band and the Context Spine"
+    },
+    {
+     "path": "screenshots/sidebar.png",
+     "size": 1011364,
+     "sha256": "3d3788b732fde5d351ffcb82324c0e07c5c88e397b4cb4c794fd022e6dd12191",
+     "w": 1280,
+     "h": 800,
+     "caption": "Characters: a sidebar, a search field and a selection"
+    },
+    {
+     "path": "screenshots/windows.png",
+     "size": 999003,
+     "sha256": "4ed325bb036d030bc7827c0b54128a7082ebd9d944124b36ec8cbd4d013b1a31",
+     "w": 1280,
+     "h": 800,
+     "caption": "Text Editor in front, Calculator behind"
+    }
+   ]
+  },
+  {
+   "id": "celeste",
+   "folder": "celeste",
+   "name": "Celeste",
+   "description": "A screen frame with a side bar and drawers that slide out of its edges. Inspired by Caelestia (caelestia-dots/shell).",
+   "author": "Federico Pereira",
+   "email": "fpereira@iperfex.com",
+   "organization": "IPERFEX",
+   "license": "MIT",
+   "version": "0.8.9.6.2",
+   "minLordOS": "0.8.9.6.2",
+   "verified": true,
+   "official": true,
+   "files": [
+    {
+     "path": "cae.js",
+     "size": 4697,
+     "sha256": "57eb997fc8af3e0fedb21ad36b8e93c611d9885207236689123ce3bca4ebb1c5"
+    },
+    {
+     "path": "components/Backdrop.jsx",
+     "size": 3472,
+     "sha256": "011c43b3ec6befaac0a611f2fc0fd3c9520c4b2408f331f440553b3d69f916f1"
+    },
+    {
+     "path": "components/Bar.jsx",
+     "size": 9160,
+     "sha256": "a3faf392c9aebd77d7a3e1c5fe878daa0e9b71974cc3ada4e90c002c0988d050"
+    },
+    {
+     "path": "components/Drawer.jsx",
+     "size": 3578,
+     "sha256": "f215441372138b49c447512ab5bd7574afc8f1523da8a6a62dfb0e2ab9ed84cb"
+    },
+    {
+     "path": "components/Frame.jsx",
+     "size": 2333,
+     "sha256": "ab0c5191637108f03e7e34b3478f22b39b592b1b77e766f1710f4eedb92af668"
+    },
+    {
+     "path": "components/Glyph.jsx",
+     "size": 6934,
+     "sha256": "483ab211df72d263a4eea2b3f8294b306c3eb78b4fbde28d8edfbcff5c92d38e"
+    },
+    {
+     "path": "components/Guard.jsx",
+     "size": 623,
+     "sha256": "e75086d05d876e30dba22574a3ca92e7213d35feb9dff07a4fa4cfd0fdd832f7"
+    },
+    {
+     "path": "components/Panels.jsx",
+     "size": 25847,
+     "sha256": "165a7fe8982ab5dacf0ea8522b4c98467dfab5d1e2fdded338689e2760ca65ce"
+    },
+    {
+     "path": "components/Window.jsx",
+     "size": 11209,
+     "sha256": "457dbd72d42ec17dacded82c1a95a395ec8a5880decd02e0409620fa20e9e74b"
+    },
+    {
+     "path": "index.jsx",
+     "size": 16929,
+     "sha256": "601739e251e9d936fae15a904ea484c8947909610d67a8f0562b2b68d2b8574c"
+    },
+    {
+     "path": "mediaHook.js",
+     "size": 2015,
+     "sha256": "31f933741e5126ded2a341809af838e1ae53c15785a7f9cd1dd7f815d69f8822"
+    },
+    {
+     "path": "minimize.js",
+     "size": 465,
+     "sha256": "370a27f57b341128015c123183dc0fc08e3a67f1dd200bbc2d10a50e77031253"
+    },
+    {
+     "path": "model.js",
+     "size": 5643,
+     "sha256": "656618e02d57999699897fe4851ca71cbceaf8d6d78f52cc4c1f41ecce38d3b9"
+    },
+    {
+     "path": "theme.json",
+     "size": 1488,
+     "sha256": "b9c02c5377ebd0e5a38eac6560b6761e7d0af3ab29ea639a3b7079511921d044"
+    },
+    {
+     "path": "tokens.js",
+     "size": 2350,
+     "sha256": "8bd6e350a444a6dd4595341f1e5552f7a7f690bcfb00ffcd2bf080b825c656c0"
+    }
+   ],
+   "docs": [
+    {
+     "path": "LICENSE",
+     "size": 1082,
+     "sha256": "cacaa7d9ddccc070415bf3ddb81c2f5931876b35e7aa2e8a02a6db848cb420c4"
+    },
+    {
+     "path": "PROVENANCE.md",
+     "size": 1182,
+     "sha256": "f890324dd105956becb710b5e804f9fe712368eb0cd11c3afb17dfaa93f9c11e"
+    },
+    {
+     "path": "README.md",
+     "size": 1651,
+     "sha256": "a4d726b573ad3030ac15fddcde30ac3b0438001bd2e9c7f3811288cd55685ea3"
+    }
+   ],
+   "screenshots": [
+    {
+     "path": "screenshots/desktop.png",
+     "size": 2429824,
+     "sha256": "1b080aeda649fef95bcb1ad513bb59a38f1f405d1bac6941fcd8ad1f4d037f4f",
+     "w": 1280,
+     "h": 800,
+     "caption": "The desktop: a frame around the display and its side bar"
+    },
+    {
+     "path": "screenshots/sidebar.png",
+     "size": 1151037,
+     "sha256": "77eb9c7413204c9c8d5b6eea5e91614105ca242a5c60e4421fff9d5e2e0f105e",
+     "w": 1280,
+     "h": 800,
+     "caption": "Characters: a sidebar, a search field and a selection"
+    },
+    {
+     "path": "screenshots/windows.png",
+     "size": 1140436,
+     "sha256": "836c8213be7241780bfd56cf8bdc4c4d7160b040363fbccc0686751dca0728cd",
+     "w": 1280,
+     "h": 800,
+     "caption": "Text Editor in front, Calculator behind"
+    }
+   ]
+  },
+  {
+   "id": "luna",
+   "folder": "luna",
+   "name": "Luna",
+   "description": "A tribute to the desktops of 2001: blue title bars with rounded tops, a green start button on a blue taskbar, and Files with a task pane.",
+   "author": "Federico Pereira",
+   "email": "fpereira@iperfex.com",
+   "organization": "IPERFEX",
+   "license": "MIT",
+   "version": "0.8.9.6.2",
+   "minLordOS": "0.8.9.6.2",
+   "verified": true,
+   "official": true,
+   "files": [
+    {
+     "path": "components/StartMenu.jsx",
+     "size": 9548,
+     "sha256": "ba8e31f27583dfd58956423a2aee61dcdf62cfb730f40a467f5dafcb027f245f"
+    },
+    {
+     "path": "components/Taskbar.jsx",
+     "size": 5612,
+     "sha256": "f50a760cc553acb29e1c2047fb48ce77b314e731083c781a8bee05a856587f7b"
+    },
+    {
+     "path": "components/Window.jsx",
+     "size": 8111,
+     "sha256": "3a99278067b6f5669a2777064cbd5314cdbe1b5f13a68e39de65bea2d7e5be06"
+    },
+    {
+     "path": "glyphs.jsx",
+     "size": 10627,
+     "sha256": "1fc7bedbac151b8496b4db7b8d27d5c10010b36453e118ca9f7865e1880dc4f3"
+    },
+    {
+     "path": "index.jsx",
+     "size": 10048,
+     "sha256": "4719a6b8b5196279b8b800bcb1bbcd1c562186a9e0621d1079f7a9455c64a16f"
+    },
+    {
+     "path": "skins/apps.jsx",
+     "size": 10895,
+     "sha256": "a5b8b312122b9f41ca35bbb47f3c8171be07009412f0550cb3e35f6c1a08030d"
+    },
+    {
+     "path": "skins/common.jsx",
+     "size": 4811,
+     "sha256": "7d593bca513305be39888bc8938265174c620f1b3f3f59435da13ff79c437921"
+    },
+    {
+     "path": "skins/editor.jsx",
+     "size": 6308,
+     "sha256": "5d608b4d8e4f4161fe9903ede1d8de182375320fe30f7cc89b016573b35762eb"
+    },
+    {
+     "path": "skins/files.jsx",
+     "size": 20359,
+     "sha256": "469426471f87660d48e61578df19cdaf1901a133ff661f906989f5017d051abb"
+    },
+    {
+     "path": "skins/settings.jsx",
+     "size": 5710,
+     "sha256": "0d457a1c1fe6d9e4a0c8f6224ec9a17af8adfa21d05cfd7a6b780ef026c14e99"
+    },
+    {
+     "path": "skins/store.jsx",
+     "size": 4263,
+     "sha256": "07a45aee4c8b82ed21d5aeed912e4ce3593929916f02739289493fc09697ab97"
+    },
+    {
+     "path": "skins/terminal.jsx",
+     "size": 5484,
+     "sha256": "39d6ad24f4b0bf8096711c8ed4c4d1f261eef449b5b1847ba678c08d47d5723d"
+    },
+    {
+     "path": "theme.json",
+     "size": 343,
+     "sha256": "6eee3d4fe164e4226f687dbff7e2498efc76c9df02b25f6bf83c55abecd0b57e"
+    },
+    {
+     "path": "tokens.js",
+     "size": 5711,
+     "sha256": "94364c23aed8f81ac884c055773adbaed9293b0954e77b06353c0c9d49bc8cf3"
+    }
+   ],
+   "docs": [
+    {
+     "path": "LICENSE",
+     "size": 1082,
+     "sha256": "cacaa7d9ddccc070415bf3ddb81c2f5931876b35e7aa2e8a02a6db848cb420c4"
+    },
+    {
+     "path": "PROVENANCE.md",
+     "size": 1177,
+     "sha256": "4983105eb63208a6e7e85dd8fb40ad76923e2456ba6ecf9a38b91e9e41054c26"
+    },
+    {
+     "path": "README.md",
+     "size": 1669,
+     "sha256": "bc0002aaa5a13ac54ca803a2517e7917af0c20869babc083fd3c1d3e13857057"
+    }
+   ],
+   "screenshots": [
+    {
+     "path": "screenshots/desktop.png",
+     "size": 30830,
+     "sha256": "85290c9443778e732d97110bb4d1a8452a0a091895753188a20b9c45e545029e",
+     "w": 1280,
+     "h": 800,
+     "caption": "The desktop: a blue taskbar with a green start button"
+    },
+    {
+     "path": "screenshots/sidebar.png",
+     "size": 202847,
+     "sha256": "9edd280bcee682b49d83522621367eba9d80aa8146c84ed2d9d40f73a0661b73",
+     "w": 1280,
+     "h": 800,
+     "caption": "Characters: a sidebar, a search field and a selection"
+    },
+    {
+     "path": "screenshots/windows.png",
+     "size": 68888,
+     "sha256": "d49f973b1f061c688086d61abc254e7ad2a343392e6a4789774267e0e9e5dfb1",
+     "w": 1280,
+     "h": 800,
+     "caption": "Text Editor in front, Calculator behind"
+    }
+   ]
+  }
+ ]
+}

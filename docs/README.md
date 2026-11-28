@@ -40,6 +40,7 @@ Website: [lordos.org](https://lordos.org) · Brand kit: [LORDOS-BRAND.md](LORDOS
 | Document | What it covers |
 |---|---|
 | [WAYLAND.md](WAYLAND.md) | Linux apps (GTK, Qt, browsers) on our Wayland compositor; its point-by-point conformance scores are in [wayland-conformance.json](wayland-conformance.json) (`tools/wl-conformance.mjs`) |
+| [TOOLKIT-AUDIT.md](TOOLKIT-AUDIT.md) | `lordos-testbench --toolkits`: GTK 3/4, Qt 5/6 and plain X11 scored 0 to 100 % on this compositor, on the person's own machine; the harnesses, the weights and the JSON schema |
 | [SYNCOBJ-PLAN.md](SYNCOBJ-PLAN.md) | Plan for explicit sync (`linux-drm-syncobj-v1`): approved, built and released in 0.8.9.5 |
 | [WEBAPPS.md](WEBAPPS.md) | Web apps and PWAs: the LordOS Web Runtime (`lord-web`, WPE WebKit), profiles, isolation (0.8.8.8) |
 | [WPEWEBKIT.md](WPEWEBKIT.md) | LordOS's backport of WPE WebKit 2.54 with WPEPlatform to Debian 13: build, verification, source offer, security rebuilds |
@@ -51,10 +52,11 @@ Website: [lordos.org](https://lordos.org) · Brand kit: [LORDOS-BRAND.md](LORDOS
 | [DEVICES.md](DEVICES.md) | The battery of the computer and of mice, keyboards and headphones; lord-hidpp |
 | [BATTERY.md](BATTERY.md) | Settings → Battery and Monitor → Battery: charge control, history, condition |
 | [WALLPAPERS.md](WALLPAPERS.md) | Moving wallpapers on the desktop and the login screen |
+| [MOVING-WALLPAPERS.md](MOVING-WALLPAPERS.md) | How moving wallpapers stay cheap: per-display pause, NV12, zero-copy, the GPU loop cache, measurements, comparison |
 | [ON-SCREEN-KEYBOARD.md](ON-SCREEN-KEYBOARD.md) | The on-screen keyboard, for a computer with no physical keyboard |
 | [THEMES-GUIDE.md](THEMES-GUIDE.md) | How to build a LordOS appearance (theme): anatomy, tokens, frames, building, verified code, testing |
 | [THEMES-PLAN.md](THEMES-PLAN.md) | Plan: many appearances, community themes from a file, a theme store with review and signing |
-| [WORKSPACES.md](WORKSPACES.md) | Lord Workspaces (since 0.8.9): activities, tiling per display, effects styles, performance, what is deferred |
+| [WORKSPACES.md](WORKSPACES.md) | Workspaces (since 0.8.9): activities, tiling per display, effects styles, performance, what is deferred |
 | [LAYERS.md](LAYERS.md) | The desktop's stacking order: what is drawn and clicked above what |
 | [SPOTLIGHT.md](SPOTLIGHT.md) | Search and the advanced clipboard |
 | [TRACKPAD.md](TRACKPAD.md) | Touchpads, gestures and touchscreens |
@@ -99,8 +101,11 @@ Website: [lordos.org](https://lordos.org) · Brand kit: [LORDOS-BRAND.md](LORDOS
 | [MAIL.md](MAIL.md) | Mail, Calendar, Contacts and Reminders |
 | [CLOUD.md](CLOUD.md) | Cloud: the person's cloud storage accounts (rclone) in Files, Settings and Backups (0.8.8.5) |
 | [DATABASES.md](DATABASES.md) | Databases, the MySQL / MariaDB client: connections, structure, content, queries, import and export |
+| [HANDS.md](HANDS.md) | Hands: an AI agent (Claude Code, Lumo) uses the desktop through `lordos-mcp` and `org.lordos.Hands1`, with consent, a banner, Stop, the panic key, and the system layer and passwords out of reach; in development |
+| [AI.md](AI.md) | Settings → Artificial intelligence: the store around Lumo (its pieces, the brain's functions, the models of each capability) |
 | [VOICE.md](VOICE.md) | Text to speech without the internet (`lord-tts`): voice packages, reading aloud from the desktop |
 | [SENTINELA.md](SENTINELA.md) | Sentinela, the process guard: rules over the Monitor's process list, a local model (llama-server in its sandbox, no network) that explains alerts; in development |
+| [SPELLING.md](SPELLING.md) | Spell checking in LordOS's text fields: lord-spell (Hunspell in its sandbox), the frames, languages, the personal dictionary shared with lord-web; ✨ AI on selected text is in AI.md; in development |
 | [MONITOR.md](MONITOR.md) | Monitor: usage, processes, network map and connections, firewall, disk health, cooling |
 | [SYSTEM.md](SYSTEM.md) | Disks, Backups, Logs, Clock and Help |
 | [CLEANER.md](CLEANER.md) | Cleaner: storage and maintenance |
@@ -148,7 +153,7 @@ Website: [lordos.org](https://lordos.org) · Brand kit: [LORDOS-BRAND.md](LORDOS
 | [iso-final/](iso-final/) | Screenshots of the final ISO test |
 | [polish/](polish/) | Before and after screenshots of the visual polish pass |
 | [packs/](packs/) | Sample language pack and script test text |
-| [classic/](classic/) | Screenshots of the Lord Classic theme and the Lord Flow theme, light and dark |
+| [classic/](classic/) | Screenshots of the Classic theme and the Flow theme, light and dark |
 | [imager/](imager/) | Screenshots of LordOS Imager (native app and desktop app) |
 | [qa/](qa/) | Screenshots of the app-by-app QA pass (see [VM-SETUP.md](VM-SETUP.md)) |
 

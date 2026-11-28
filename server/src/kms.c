@@ -5,6 +5,8 @@
 #include <errno.h>
 #include <drm/drm_fourcc.h>
 #include <fcntl.h>
+#include <pthread.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -424,7 +426,111 @@ int kms_attach(Kms *k, int fd, int keep) {
     return 0;
 }
 
+/* ---- the modeset after a dropped flip, on a thread (kms.h) ---- */
+enum { RC_RUNNING = 1, RC_OK, RC_FAILED, RC_ORPHAN };
+struct recover {
+    int fd, state;              /* state: __atomic; the thread's answer, or RC_ORPHAN when nobody waits any more */
+    uint32_t conn_id;
+    struct drm_mode_crtc set;
+};
+static int recover_running;     /* __atomic */
+#ifdef KMS_TEST
+int (*kms_test_setcrtc)(int fd, struct drm_mode_crtc *set);
+#endif
+
+static void *recover_thread(void *arg) {
+    struct recover *r = arg;
+    r->set.set_connectors_ptr = (uintptr_t)&r->conn_id;
+#ifdef KMS_TEST
+    int bad = kms_test_setcrtc ? kms_test_setcrtc(r->fd, &r->set) : xioctl(r->fd, DRM_IOCTL_MODE_SETCRTC, &r->set);
+#else
+    int bad = xioctl(r->fd, DRM_IOCTL_MODE_SETCRTC, &r->set);
+#endif
+    int want = RC_RUNNING;
+    __atomic_sub_fetch(&recover_running, 1, __ATOMIC_SEQ_CST);
+    if (!__atomic_compare_exchange_n(&r->state, &want, bad ? RC_FAILED : RC_OK, 0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST))
+        free(r);                /* orphaned (kms_close): the answer is nobody's */
+    return NULL;
+}
+
+int kms_recover_busy(void) { return __atomic_load_n(&recover_running, __ATOMIC_SEQ_CST); }
+
+/* the modeset done (ok) or failed: as a flip's event would, or as kms_flip_abandon does */
+static void recover_finish(Kms *k, int ok) {
+    struct recover *r = k->recover;
+    k->recover = NULL;
+    free(r);
+    k->flip_pending = 0;
+    k->flip_ns = kms_now_ns();
+    k->flip_seq++;
+    if (ok) { k->modeset_pending = 0; k->presented = 1; k->recover_bg = 0; }
+    else fprintf(stderr, "lord-server: kms: the modeset after a dropped page flip failed; the next frame tries again\n");
+    if (k->custom) { if (k->on_flip) k->on_flip(k->recover_data); }
+    else if (ok) k->front = k->recover_back;
+}
+
+void kms_recover_poll(Kms *k) {
+    struct recover *r = k->recover;
+    if (!r) return;
+    int st = __atomic_load_n(&r->state, __ATOMIC_SEQ_CST);
+    if (st == RC_OK || st == RC_FAILED) recover_finish(k, st == RC_OK);
+}
+
+/* 0 shown now, 1 still running (a flip pending until kms_recover_poll), -1 not started or failed at once */
+static int recover_modeset(Kms *k, uint32_t fb, void *data, int back) {
+    if (k->recover) return 1;   /* one at a time (callers see flip_pending first) */
+    struct recover *r = calloc(1, sizeof *r);
+    if (!r) return -1;
+    r->fd = k->fd;
+    r->conn_id = k->conn_id;
+    r->state = RC_RUNNING;
+    r->set = (struct drm_mode_crtc){ .crtc_id = k->crtc_id, .fb_id = fb, .count_connectors = 1, .mode = k->mode, .mode_valid = 1 };
+    pthread_t th;
+    pthread_attr_t at;
+    pthread_attr_init(&at);
+    pthread_attr_setdetachstate(&at, PTHREAD_CREATE_DETACHED);
+    pthread_attr_setstacksize(&at, 64 * 1024);
+    sigset_t all, old;
+    sigfillset(&all);
+    pthread_sigmask(SIG_BLOCK, &all, &old);             /* signals stay with the main thread */
+    __atomic_add_fetch(&recover_running, 1, __ATOMIC_SEQ_CST);
+    int e = pthread_create(&th, &at, recover_thread, r);
+    pthread_sigmask(SIG_SETMASK, &old, NULL);
+    pthread_attr_destroy(&at);
+    if (e) { __atomic_sub_fetch(&recover_running, 1, __ATOMIC_SEQ_CST); free(r); return -1; }
+    k->recover = r;
+    k->recover_data = data;
+    k->recover_back = back;
+    k->flip_pending = 1;
+    k->flip_async = 0;
+    k->flip_submit_ns = kms_now_ns();
+    for (int ms = 0; ms < KMS_RECOVER_WAIT_MS; ms++) {
+        int st = __atomic_load_n(&r->state, __ATOMIC_SEQ_CST);
+        if (st != RC_RUNNING) {
+            k->recover = NULL;
+            free(r);
+            k->flip_pending = 0;
+            if (st == RC_FAILED) return -1;
+            k->modeset_pending = 0;
+            k->presented = 1;
+            k->recover_bg = 0;
+            return 0;
+        }
+        struct timespec t = { 0, 1000000 };
+        nanosleep(&t, NULL);
+    }
+    fprintf(stderr, "lord-server: kms: the modeset after a dropped page flip is taking over %d ms; the desktop goes on meanwhile\n",
+            KMS_RECOVER_WAIT_MS);
+    return 1;
+}
+
 void kms_close(Kms *k) {
+    if (k->recover) {                          /* a recovery modeset still running: its thread frees it */
+        struct recover *r = k->recover;
+        int want = RC_RUNNING;
+        if (!__atomic_compare_exchange_n(&r->state, &want, RC_ORPHAN, 0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) free(r);
+        k->recover = NULL;
+    }
     if (k->fd <= 0) return;
     if (k->crtc_id) busy_crtcs &= ~(1u << k->crtc_index);
     if (k->cursor_handle) {
@@ -459,6 +565,12 @@ KmsBuffer *kms_back(Kms *k) { return &k->buf[k->front ^ 1]; }
 
 int kms_flip(Kms *k) {
     int back = k->front ^ 1;
+    if (k->modeset_pending && k->recover_bg) {      /* after a dropped flip: on a thread, bounded (kms.h) */
+        int r = recover_modeset(k, k->buf[back].fb_id, NULL, back);
+        if (r < 0) { perror("SETCRTC"); return -1; }
+        if (!r) k->front = back;
+        return 0;
+    }
     if (k->modeset_pending) {               /* the first frame after the boot splash: modeset */
         if (kms_set_fb(k, k->buf[back].fb_id)) { perror("SETCRTC"); return -1; }
         k->front = back;
@@ -569,6 +681,7 @@ int kms_flip_fb(Kms *k, uint32_t fb, void *data) {
         .crtc_id = k->crtc_id, .fb_id = fb, .flags = DRM_MODE_PAGE_FLIP_EVENT, .user_data = (uintptr_t)data,
     };
     k->custom = 1;
+    k->flip_data = data;
     int async = k->async_next && k->async_cap && !k->modeset_pending;
     k->async_next = 0;
     /* a torn flip the driver refuses (amdgpu: a buffer of another format, modifier or pitch than the one shown, as the
@@ -580,6 +693,17 @@ int kms_flip_fb(Kms *k, uint32_t fb, void *data) {
     }
     k->flip_async = 0;
     if (!k->modeset_pending && xioctl(k->fd, DRM_IOCTL_MODE_PAGE_FLIP, &pf) == 0) { k->flip_pending = 1; k->flip_submit_ns = kms_now_ns(); return 0; }
+    /* after a dropped flip: the modeset on a thread, bounded (kms.h) */
+    if (k->modeset_pending && k->recover_bg) {
+        int r = recover_modeset(k, fb, data, 0);
+        if (r) return r < 0 ? -1 : 0;
+        struct timespec t;
+        clock_gettime(CLOCK_MONOTONIC, &t);
+        k->flip_ns = (uint64_t)t.tv_sec * 1000000000ull + (uint64_t)t.tv_nsec;
+        k->flip_seq++;
+        if (k->on_flip) k->on_flip(data);
+        return 0;
+    }
     /* no page flip: synchronous modeset and notify right away */
     if (kms_set_fb(k, fb)) return -1;
     struct timespec t;
@@ -588,6 +712,22 @@ int kms_flip_fb(Kms *k, uint32_t fb, void *data) {
     k->flip_seq++;
     if (k->on_flip) k->on_flip(data);
     return 0;
+}
+
+int kms_flip_stuck(const Kms *k, uint64_t now_ns, uint64_t limit_ns) {
+    return !k->recover && k->flip_pending && k->flip_submit_ns && now_ns > k->flip_submit_ns + limit_ns;
+}
+
+void kms_flip_abandon(Kms *k) {
+    if (!k->flip_pending || k->recover) return;     /* the recovery's own modeset is never dropped */
+    k->flip_pending = 0;
+    k->flip_async = 0;
+    k->flip_ns = kms_now_ns();
+    k->flip_seq++;
+    if (k->custom) { if (k->on_flip) k->on_flip(k->flip_data); }
+    else k->front ^= 1;
+    k->modeset_pending = 1;
+    k->recover_bg = 1;
 }
 
 /* ---- hardware cursor ---- */
@@ -624,6 +764,7 @@ int kms_cursor_image(Kms *k, const uint32_t *argb, int w, int h, int hot_x, int 
     memset(k->cursor_map, 0, k->cursor_size);
     for (int y = 0; y < h && y < (int)k->cursor_h; y++)
         for (int x = 0; x < w && x < (int)k->cursor_w; x++) k->cursor_map[(size_t)y * k->cursor_pitch + x] = argb[(size_t)y * w + x];
+    if (k->recover) return k->cursor_ok ? 0 : -1;  /* the CRTC is the recovery's (kms.h): the picture is in the buffer */
     struct drm_mode_cursor2 c = { .flags = DRM_MODE_CURSOR_BO, .crtc_id = k->crtc_id, .width = k->cursor_w, .height = k->cursor_h,
                                   .handle = k->cursor_handle, .hot_x = hot_x, .hot_y = hot_y };
     k->cursor_ok = xioctl(k->fd, DRM_IOCTL_MODE_CURSOR2, &c) == 0;
@@ -636,13 +777,13 @@ int kms_cursor_fits(const Kms *k, int w, int h) {
 }
 
 void kms_cursor_move(Kms *k, int x, int y) {
-    if (!k->cursor_ok || !k->cursor_visible) return;
+    if (!k->cursor_ok || !k->cursor_visible || k->recover) return;     /* the CRTC is the recovery's (kms.h) */
     struct drm_mode_cursor c = { .flags = DRM_MODE_CURSOR_MOVE, .crtc_id = k->crtc_id, .x = x, .y = y };
     xioctl(k->fd, DRM_IOCTL_MODE_CURSOR, &c);
 }
 
 void kms_cursor_show(Kms *k, int visible) {
-    if (!k->cursor_ok || k->cursor_visible == visible) return;
+    if (!k->cursor_ok || k->cursor_visible == visible || k->recover) return;
     struct drm_mode_cursor2 c = { .flags = DRM_MODE_CURSOR_BO, .crtc_id = k->crtc_id, .width = k->cursor_w, .height = k->cursor_h,
                                   .handle = visible ? k->cursor_handle : 0 };
     xioctl(k->fd, DRM_IOCTL_MODE_CURSOR2, &c);

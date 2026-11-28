@@ -450,6 +450,9 @@ int checks_run(void) {
         struct wl_data_source *src = wl_data_device_manager_create_data_source(ddm);
         wl_data_source_add_listener(src, &ds_l, NULL);
         wl_data_source_offer(src, CLIP_MIME);
+        /* the selection the new device is told at once (another app's, or LordOS's own) is read first, so the offer
+         * waited for below is the one this client's own source made (BUG-24 of the ws170 QA, on the primary selection) */
+        sync_or();
         clip_offer_ready = clip_sent = 0;
         wl_data_device_set_selection(dd, src, kb_serial);
         if (tb_wait(&clip_offer_ready, 1500) < 0) return died();
@@ -478,6 +481,10 @@ int checks_run(void) {
         struct zwp_primary_selection_source_v1 *ps = zwp_primary_selection_device_manager_v1_create_source(pdm);
         zwp_primary_selection_source_v1_add_listener(ps, &ps_l, NULL);
         zwp_primary_selection_source_v1_offer(ps, CLIP_MIME);
+        /* the primary selection the new device is told at once came from elsewhere (the person's last selected text,
+         * often a source that no longer answers): before, it was taken for this client's own and read empty, "OFFER CAME,
+         * NO TEXT" on a real desktop (BUG-24 of the ws170 QA). Read it first; the offer waited for below is ours. */
+        sync_or();
         prim_ready = prim_sent = 0;
         zwp_primary_selection_device_v1_set_selection(pd, ps, kb_serial);
         if (tb_wait(&prim_ready, 1500) < 0) return died();

@@ -1,4 +1,4 @@
-// The contents of Lord Celeste's drawers (components/Drawer.jsx slides them out of the frame):
+// The contents of Celeste's drawers (components/Drawer.jsx slides them out of the frame):
 //   top     Dashboard: the user and the date, a month calendar, CPU, memory and battery, what is playing; Media;
 //           Performance
 //   bottom  Launcher: the apps, "=" a calculator, ">" the theme's actions
@@ -349,7 +349,7 @@ function Tile({ cx, label, detail, on, onClick, children }) {
   );
 }
 
-// One notification of the history, with its buttons (they run the notification's own actions, as in Lord Flow's
+// One notification of the history, with its buttons (they run the notification's own actions, as in Flow's
 // clock panel) and a ✕ that removes it from the history.
 function Note({ cx, n, onRemove }) {
   const [hover, setHover] = useState(false);

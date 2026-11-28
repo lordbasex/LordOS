@@ -1,0 +1,47 @@
+Description: VP8 with LibWebRTC's own encoder, not GStreamer's vp8enc
+ With the LibWebRTC backend on the GLib ports, WebKit encodes VP8 through its GStreamer encoder element (vp8enc). On
+ WPE 2.54.3 no frame ever reached vp8enc: a call that negotiated VP8 sent no video (framesEncoded stayed 0), or
+ libwebrtc switched it to another codec. WebKit already uses LibWebRTC's own encoder for VP9 for similar reasons; use
+ its libvpx VP8 encoder too (libvpx is built into libwebrtc), and offer VP8 whatever GStreamer has.
+Author: LordOS <lord.basex@gmail.com>
+Forwarded: no
+Last-Update: 2026-11-26
+
+--- a/Source/WebCore/platform/mediastream/libwebrtc/gstreamer/GStreamerVideoEncoderFactory.cpp
++++ b/Source/WebCore/platform/mediastream/libwebrtc/gstreamer/GStreamerVideoEncoderFactory.cpp
+@@ -36,6 +36,7 @@
+ #include "VideoFrameGStreamer.h"
+ #include "webrtc/api/make_ref_counted.h"
+ #include "webrtc/api/video_codecs/vp9_profile.h"
++#include "webrtc/modules/video_coding/codecs/vp8/include/vp8.h"
+ #include "webrtc/modules/video_coding/codecs/vp9/include/vp9.h"
+ #include "webrtc/modules/video_coding/include/video_codec_interface.h"
+ #include "webrtc/modules/video_coding/include/video_error_codes.h"
+@@ -297,8 +298,15 @@
+         return webrtc::CreateVp9Encoder(environment, { webrtc::VP9Profile::kProfile2 });
+     }
+ 
++    // LordOS: VP8 from LibWebRTC too (its libvpx encoder, built into this library), as VP9 above. Through vp8enc no frame
++    // reached the encoder, so libwebrtc switched a VP8 call to another codec or sent no video.
++    if (format.name == "VP8") {
++        GST_INFO("Using VP8 encoder from LibWebRTC.");
++        return webrtc::CreateVp8Encoder(environment);
++    }
++
+     auto formatName = fromStdString(format.name);
+-    if (formatName == "VP8"_s || formatName == "H264"_s)
++    if (formatName == "H264"_s)
+         return makeUnique<LibWebRTCGStreamerVideoEncoder>(formatName, format);
+ 
+     return nullptr;
+@@ -322,8 +330,8 @@
+     std::vector<webrtc::SdpVideoFormat> supportedFormats;
+ 
+     auto& scanner = GStreamerRegistryScanner::singleton();
+-    if (scanner.isCodecSupported(GStreamerRegistryScanner::Configuration::Encoding, "vp8"_s))
+-        supportedFormats.push_back(webrtc::SdpVideoFormat::VP8());
++    // LordOS: LibWebRTC's own VP8 encoder (Create above) is always there
++    supportedFormats.push_back(webrtc::SdpVideoFormat::VP8());
+ 
+     if (scanner.isCodecSupported(GStreamerRegistryScanner::Configuration::Encoding, "avc1"_s)) {
+         for (auto& format : supportedH264Formats())

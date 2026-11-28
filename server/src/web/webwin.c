@@ -43,6 +43,7 @@
 #include "xdg-activation-v1-client-protocol.h"
 #include "text-input-unstable-v3-client-protocol.h"
 #include "cursor-shape-v1-client-protocol.h"
+#include "primary-selection-unstable-v1-client-protocol.h"
 
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
@@ -120,6 +121,11 @@ struct WebWin {
     struct xdg_activation_v1 *activation;
     struct zwp_text_input_manager_v3 *ti_mgr;
     struct wp_cursor_shape_manager_v1 *cursor_mgr;
+    struct zwp_primary_selection_device_manager_v1 *psm;
+    struct zwp_primary_selection_device_v1 *pdev;
+    struct zwp_primary_selection_source_v1 *psrc;   /* ours, while it is the session's primary selection */
+    struct zwp_primary_selection_offer_v1 *poffer;  /* the session's, kept only to be let go */
+    char *prim;                                     /* the text psrc gives */
     Output outputs[MAX_OUTPUTS];
     int nout;
 
@@ -286,6 +292,7 @@ static void reg_global(void *d, struct wl_registry *r, uint32_t name, const char
     }
     else if (!strcmp(iface, xdg_activation_v1_interface.name)) win->activation = wl_registry_bind(r, name, &xdg_activation_v1_interface, 1);
     else if (!strcmp(iface, zwp_text_input_manager_v3_interface.name)) win->ti_mgr = wl_registry_bind(r, name, &zwp_text_input_manager_v3_interface, 1);
+    else if (!strcmp(iface, zwp_primary_selection_device_manager_v1_interface.name)) win->psm = wl_registry_bind(r, name, &zwp_primary_selection_device_manager_v1_interface, 1);
     else if (!strcmp(iface, wp_cursor_shape_manager_v1_interface.name)) win->cursor_mgr = wl_registry_bind(r, name, &wp_cursor_shape_manager_v1_interface, 1);
     else if (!strcmp(iface, wl_output_interface.name) && win->nout < MAX_OUTPUTS && ver >= 2) {
         Output *o = &win->outputs[win->nout++];
@@ -707,6 +714,7 @@ void webwin_hide(WebWin *win) {
 }
 
 int webwin_visible(WebWin *win) { return win->shown; }
+int webwin_focused(WebWin *win) { return win->focused; }
 
 void webwin_set_title(WebWin *win, const char *title) {
     snprintf(win->title, sizeof win->title, "%s", title && title[0] ? title : win->w->app.name);
@@ -787,6 +795,48 @@ static void new_source(WebWin *win) {
         if (win->own_html) wl_data_source_offer(win->source, "text/html");
     }
     wl_data_device_set_selection(win->dd, win->source, win->input_serial);
+    wl_display_flush(win->dpy);
+}
+
+/* ---- the primary selection: the page's selection, offered to the session (webwin_set_primary) ---- */
+
+static void psrc_send(void *d, struct zwp_primary_selection_source_v1 *s, const char *mime, int32_t fd) {
+    WebWin *win = d;
+    (void)mime;
+    if (s != win->psrc || !win->prim) { close(fd); return; }
+    Outgoing *o = g_new0(Outgoing, 1);
+    o->len = strlen(win->prim);
+    o->data = g_memdup2(win->prim, o->len);
+    fcntl(fd, F_SETFL, fcntl(fd, F_GETFL) | O_NONBLOCK);
+    g_unix_fd_add(fd, G_IO_OUT | G_IO_ERR | G_IO_HUP, out_write, o);
+}
+static void psrc_cancelled(void *d, struct zwp_primary_selection_source_v1 *s) {
+    WebWin *win = d;
+    if (win->psrc == s) { win->psrc = NULL; g_free(win->prim); win->prim = NULL; }
+    zwp_primary_selection_source_v1_destroy(s);
+}
+static const struct zwp_primary_selection_source_v1_listener psrc_listener = { psrc_send, psrc_cancelled };
+
+static void pdev_offer(void *d, struct zwp_primary_selection_device_v1 *dev, struct zwp_primary_selection_offer_v1 *o) { (void)d; (void)dev; (void)o; }
+static void pdev_selection(void *d, struct zwp_primary_selection_device_v1 *dev, struct zwp_primary_selection_offer_v1 *o) {
+    (void)dev;
+    WebWin *win = d;
+    if (win->poffer && win->poffer != o) zwp_primary_selection_offer_v1_destroy(win->poffer);
+    win->poffer = o;
+}
+static const struct zwp_primary_selection_device_v1_listener pdev_listener = { pdev_offer, pdev_selection };
+
+void webwin_set_primary(WebWin *win, const char *text) {
+    if (!win->psm || !win->pdev || !win->input_serial || !text || !text[0]) return;
+    if (win->psrc && win->prim && !strcmp(win->prim, text)) return;     /* the same selection again */
+    if (win->psrc) zwp_primary_selection_source_v1_destroy(win->psrc);
+    g_free(win->prim);
+    win->prim = g_strdup(text);
+    win->psrc = zwp_primary_selection_device_manager_v1_create_source(win->psm);
+    zwp_primary_selection_source_v1_add_listener(win->psrc, &psrc_listener, win);
+    static const char *const types[] = { "text/plain;charset=utf-8", "text/plain", "UTF8_STRING" };
+    for (size_t i = 0; i < sizeof types / sizeof types[0]; i++) zwp_primary_selection_source_v1_offer(win->psrc, types[i]);
+    zwp_primary_selection_device_v1_set_selection(win->pdev, win->psrc, win->input_serial);
     wl_display_flush(win->dpy);
 }
 
@@ -1005,13 +1055,20 @@ int webwin_paste(WebWin *win) {
     return paste_text(win, 0);
 }
 
-/* Ctrl+V or Shift+Insert: webwin_paste. 1 when lord-web pasted (the key doesn't go to WebKit). */
+void webwin_paste_plain(WebWin *win) {
+    const char *t = win->known;
+    if (t && t[0] && webxfer_paste_text(win->w, t)) { web_note("paste as plain text (%zu bytes)", strlen(t)); return; }
+    if (win->w->view) webkit_web_view_execute_editing_command(win->w->view, WEBKIT_EDITING_COMMAND_PASTE_AS_PLAIN_TEXT);
+}
+
+/* Ctrl+V or Shift+Insert: webwin_paste; Ctrl+Shift+V: webwin_paste_plain. 1 when lord-web pasted (the key doesn't go to WebKit). */
 static int paste_key(WebWin *win, uint32_t key) {
     xkb_keysym_t sym = webback_keysym(win->back, key);
     if (!sym) return 0;
     int ctrl = (win->mods & WEBMOD_CTRL) != 0, alt = (win->mods & WEBMOD_ALT) != 0;
     int shift = (win->mods & WEBMOD_SHIFT) != 0;
     if (!((ctrl && !alt && (sym == XKB_KEY_v || sym == XKB_KEY_V)) || (shift && !ctrl && !alt && sym == XKB_KEY_Insert))) return 0;
+    if (ctrl && shift) { webwin_paste_plain(win); return 1; }
     return webwin_paste(win);
 }
 
@@ -1347,6 +1404,7 @@ static void kb_enter(void *d, struct wl_keyboard *k, uint32_t serial, struct wl_
     webback_set_focused(win->back, 1);
     if (!win->pb_timer) win->pb_timer = g_timeout_add(400, pb_watch, win);
     if (win->ime && win->ime->enabled) ime_send_state(win->ime);
+    web_menu_ai_focused(win->w);        /* ✨ AI's Replace waits for the keyboard (webmenu.c) */
 }
 static void kb_leave(void *d, struct wl_keyboard *k, uint32_t serial, struct wl_surface *s) {
     (void)k; (void)serial; (void)s;
@@ -1616,6 +1674,7 @@ void webwin_attach(WebWin *win) {
     if (win->seat) {
         seat_caps(win, win->seat, win->seat_caps);
         if (win->ddm) { win->dd = wl_data_device_manager_get_data_device(win->ddm, win->seat); wl_data_device_add_listener(win->dd, &dd_listener, win); }
+        if (win->psm) { win->pdev = zwp_primary_selection_device_manager_v1_get_device(win->psm, win->seat); zwp_primary_selection_device_v1_add_listener(win->pdev, &pdev_listener, win); }
     }
     ime_attach(win);
     wl_display_flush(win->dpy);

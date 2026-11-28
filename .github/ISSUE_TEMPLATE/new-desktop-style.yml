@@ -1,0 +1,90 @@
+name: New desktop style
+description: Share a desktop style (theme) you made for LordOS, for review.
+title: "New desktop style: "
+labels: ["desktop-style", "community"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for sharing a desktop style. The easiest way to fill this in is the Claude Code plugin
+        [lordos-theme-kit](https://github.com/lordbasex/lordos-theme-kit): `/lordos-theme publish` writes every section.
+        Community styles run only on development builds of LordOS for now. Don't include personal data.
+  - type: input
+    id: name
+    attributes:
+      label: Name and id
+      description: The name in theme.json and the folder name (its id).
+      placeholder: Aurora Glass (aurora-glass)
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What it looks like and how it works (bars, Dock or taskbar, panels, menus).
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version, licence and LordOS version
+      placeholder: 1.0.0 · MIT · made for LordOS 0.8.9.6.2
+    validations:
+      required: true
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots
+      description: Light, dark and right to left (Arabic) at least. Drag images here, or link them.
+    validations:
+      required: true
+  - type: input
+    id: package
+    attributes:
+      label: Package
+      description: A link to the source-only .zip (for example a release of your repository) and its SHA-256.
+    validations:
+      required: true
+  - type: input
+    id: source
+    attributes:
+      label: Source repository
+      placeholder: https://github.com/you/aurora-glass
+  - type: textarea
+    id: provenance
+    attributes:
+      label: Provenance
+      description: |
+        What inspired it (with links), what you studied, what you wrote new, and any reused code or art with its
+        licence. LordOS takes ideas, never GPL code; a port says "inspired by <project>" and has a name of its own.
+    validations:
+      required: true
+  - type: textarea
+    id: check
+    attributes:
+      label: Check report
+      description: The output of `/lordos-theme check` (or `node scripts/check.mjs <folder>` from lordos-theme-kit).
+      render: text
+    validations:
+      required: true
+  - type: checkboxes
+    id: tested
+    attributes:
+      label: Tested
+      options:
+        - label: LordOS apps and Linux apps, with and without their own frame; the window menu from a right click
+        - label: Every app's menus reachable; menus never under the Dock or off screen
+        - label: Light and dark, every accent, transparency on and off, reduce motion
+        - label: Right to left (Arabic)
+        - label: Several displays, unplug and plug back, mirror mode, 150 % scale
+        - label: Switching to it and back with windows open
+        - label: Notifications, search, permission prompts and the power dialog look right; privacy indicators visible
+  - type: checkboxes
+    id: confirm
+    attributes:
+      label: Before you submit
+      options:
+        - label: The screenshots and this issue contain no personal data.
+          required: true
+        - label: I may share everything in the package under its licence, and I credited every source.
+          required: true

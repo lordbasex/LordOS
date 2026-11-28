@@ -36,6 +36,10 @@ void wl_tf_open_holes(Canvas *c) { (void)c; }
 void media_paint(Canvas *c, int id, int node, float x, float y, float w, float h, float r, float op) { (void)c; (void)id; (void)node; (void)x; (void)y; (void)w; (void)h; (void)r; (void)op; }
 void media_paint_note(Canvas *c, int id, int node, float x, float y, float w, float h, float op) { (void)c; (void)id; (void)node; (void)x; (void)y; (void)w; (void)h; (void)op; }
 int media_cover_node(float x0, float y0, float x1, float y1) { (void)x0; (void)y0; (void)x1; (void)y1; return 0; }
+int media_frost_source(int node, float x0, float y0, float x1, float y1) { (void)node; (void)x0; (void)y0; (void)x1; (void)y1; return 0; }
+int wl_paint_frost(int src, int node, float x, float y, float w, float h, float rad, float blur) {
+    (void)src; (void)node; (void)x; (void)y; (void)w; (void)h; (void)rad; (void)blur; return 0;
+}
 int media_id_protected(int id) { (void)id; return 0; }      /* no media sources here */
 int gpu_active(void) { return 0; }
 

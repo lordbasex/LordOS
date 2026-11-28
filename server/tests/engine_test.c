@@ -27,14 +27,17 @@
 #include "ui/wave.h"
 #include "sound/spectrum.h"
 #include "ui/unicode.h"
+#include "media/media_int.h"
 
 /* ---- stubs for what paint.c reaches outside the UI engine ---- */
 /* the terminal (test_drag_exact): a dark box with a cursor block; where it was painted is noted in
  * logical px, as term_paint.c notes s->gx… for term_damage */
 static int term_cursor;
 static Box term_at;
+static int term_paints;                 /* test_gpu_cover: how many times a terminal was painted inside the clip */
 void term_paint(Canvas *c, int id, float x, float y, float w, float h, float op) {
     (void)id;
+    if (x < c->clip.x1 && y < c->clip.y1 && x + w > c->clip.x0 && y + h > c->clip.y0) term_paints++;
     const float k = paint_view.k;
     uint32_t a = (uint32_t)(op * 255 + 0.5f) << 24;
     canvas_rrect(c, x, y, w, h, 0, a | 0x101014);
@@ -72,6 +75,16 @@ void wl_paint_begin(void) { nwdraw = 0; }
 void wl_paint_save(void) { nwsaved = nwdraw; memcpy(wsaved, wdraw, sizeof *wdraw * (size_t)nwdraw); }
 void wl_paint_restore(void) { nwdraw = nwsaved; memcpy(wdraw, wsaved, sizeof *wdraw * (size_t)nwsaved); }
 void wl_paint_popups(Canvas *c) { (void)c; }
+/* the GPU's frosted glass (paint.c frost_source → wl.c wl_paint_frost): noted here, as wl.c notes it for layer 0 */
+static int frost_calls, frost_node, frost_src_seen;
+int wl_paint_frost(int src, int node, float x, float y, float w, float h, float rad, float blur) {
+    (void)x; (void)y; (void)w; (void)h; (void)rad; (void)blur;
+    if (!test_gpu) return 0;
+    frost_calls++;
+    frost_node = node;
+    frost_src_seen = src;
+    return 1;
+}
 void wl_tf_begin(int node, float sx, float sy, float tx, float ty, float op, int skip) { (void)node; (void)op; (void)skip; wtf.begins++; wtf.sx = sx; wtf.sy = sy; wtf.tx = tx; wtf.ty = ty; wtf_on = 1; }
 void wl_tf_end(void) { wtf.ends++; wtf_on = 0; }
 void wl_tf_nested(int d) { (void)d; }
@@ -91,13 +104,27 @@ int wl_draws_meet(Rect r) {
  * tests' secret) for test_protected_media; media_id_protected says whether that source is marked protected */
 enum { PROT_MEDIA_ID = 4242 };
 static int prot_media_marked;
+/* media sources: the real mviews.c (which nodes show a source, a new frame's damage, media_cover_node) over one test
+ * source, MV_MEDIA_ID, a "video" whose frames are flat colours from frame_seq, painted opaque over the whole box
+ * (test_media_views) */
+enum { MV_MEDIA_ID = 4343 };
+static MediaSrc mv_src;
+MediaSrc *media_src_at(int i) { return i == 0 && mv_src.used ? &mv_src : NULL; }
+MediaSrc *media_src_get(int id) { return mv_src.used && id == mv_src.id ? &mv_src : NULL; }
+static uint32_t mv_colour(unsigned seq) { return 0xff000000u | ((seq * 0x3b5d1fu + 0x204080u) & 0xffffffu); }
 void media_paint(Canvas *c, int id, int node, float x, float y, float w, float h, float r, float op) {
-    (void)node; (void)r;
+    (void)r;
     if (id == PROT_MEDIA_ID) canvas_rrect(c, x, y, w, h, 0, ((uint32_t)(op * 255 + 0.5f) << 24) | 0xd01010);
+    MediaSrc *s = media_src_get(id);
+    if (!s) return;
+    Node *nd = node_get(node);
+    if (nd && nd->crop) { media_src_view_drop(s, node); return; }
+    s->node = node;                                         /* as mview.c's media_paint */
+    media_src_view_note(s, node, (int)lroundf(w), (int)lroundf(h));
+    canvas_rrect(c, x, y, w, h, 0, mv_colour(s->frame_seq));
 }
 int media_id_protected(int id) { return id == PROT_MEDIA_ID && prot_media_marked; }
 void media_paint_note(Canvas *c, int id, int node, float x, float y, float w, float h, float op) { (void)c; (void)id; (void)node; (void)x; (void)y; (void)w; (void)h; (void)op; }
-int media_cover_node(float x0, float y0, float x1, float y1) { (void)x0; (void)y0; (void)x1; (void)y1; return 0; }
 int gpu_active(void) { return test_gpu; }
 void lbf_input(uint64_t ev_ns) { (void)ev_ns; }   /* bench/lbinput.c: only lbi_path is used */
 
@@ -1155,6 +1182,107 @@ static int full_differs(Node *root, int w, int h, int *where) {
     return worst;
 }
 
+/* One moving wallpaper on three displays (sdk/motion.jsx: one player per file, a <MediaView> per display). Up to
+ * 0.8.9.6.2 the source remembered only the node painted last: a new frame damaged that display's copy alone, the
+ * others stayed on an old frame (and showed patches of the new one where something else repainted them). Now every
+ * plain node showing the source is damaged by a new frame, only inside its own box; each one covers its own damage
+ * (media_cover_node); nodes that die, show another source or a part of it are dropped. */
+static int mv_rect_in(Box r, Node *const *v, int n) {
+    for (int i = 0; i < n; i++)
+        if (v[i] && r.x0 >= floorf(v[i]->ax) && r.y0 >= floorf(v[i]->ay) && r.x1 <= ceilf(v[i]->ax + v[i]->w) && r.y1 <= ceilf(v[i]->ay + v[i]->h)) return 1;
+    return 0;
+}
+/* the boxes a new frame damaged: how many, all inside a view, and their area */
+static int mv_damage(Node *const *v, int n, float *area, int *outside) {
+    *area = 0; *outside = 0;
+    for (int i = 0; i < ui.dlist.n; i++) {
+        Box r = ui.dlist.r[i];
+        if (r.x1 <= r.x0 || r.y1 <= r.y0) continue;
+        *area += (r.x1 - r.x0) * (r.y1 - r.y0);
+        if (!mv_rect_in(r, v, n)) (*outside)++;
+    }
+    return ui.dlist.n;
+}
+static void test_media_views(void) {
+    enum { DW = 120, DH = 80, W = 3 * DW, H = DH };
+    int was_multi = paint_multi_damage;
+    paint_multi_damage = 1;
+    ui_reset();
+    memset(&mv_src, 0, sizeof mv_src);
+    static uint8_t ring[4];
+    mv_src = (MediaSrc){ .used = 1, .id = MV_MEDIA_ID, .kind = SK_PLAYER, .sock = -1, .cur_slot = -1, .map = ring, .w = DW, .h = DH };
+    mv_src.view.bg = 0xff000000u;
+    Node *root = view(NULL);
+    ui.root = root;
+    sn(root, "backgroundColor", 0xff202020);
+    Node *v[3];
+    for (int i = 0; i < 3; i++) {                                   /* each display's MotionWallpaper */
+        Node *d = box_in(root, (float)(i * DW), 0, DW, DH, 0xff303030);     /* its still wallpaper */
+        v[i] = node_new(NODE_MEDIA);
+        node_append(d, v[i]);
+        ss(v[i], "position", "absolute");
+        sn(v[i], "left", 0); sn(v[i], "top", 0); sn(v[i], "width", DW); sn(v[i], "height", DH);
+        v[i]->term = MV_MEDIA_ID;
+    }
+    Node *clock = box_in(root, 10, 10, 30, 12, 0xffe0e0e0);         /* something else on the first display */
+    render(root, W, H);
+    CHECK(media_src_view_count(&mv_src) == 3, "three displays show the one player: %d", media_src_view_count(&mv_src));
+    int bw = 0, bh = 0;
+    CHECK(media_src_view_box(&mv_src, &bw, &bh) && bw == DW && bh == DH, "the helper scales to one display's box: %dx%d", bw, bh);
+    /* a new frame: every copy damaged, nothing outside them, and a partial repaint equals a full one */
+    float area;
+    int outside, where = 0;
+    for (int f = 0; f < 3; f++) {
+        ui.damage = (Box){ 0, 0, 0, 0 };
+        mv_src.frame_seq++;
+        media_src_damage(&mv_src);
+        int n = mv_damage(v, 3, &area, &outside);
+        CHECK(n == 3 && outside == 0 && area == 3.0f * DW * DH, "frame %d: %d boxes damaged, %d outside the views, area %.0f", f, n, outside, area);
+        for (int i = 0; i < 3; i++)
+            CHECK(media_cover_node(v[i]->ax, v[i]->ay, v[i]->ax + v[i]->w, v[i]->ay + v[i]->h) == v[i]->id, "display %d's view covers its own damage", i);
+        int nr;
+        float pa;
+        CHECK(paint_partial(root, W, H, &nr, &pa) == 1, "frame %d: painted in part", f);
+        for (int i = 0; i < 3; i++) {
+            int cx = (int)(v[i]->ax + 60), cy = (int)(v[i]->ay + 60);
+            CHECK(fb[cy * W + cx] == mv_colour(mv_src.frame_seq), "frame %d: display %d shows it (%08x, want %08x)", f, i, fb[cy * W + cx], mv_colour(mv_src.frame_seq));
+        }
+        CHECK((fb[15 * W + 20] & 0xffffff) == 0xe0e0e0, "frame %d: the clock over the first copy is still drawn", f);
+        CHECK(full_differs(root, W, H, &where) == 0, "frame %d: partial repaint equals a full one", f);
+    }
+    /* a part of the picture changed (Machines' damage_rect): with several copies, each one whole, none outside */
+    ui.damage = (Box){ 0, 0, 0, 0 };
+    mv_src.frame_seq++;
+    int k = media_src_damage_rect(&mv_src, 10, 10, 4, 4);
+    int n = mv_damage(v, 3, &area, &outside);
+    CHECK(k == 3 && n == 3 && outside == 0, "damage_rect: %d nodes, %d boxes, %d outside", k, n, outside);
+    render(root, W, H);
+    /* the third display's view now shows another source, the second's is destroyed: only the first one is left */
+    v[2]->term = MV_MEDIA_ID + 1;
+    node_invalidate(v[2]);
+    node_destroy(v[1]->parent);
+    v[1] = NULL;
+    render(root, W, H);
+    ui.damage = (Box){ 0, 0, 0, 0 };
+    mv_src.frame_seq++;
+    media_src_damage(&mv_src);
+    n = mv_damage(v, 1, &area, &outside);
+    CHECK(media_src_view_count(&mv_src) == 1 && n == 1 && outside == 0 && area == (float)DW * DH, "retargeted and destroyed views dropped: %d views, %d boxes, %d outside", media_src_view_count(&mv_src), n, outside);
+    CHECK(mv_src.node == v[0]->id, "the node painted last follows the live view: %d", mv_src.node);
+    CHECK(media_cover_node(v[2]->ax, 0, v[2]->ax + DW, DH) == 0, "the retargeted view covers nothing for this source");
+    /* a view that shows a part of the picture now (Node.crop) is no longer a whole copy */
+    float crop[4] = { 0, 0, DW / 2, DH };
+    v[0]->crop = malloc(sizeof crop);
+    memcpy(v[0]->crop, crop, sizeof crop);
+    node_invalidate(v[0]);
+    render(root, W, H);
+    CHECK(media_src_view_count(&mv_src) == 0 && mv_src.node == 0, "a crop node is not a whole copy: %d views", media_src_view_count(&mv_src));
+    (void)clock;
+    ui_reset();
+    mv_src.used = 0;
+    paint_multi_damage = was_multi;
+}
+
 static void test_multi_damage(void) {
     enum { W = 640, H = 400, DOTS = 24 };
     paint_multi_damage = 1;                 /* off by default (paint.c); LORD_DAMAGE=multi */
@@ -2142,7 +2270,7 @@ static void test_gcontend(void) {
 }
 
 /* The blurred backdrop cache (paint.c, 0.8.8.10): four frosted cards 16 px apart over a striped wallpaper, like
- * Lord Workspaces' widgets. A hand moving inside one card repaints the hand, not the four cards and their margins;
+ * Workspaces' widgets. A hand moving inside one card repaints the hand, not the four cards and their margins;
  * a stripe changing under a card, a card moving and a card's own blur changing blur again; every frame is the
  * same as a full repaint. */
 static void test_blur_cache(void) {
@@ -2273,7 +2401,7 @@ static void test_sound_wave(void) {
     wave_source(NULL);
 }
 
-/* Paint order and the blur cache (0.8.8.10): three frosted cards 16 px apart in a row, as Lord Workspaces' widgets.
+/* Paint order and the blur cache (0.8.8.10): three frosted cards 16 px apart in a row, as Workspaces' widgets.
  * A ring changing near the edge of a card painted above its neighbour leaves the neighbour's blur alone (the change
  * is not under it); the same change in a card painted below blurs the neighbour again; a card raised with zIndex is
  * handled as unsure. Every frame equals a full repaint. */
@@ -4235,7 +4363,7 @@ static void bench(void) {
 #ifndef ENGINE_BEFORE
 /* the wallpaper slideshow's transition (0.8.9, sdk/slideshow.jsx) on a 1920×1080 display: the arriving picture over
  * the one shown, its opacity and translation (whole pixels) set every frame as lord.setStyle does, under a window and
- * Lord Workspaces' blurred bars (a spine and a top band); 144 frames (2.4 s at 60 Hz). Then Reduce motion's plain fade
+ * Workspaces' blurred bars (a spine and a top band); 144 frames (2.4 s at 60 Hz). Then Reduce motion's plain fade
  * (opacity only), and a 6 % zoom for comparison (a scaled raster composited every frame). The pictures are the
  * 1920×1080 bases, so they are scaled once to their 2 % larger box. */
 static void bench_slideshow(void) {
@@ -4355,12 +4483,344 @@ static void test_blit_crop(void) {
     CHECK(a[0] == (src[40 * SWP + 50] | 0xff000000u), "a part past the edge: clamped by the bilinear path");
 }
 
+#ifndef ENGINE_BEFORE
+/* (ws170 QA BUG-14) the GPU's frosted glass over a moving wallpaper (paint.c frost_source, docs/MOVING-WALLPAPERS.md):
+ * on the GPU path a frosted node whose only backdrop is the GPU-drawn picture is handed to the GPU (wl_paint_frost)
+ * and is no strip the CPU repaints with each frame (paint_blurs_over); one with something else under it (a desktop
+ * icon, another window's shadow, a rounded clip around it) stays the CPU's, and so does everything without the switch,
+ * on the CPU path and in a capture */
+/* Monitor over many windows on the GPU path (QA on the maintainer's PC, ws174: 3 displays at 4K, 200 %, about 18
+ * windows under Monitor; every ~2 s a 0.8-1.6 s stall painting a display, gone with Monitor closed). The opaque-cover
+ * skip (cover_walk) and the hidden-blur rule (blur_hidden) ran only on the CPU path, so on the GPU path every window
+ * under Monitor's changing chart was painted again inside each of its rectangles, and a translucent, blurred window
+ * under it grew the damage to its whole body. Now both hold on the GPU path too: the windows below the cover are only
+ * noted (their app windows stay in the frame's list, in paint order, for the GPU to draw), never painted. Every frame
+ * must equal a full repaint, the list of app windows must be the full repaint's, and no covered terminal is painted. */
+static void test_gpu_cover(void) {
+    enum { W = 1280, H = 800, NWIN = 18, ROWS = 40, BARS = 24 };
+    for (int gpu = 0; gpu < 2; gpu++)
+        for (int mode = 0; mode < 2; mode++) {
+            test_gpu = gpu;
+            paint_multi_damage = mode;
+            ui_reset();
+            Node *root = view(NULL);
+            ui.root = root;
+            sn(root, "backgroundColor", 0xff203040);
+            for (int i = 0; i < NWIN; i++) {
+                Node *w = i == NWIN - 2 ? box_in(root, 360, 260, 600, 400, 0xff1f1f23)
+                                        : box_in(root, (float)(20 + i * 30), (float)(20 + i * 16), 700, 480, 0xff1f1f23);
+                ss(w, "overflow", "hidden");
+                sn(w, "borderRadius", 12);
+                sn(w, "shadowColor", 0x80000000); sn(w, "shadowBlur", 30); sn(w, "shadowOffsetY", 10);
+                for (int r = 0; r < ROWS; r++) box_in(w, 10, (float)(30 + r * 11), 680, 9, r % 2 ? 0xff2c2c30 : 0xff34343a);
+                Node *t = node_new(NODE_TERM);
+                node_append(w, t);
+                ss(t, "position", "absolute");
+                sn(t, "left", 400); sn(t, "top", 100); sn(t, "width", 200); sn(t, "height", 120);
+                if (i % 6 == 2) {                               /* a Linux app's window */
+                    Node *surf = node_new(NODE_SURFACE);
+                    surf->term = 100 + i;
+                    node_append(w, surf);
+                    ss(surf, "position", "absolute");
+                    sn(surf, "left", 20); sn(surf, "top", 60); sn(surf, "width", 300); sn(surf, "height", 200);
+                }
+                if (i == NWIN - 2) {                            /* a translucent, blurred Terminal right under Monitor */
+                    Node *body = box_in(w, 0, 24, 600, 376, 0x50202020);
+                    sn(body, "backdropBlur", 14);
+                }
+            }
+            Node *mon = box_in(root, 300, 200, 760, 520, 0xff2a2a2c);   /* Monitor, opaque, on top */
+            ss(mon, "overflow", "hidden");
+            sn(mon, "borderRadius", 10);
+            Node *chart = box_in(mon, 40, 60, 680, 400, 0xff20304a);
+            ss(chart, "overflow", "hidden");
+            Node *bars[BARS];
+            for (int i = 0; i < BARS; i++) bars[i] = box_in(chart, (float)(i * 28), 200, 20, 200, 0xff30d158);
+            render(root, W, H);
+            int bad = 0, worst_all = 0, list_bad = 0, frames = 0;
+            long painted = 0;
+            double ms = 0;
+            for (int f = 0; f < 12; f++) {
+                for (int i = 0; i < BARS; i++) sn(bars[i], "top", (float)(40 + (rnd() % 300)));   /* every bar: the chart changes */
+                layout_root(root, W, H);
+                int n = 0;
+                float area = 0;
+                term_paints = 0;
+                double t0 = now_ms();
+                if (paint_partial(root, W, H, &n, &area) < 0) { bad++; continue; }
+                ms += now_ms() - t0;
+                painted += term_paints;
+                frames++;
+                WDraw got[WDRAW_MAX];
+                int ngot = nwdraw;
+                memcpy(got, wdraw, sizeof *wdraw * (size_t)nwdraw);
+                int where = 0, worst = full_differs(root, W, H, &where);
+                if (worst > worst_all) worst_all = worst;
+                if (gpu && (ngot != nwdraw || memcmp(got, wdraw, sizeof *wdraw * (size_t)ngot))) list_bad++;
+            }
+            CHECK(!bad, "gpu cover %d/%d: %d frames with bad rectangles", gpu, mode, bad);
+            CHECK(worst_all <= 1, "gpu cover %d/%d: a frame differs from a full repaint by %d", gpu, mode, worst_all);
+            CHECK(!list_bad, "gpu cover %d/%d: %d frames lost or reordered app windows", gpu, mode, list_bad);
+            CHECK(!painted, "gpu cover %d/%d: %ld covered terminals painted in %d frames", gpu, mode, painted, frames);
+            printf("monitor over %d windows (%s, %s): %.2f ms a frame, %ld covered terminals painted\n", NWIN, gpu ? "GPU path" : "CPU path",
+                   mode ? "several rectangles" : "one box", frames ? ms / frames : 0, painted);
+        }
+    test_gpu = 0;
+    paint_multi_damage = 0;
+}
+
+static void test_gpu_frost(void) {
+    enum { W = 800, H = 600 };
+    ui_reset();
+    static uint8_t ring[4];
+    mv_src = (MediaSrc){ .used = 1, .id = MV_MEDIA_ID, .kind = SK_PLAYER, .sock = -1, .cur_slot = -1, .map = ring, .w = W, .h = H };
+    mv_src.view.bg = 0xff000000u;
+    Node *root = view(NULL);
+    ui.root = root;
+    sn(root, "backgroundColor", 0xff202020);
+    Node *wall = box_in(root, 0, 0, W, H, 0xff303030);              /* the still wallpaper under it */
+    Node *video = node_new(NODE_MEDIA);
+    node_append(wall, video);
+    ss(video, "position", "absolute");
+    sn(video, "left", 0); sn(video, "top", 0); sn(video, "width", W); sn(video, "height", H);
+    video->term = MV_MEDIA_ID;
+    Node *icon = box_in(root, 420, 120, 48, 48, 0xffe0a020);       /* a desktop icon */
+    Node *dock = box_in(root, 200, 520, 400, 64, 0x80ffffff);
+    sn(dock, "borderRadius", 16); sn(dock, "backdropBlur", 20);
+    Node *win = box_in(root, 400, 100, 300, 200, 0xc0202024);       /* over the icon */
+    sn(win, "borderRadius", 10); sn(win, "backdropBlur", 20);
+    Node *bar = box_in(root, 0, 0, W, 24, 0x99202020);
+    sn(bar, "backdropBlur", 20);
+    /* the GPU draws the picture this paint, all of it on the node's box */
+    mv_src.nv = 1; mv_src.gtex = (GpuTex *)ring; mv_src.gpu_drawn = 1;
+    mv_src.map_ok = 1; mv_src.map_w = W; mv_src.map_h = H; mv_src.map_fx = 0; mv_src.map_fy = 0; mv_src.map_kx = 1.0f / W; mv_src.map_ky = 1.0f / H;
+    int was_gpu = test_gpu;
+    test_gpu = 1;
+    paint_gpu_frost = 1;
+    frost_calls = 0;
+    render(root, W, H);
+    media_src_view_note(&mv_src, video->id, W, H);
+    Box b[8];
+    int n = paint_blurs_over(video, b, 8);
+    CHECK(frost_calls == 2, "the Dock and the menu bar go to the GPU, the window over the icon doesn't: %d", frost_calls);
+    CHECK(n == 1 && b[0].x0 >= 340 && b[0].x1 <= 760 && b[0].y0 >= 40 && b[0].y1 <= 360, "the CPU repaints only the window's strip with each frame: %d", n);
+    /* the icon moves away: the window's backdrop is the picture alone */
+    sn(icon, "left", 20);
+    frost_calls = 0;
+    render(root, W, H);
+    CHECK(frost_calls == 3 && paint_blurs_over(video, b, 8) == 0, "nothing left for the CPU: %d calls", frost_calls);
+    /* a shadow reaching under the menu bar keeps it on the CPU */
+    sn(win, "top", 40); sn(win, "shadowColor", 0x66000000); sn(win, "shadowBlur", 24); sn(win, "shadowOffsetY", 8);
+    frost_calls = 0;
+    render(root, W, H);
+    n = paint_blurs_over(video, b, 8);
+    CHECK(frost_calls == 2 && n == 1, "the shadow under the menu bar: the bar stays on the CPU (%d to the GPU, %d strips)", frost_calls, n);
+    /* without the switch, on the CPU path, in a capture: never */
+    paint_gpu_frost = 0;
+    frost_calls = 0;
+    render(root, W, H);
+    CHECK(frost_calls == 0 && paint_blurs_over(video, b, 8) == 3, "switched off: every frosted node is the CPU's (%d)", frost_calls);
+    paint_gpu_frost = 1;
+    test_gpu = 0;
+    frost_calls = 0;
+    render(root, W, H);
+    CHECK(frost_calls == 0, "the CPU path: %d", frost_calls);
+    test_gpu = 1;
+    paint_capture_mode = 1;
+    frost_calls = 0;
+    render(root, W, H);
+    paint_capture_mode = 0;
+    CHECK(frost_calls == 0, "a capture: %d", frost_calls);
+    /* the picture not drawn by the GPU (a frame it couldn't import): the CPU's */
+    mv_src.gpu_drawn = 0;
+    frost_calls = 0;
+    paint_damage(root);
+    ui.damage = (Box){ 0, 0, 0, 0 };
+    CHECK(paint_blurs_over(video, b, 8) == 3, "no GPU picture: every strip the CPU's");
+    paint_gpu_frost = 0;
+    test_gpu = was_gpu;
+    memset(&mv_src, 0, sizeof mv_src);
+    ui_reset();
+}
+#endif
+
+#ifndef ENGINE_BEFORE
+/* (ws170 QA BUG-14) the frosted strips over a GPU-drawn moving wallpaper: a blurred node whose background is opaque is
+ * not one (its blur never shows), and a new frame repaints them at most every media_blur_interval_ms(), the last frame
+ * always reaching them once its time comes */
+static void test_motion_blur_refresh(void) {
+    ui_reset();
+    Node *root = view(NULL);
+    ui.root = root;
+    Node *video = view(root);
+    ss(video, "position", "absolute");
+    sn(video, "left", 0); sn(video, "top", 0); sn(video, "width", 800); sn(video, "height", 600);
+    Node *glass = view(root), *solid = view(root), *faded = view(root);
+    Node *nodes[3] = { glass, solid, faded };
+    static const uint32_t bgs[3] = { 0x80ffffff, 0xff202020, 0xff202020 };
+    for (int i = 0; i < 3; i++) {
+        ss(nodes[i], "position", "absolute");
+        sn(nodes[i], "left", 20 + 260 * i); sn(nodes[i], "top", 20); sn(nodes[i], "width", 200); sn(nodes[i], "height", 100);
+        sn(nodes[i], "backgroundColor", bgs[i]); sn(nodes[i], "backdropBlur", 20);
+    }
+    sn(faded, "opacity", 0.5);              /* opaque, but drawn translucent: its blur shows */
+    layout_root(root, 800, 600);
+    paint_damage(root);
+    Box out[8];
+    int n = paint_blurs_over(video, out, 8);
+    int left_of_solid = 0;
+    for (int i = 0; i < n; i++) if (out[i].x0 >= 260 && out[i].x1 <= 520 - 20) left_of_solid++;
+    CHECK(n == 2 && !left_of_solid, "frosted strips over the video: %d (want the translucent and the faded one, not the opaque)", n);
+    sn(solid, "backgroundColor", 0xf0202020);
+    layout_root(root, 800, 600);
+    paint_damage(root);
+    CHECK(paint_blurs_over(video, out, 8) == 3, "a translucent background shows its blur again");
+    ui.damage = (Box){ 0, 0, 0, 0 };
+
+    int every = media_blur_interval_ms();
+    MediaSrc *s = calloc(1, sizeof *s);
+    double t = 1000;
+    CHECK(media_src_blur_frame(s, t) == 1, "the first frame refreshes the strips");
+    int refreshed = 0;
+    for (int f = 1; f <= 30; f++) refreshed += media_src_blur_frame(s, t + f * 33.3);   /* a second at 30 frames/s */
+    int want = every > 0 ? (int)(1000 / every) : 30;
+    CHECK(refreshed >= want - 1 && refreshed <= want + 1, "30 frames in a second: %d refreshes (interval %d ms)", refreshed, every);
+    double last = t + 30 * 33.3;
+    int pending = s->blur_pending;
+    double due = media_src_blur_due(s, last);
+    CHECK(!every || (pending && due > 0 && due <= every), "the last frame waits at most one interval: pending %d, due %.1f", pending, due);
+    CHECK(media_src_blur_due(s, last + every + 1) < 0 && !s->blur_pending, "and is refreshed once its time came");
+    CHECK(media_src_blur_due(s, last + 2 * every) < 0, "then nothing waits");
+    free(s);
+    ui_reset();
+}
+#endif
+
+#ifndef ENGINE_BEFORE
+/* A moving wallpaper under Flow's frosted surfaces (ws170 QA BUG-14; docs/MOVING-WALLPAPERS.md "The frosted surfaces
+ * over the video"): one 3840×2160 display at scale 1, a full-screen node standing in for the video (the GPU draws it;
+ * the CPU repaints only what blurs it), the menu bar, the Dock, a desk widget and two frosted windows with text, as on
+ * the QA's desktop. Each refresh is what media_src_blur_damage asks for after a video frame: every frosted box over the
+ * video (paint_blurs_over) damaged and repainted (the blur recomputed, as the video changed under it). Printed: the
+ * median time of one refresh and what it costs of the main thread per display at 30 frames a second (every frame,
+ * before) and at the throttled rate (MEDIA_BLUR_MS, after). The video's rows read back from the GPU are not counted. */
+static void bench_motion(void) {
+    quiet = 1;
+    ui_reset();
+    Node *root = view(NULL);
+    ui.root = root;
+    static uint8_t ring[4];
+    mv_src = (MediaSrc){ .used = 1, .id = MV_MEDIA_ID, .kind = SK_PLAYER, .sock = -1, .cur_slot = -1, .map = ring, .w = 3840, .h = 2160 };
+    Node *video = node_new(NODE_MEDIA);                 /* the moving wallpaper (engine-test's media_paint: an opaque frame) */
+    node_append(root, video);
+    ss(video, "position", "absolute");
+    sn(video, "left", 0); sn(video, "top", 0); sn(video, "width", 3840); sn(video, "height", 2160);
+    video->term = MV_MEDIA_ID;
+    const float frost = 30;
+    Node *bar = view(root);
+    ss(bar, "position", "absolute");
+    sn(bar, "left", 0); sn(bar, "top", 0); sn(bar, "width", 3840); sn(bar, "height", 28);
+    sn(bar, "backgroundColor", 0x99202020); sn(bar, "backdropBlur", frost);
+    ss(bar, "flexDirection", "row"); sn(bar, "gap", 18); sn(bar, "paddingLeft", 14);
+    static const char *const menus[] = { "Terminal", "Shell", "Edit", "View", "Profiles", "Window", "Help" };
+    for (int i = 0; i < 7; i++) text(bar, menus[i], 13);
+    static const struct { float x, y, w, h; int rows; } wins[] = { { 200, 120, 1600, 1000, 45 }, { 2000, 300, 1200, 800, 24 } };
+    for (int k = 0; k < 2; k++) {
+        Node *w = view(root);
+        ss(w, "position", "absolute");
+        sn(w, "left", wins[k].x); sn(w, "top", wins[k].y); sn(w, "width", wins[k].w); sn(w, "height", wins[k].h);
+        sn(w, "backgroundColor", 0xd0202024); sn(w, "borderRadius", 12); sn(w, "backdropBlur", frost);
+        sn(w, "shadowColor", 0x66000000); sn(w, "shadowBlur", 24); sn(w, "shadowOffsetY", 8);
+        sn(w, "padding", 12); sn(w, "gap", 4); ss(w, "overflow", "hidden");
+        for (int r = 0; r < (getenv("BENCH_NO_TEXT") ? 0 : wins[k].rows); r++) text(w, "lordbasex@master-lordos:~$ pt standard caro_davy anna eve jane giovanni vera", 14);
+    }
+    Node *widget = view(root);
+    ss(widget, "position", "absolute");
+    sn(widget, "left", 3300); sn(widget, "top", 120); sn(widget, "width", 360); sn(widget, "height", 200);
+    sn(widget, "backgroundColor", 0x66ffffff); sn(widget, "borderRadius", 18); sn(widget, "backdropBlur", frost);
+    text(widget, "27 Nov 07:14", 28);
+    Node *dock = view(root);
+    ss(dock, "position", "absolute");
+    sn(dock, "left", 1370); sn(dock, "top", 2060); sn(dock, "width", 1100); sn(dock, "height", 84);
+    sn(dock, "backgroundColor", 0x80ffffff); sn(dock, "borderRadius", 20); sn(dock, "backdropBlur", frost);
+
+    const int W = 3840, H = 2160;
+    uint32_t *px = calloc((size_t)W * H, 4);
+    Canvas c;
+    canvas_init(&c, px, W, H, W);
+    layout_root(root, W, H);
+    paint_damage(root);
+    ui.damage = (Box){ 0, 0, (float)W, (float)H };
+    paint_root_clear(&c, root, 0);
+    Box boxes[32];
+    int nb = paint_blurs_over(video, boxes, 32);
+    /* BENCH_NO_BLUR: the same boxes repainted without their blur (what the content alone costs) */
+    if (getenv("BENCH_NO_BLUR")) for (Node *ch = root->first; ch; ch = ch->next) ch->s.backdrop_blur = 0;
+    double area = 0;
+    for (int i = 0; i < nb; i++) area += (double)(boxes[i].x1 - boxes[i].x0) * (boxes[i].y1 - boxes[i].y0);
+    enum { N = 31 };
+    double v[N];
+    for (int f = 0; f < N; f++) {
+        double a = now_ms();
+        for (int i = 0; i < nb; i++) {
+            Rect r = { (int)boxes[i].x0, (int)boxes[i].y0, (int)boxes[i].x1, (int)boxes[i].y1 };
+            ui.damage = boxes[i];
+            canvas_set_clip(&c, r);
+            paint_root_clear(&c, root, 0);
+        }
+        canvas_set_clip(&c, (Rect){ 0, 0, W, H });
+        v[f] = now_ms() - a;
+    }
+    ui.damage = (Box){ 0, 0, 0, 0 };
+    double ms = median(v, N);
+    int every = media_blur_interval_ms();
+    double after_hz = every > 0 ? 1000.0 / every : 30;
+    if (after_hz > 30) after_hz = 30;
+    printf("motion: %d frosted boxes over the video, %.1f Mpx; one refresh %.2f ms; main thread per display: "
+           "%.0f %% at 30 frames/s (every frame), %.0f %% at %.1f refreshes/s (every %d ms)\n",
+           nb, area / 1e6, ms, ms * 30 / 10, ms * after_hz / 10, after_hz, every);
+    /* the GPU path (paint.c frost_source): the picture drawn by the GPU, its frosted nodes handed to it; what the CPU still
+     * repaints with each frame is what paint_blurs_over leaves */
+    mv_src.nv = 1; mv_src.gtex = (GpuTex *)ring; mv_src.gpu_drawn = 1;
+    mv_src.map_ok = 1; mv_src.map_w = W; mv_src.map_h = H; mv_src.map_kx = 1.0f / W; mv_src.map_ky = 1.0f / H;
+    int was_gpu = test_gpu;
+    test_gpu = 1;
+    paint_gpu_frost = 1;
+    frost_calls = 0;
+    ui.damage = (Box){ 0, 0, (float)W, (float)H };
+    paint_root_clear(&c, root, 0);
+    ui.damage = (Box){ 0, 0, 0, 0 };
+    int gpu_boxes = frost_calls, left = paint_blurs_over(video, boxes, 32);
+    double gms = 0;
+    for (int f = 0; f < N; f++) {
+        double a = now_ms();
+        for (int i = 0; i < left; i++) {
+            ui.damage = boxes[i];
+            canvas_set_clip(&c, (Rect){ (int)boxes[i].x0, (int)boxes[i].y0, (int)boxes[i].x1, (int)boxes[i].y1 });
+            paint_root_clear(&c, root, 0);
+        }
+        canvas_set_clip(&c, (Rect){ 0, 0, W, H });
+        v[f] = now_ms() - a;
+    }
+    gms = median(v, N);
+    printf("motion, GPU frosted glass: %d of the %d frosted boxes blurred by the GPU, %d left to the CPU; a video frame costs "
+           "the main thread %.2f ms (%.0f %% at 30 frames/s per display; the GPU's own work: build/motion-bench frost)\n",
+           gpu_boxes, nb, left, gms, gms * 30 / 10);
+    ui.damage = (Box){ 0, 0, 0, 0 };
+    paint_gpu_frost = 0;
+    test_gpu = was_gpu;
+    memset(&mv_src, 0, sizeof mv_src);
+    free(px);
+}
+#endif
+
 int main(int argc, char **argv) {
     const char *dir = getenv("LORD_FONTS") ? getenv("LORD_FONTS") : "../assets/fonts";
     fonts_set_builtin_dir(dir);
     if (text_init(dir)) { printf("engine-test: no fonts in %s\n", dir); return 1; }
 #ifndef ENGINE_BEFORE
     if (argc > 1 && !strcmp(argv[1], "bench-slideshow")) { bench_slideshow(); return 0; }
+    if (argc > 1 && !strcmp(argv[1], "bench-motion")) { bench_motion(); return 0; }
 #endif
     if (argc > 1 && !strcmp(argv[1], "bench")) { bench(); return 0; }
 #ifdef ENGINE_BEFORE
@@ -4394,9 +4854,13 @@ int main(int argc, char **argv) {
     test_node_ref();
     test_backdrop_band();
     test_multi_damage();
+    test_media_views();
     test_text_child_damage();
     test_minimize_damage();
     test_hidden_blur_damage();
+    test_gpu_cover();
+    test_motion_blur_refresh();
+    test_gpu_frost();
     test_gscissor_unit();
     test_gcontend();
     memset(&gc_all, 0, sizeof gc_all);

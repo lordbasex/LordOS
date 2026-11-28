@@ -12,7 +12,7 @@ Everything you can configure in LordOS is in Settings. The field at the top sear
 | Section | What it has |
 |---|---|
 | [General](settings:general) | This computer: name, software and storage |
-| [Appearance](settings:appearance) | Desktop style (Lord Flow or Lord Classic), dark or light mode, accent color, transparency |
+| [Appearance](settings:appearance) | Desktop style (Flow or Classic), dark or light mode, accent color, transparency |
 | [Wallpaper](settings:wallpaper) | The desktop background |
 | [Desktop & Dock](settings:dock) | The Dock, desktops and window buttons |
 | [Displays](settings:displays) | Resolution, scale, arrangement of several displays, Night Light |

@@ -95,7 +95,7 @@
   "menu.emptyTrash": "Alisan ng Laman ang Basurahan",
   "menu.file": "File",
   "menu.forward": "Pasulong",
-  "menu.getInfo": "Kunin ang Impormasyon",
+  "menu.getInfo": "Mga Katangian",
   "menu.go": "Pumunta",
   "menu.groupBy": "Igrupo ayon sa",
   "menu.newFolder": "Bagong Folder",
@@ -342,5 +342,9 @@
   "readOnly.denied": "Read-only ang folder na ito: hindi ka pinapayagan ng mga pahintulot nito na baguhin ito. Para baguhin ito, gamitin ang Terminal o ibang app.",
   "fromMachineNoRun": "Galing ang “{name}” sa makinang {machine}. Hindi nagbubukas ang Mga File ng mga program o installer mula sa isang makina: gamitin ang Buksan Gamit kung pinagkakatiwalaan mo ito.",
   "info.from": "Pinagmulan",
-  "info.fromMachine": "Ang makinang {machine}"
+  "info.fromMachine": "Ang makinang {machine}",
+  "skin.address": "Address",
+  "skin.tasks": "Mga Gawain sa File at Folder",
+  "skin.otherPlaces": "Iba Pang Lugar",
+  "skin.details": "Mga Detalye"
 }

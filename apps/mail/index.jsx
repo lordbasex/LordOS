@@ -17,7 +17,7 @@ import { CATEGORY_COLORS, categoryName, listDate, fullDate, folderName, addrShor
 import { quote } from './md.js';
 import { safeName } from './util.js';
 
-// a small window (a Lord Workspaces tile): below SIDE_AT the accounts and folders hide behind a toolbar button, below
+// a small window (a Workspaces tile): below SIDE_AT the accounts and folders hide behind a toolbar button, below
 // ONE_AT the list and the message take turns (the message with a back button)
 const SIDE_AT = 820, ONE_AT = 640;
 

@@ -1,4 +1,4 @@
-// menubar_displays_scene.mjs — the second scene of tests/menubar_test.mjs (not run by itself), 0.8.8.6: Lord Flow's
+// menubar_displays_scene.mjs — the second scene of tests/menubar_test.mjs (not run by itself), 0.8.8.6: Flow's
 // menu bar on every display. Three monitors side by side over the stub `lord` (the bundle's banner); <MenuBars> from
 // themes/default/components/MenuBar.jsx through runtime/index.js and the real SDK. It checks one bar per display,
 // the app's menus lit only on the focused window's display, a click on a dimmed bar lighting it, one clock timer

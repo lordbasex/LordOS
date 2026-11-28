@@ -119,3 +119,65 @@ double mp_param_num(const char *params, const char *key, double def) {
     double v = strtod(b, &end);
     return end == b ? def : v;
 }
+
+int mp_ring_layout(int64_t fmt, int64_t w, int64_t h, int64_t slots, int64_t colors, MpRing *out) {
+    if (!out) return -1;
+    memset(out, 0, sizeof *out);
+    if (w < 1 || h < 1 || w > MP_MAX_DIM || h > MP_MAX_DIM || slots < 1 || slots > MP_RING_SLOTS) return -1;
+    if (fmt == MF_BGRA) {
+        if (colors != 0) return -1;
+        out->slot_bytes = (size_t)w * (size_t)h * 4;
+        out->y_stride = (int)w * 4;
+    } else if (fmt == MF_NV12) {
+        if ((w & 1) || (h & 1) || w < 2 || h < 2) return -1;
+        if (colors < 0 || (colors & ~(int64_t)(0xff | MC_FULL)) || (colors & 0xff) >= MC_MATRICES) return -1;
+        out->y_off = 0;
+        out->y_stride = (int)w;
+        out->uv_off = (size_t)w * (size_t)h;
+        out->uv_stride = (int)w;
+        out->slot_bytes = (size_t)w * (size_t)h + (size_t)w * (size_t)(h / 2);
+        out->matrix = (int)(colors & 0xff);
+        out->full = (colors & MC_FULL) != 0;
+    } else return -1;
+    out->fmt = (int)fmt;
+    out->w = (int)w;
+    out->h = (int)h;
+    out->slots = (int)slots;
+    return 0;
+}
+
+int mp_dma_check(const void *payload, size_t len, int nfds, const int64_t size[MP_DMA_MAX_OBJ], int max_w, int max_h,
+                 int (*plane_ok)(uint32_t fourcc, uint64_t modifier)) {
+    MpDma d;
+    if (!payload || len != sizeof d || !size) return -1;
+    memcpy(&d, payload, sizeof d);
+    if (d.magic != MP_DMA_MAGIC || d.pad) return -1;
+    if (max_w > MP_MAX_DIM) max_w = MP_MAX_DIM;
+    if (max_h > MP_MAX_DIM) max_h = MP_MAX_DIM;
+    if (d.w < 2 || d.h < 2 || (d.w & 1) || (d.h & 1) || d.w > (uint32_t)max_w || d.h > (uint32_t)max_h) return -1;
+    if ((d.colors & ~(uint32_t)(0xff | MC_FULL)) || (d.colors & 0xff) >= MC_MATRICES) return -1;
+    if (d.nobj < 1 || d.nobj > MP_DMA_MAX_OBJ || (int)d.nobj != nfds) return -1;
+    int deep = d.plane[0].fourcc == MP_FOURCC_R16;
+    if (!(d.plane[0].fourcc == MP_FOURCC_R8 || deep)) return -1;
+    if (d.plane[1].fourcc != (deep ? MP_FOURCC_GR1616 : MP_FOURCC_GR88)) return -1;
+    uint64_t bpp = deep ? 2 : 1;
+    int used[MP_DMA_MAX_OBJ] = { 0 };
+    uint64_t lo[2], hi[2];
+    for (int i = 0; i < 2; i++) {
+        uint32_t o = d.plane[i].obj;
+        if (o >= d.nobj) return -1;
+        if (size[o] <= 0 || (uint64_t)size[o] > MP_DMA_MAX_BYTES) return -1;
+        uint64_t rows = i ? d.h / 2 : d.h, row = (uint64_t)d.w * bpp;      /* U-V: w/2 pairs of two samples */
+        uint64_t pitch = d.plane[i].pitch, off = d.plane[i].offset;
+        if (pitch < row || pitch > MP_DMA_MAX_PITCH) return -1;
+        uint64_t end = off + pitch * (rows - 1) + row;                      /* no overflow: every term is < 2^32 */
+        if (end > (uint64_t)size[o]) return -1;
+        if (plane_ok && !plane_ok(d.plane[i].fourcc, d.modifier[o])) return -1;
+        lo[i] = off;
+        hi[i] = off + pitch * rows;
+        used[o] = 1;
+    }
+    if (d.plane[0].obj == d.plane[1].obj && lo[0] < hi[1] && lo[1] < hi[0]) return -1;
+    for (uint32_t i = 0; i < d.nobj; i++) if (!used[i]) return -1;
+    return 0;
+}

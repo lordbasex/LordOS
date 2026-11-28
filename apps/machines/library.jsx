@@ -7,11 +7,11 @@
 // Requirements and the Pi page are the other screens of this window.
 import {
   View, Text, Image, ScrollView, TextInput, useAppWindow, useStore, createStore, admin, fs, wm, windows, revealPath, openFolder, ConfirmDialog, useSystemInfo, statusText, useSettings, settings,
-  EmptyState, useNarrow, useWindowWidth, addListener, direction, Overlay, screen, t as tr, battery,
+  EmptyState, useNarrow, useWindowWidth, addListener, direction, Overlay, screen, t as tr, battery, workAreaOf,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { groupJobCloses, canRun, sensorLines, cardLights, budgetLine, isolationGaps, stateView, actionsOf, reqRows, unreadableOf, missingFor, usage, summaryOf, doingOf, thumbSrc, systemOf, libView, filterMachines, sortMachines, noSuspend,
-  chipCounts, libGrid, skeletonPlan, seenNext, specParts, restLine, gvtGpu, vcpuAdvice, LIB_VIEWS, LIB_SORTS, menuSpot, popMenuHeight, displayUnder } from './model.js';
+  chipCounts, libGrid, skeletonPlan, seenNext, specParts, restLine, gvtGpu, vcpuAdvice, LIB_VIEWS, LIB_SORTS, menuSpot, popMenuHeight, popMenuWidth, menuBounds, displayUnder } from './model.js';
 import { Assistant } from './assistant.jsx';
 import { Configure } from './configure.jsx';
 import { Sheet, Sym } from './kit.jsx';
@@ -113,7 +113,12 @@ function stateOf(m, windowed) {
 // A machine's menu over everything, not cut by the window (the shell's popover layer): below the ··· button or the
 // pointer, above them when it doesn't fit, always on the screen (model.js menuSpot)
 function CardMenu({ at, root, rl, items, onClose }) {
-  const w = 232, spot = menuSpot(at, w, popMenuHeight(items), displayUnder(screen.displays, at.x, at.y) || { x: 0, y: 0, w: screen.width, h: screen.height });
+  // (QA of 0.8.9.6.2: the menu was cut at 1280 px and covered the Dock) as wide as its labels need, inside the work area
+  const d = displayUnder(screen.displays, at.x, at.y) || { x: 0, y: 0, w: screen.width, h: screen.height };
+  let area = null;
+  try { area = workAreaOf(d); } catch (e) { area = null; }
+  const b = menuBounds(d, area);
+  const w = Math.min(popMenuWidth(items), Math.max(160, b.w - 16)), spot = menuSpot(at, w, popMenuHeight(items), b);
   return (
     <Overlay anchor={root}>
       <View style={{ position: 'absolute', left: spot.left - rl[0], top: spot.top - rl[1], width: w }}>
@@ -519,15 +524,19 @@ function FirstRun({ host, onNew, onImport, onCheck, onCanRun }) {
   const narrow = useNarrow();       // a small window: the two panes one above the other
   return (
     <View style={{ flex: 1, flexDirection: narrow ? 'column' : 'row', gap: 16, padding: 16 }}>
-      <View style={{ flex: 1, padding: narrow ? 16 : 28, alignItems: 'center', justifyContent: 'center', gap: 10, borderRadius: 18, backgroundColor: side ? p.raised : 'transparent' }}>
+      {/* centred while it fits, and it scrolls in a short window instead of spilling out (GitHub #266) */}
+      <View style={{ flex: 1, justifyContent: 'center', borderRadius: 18, backgroundColor: side ? p.raised : 'transparent' }}>
+       <ScrollView style={{ flex: -1 }} contentStyle={{ padding: narrow ? 16 : 28, alignItems: 'center', gap: 10 }}>
         <AppMark size={96} />
         <Text style={{ marginTop: 8, fontSize: 20, fontWeight: 700, color: p.text }}>{tr('machines.empty')}</Text>
         <Text style={{ maxWidth: 420, fontSize: 13, lineHeight: 1.5, color: p.dim, textAlign: 'center' }}>{tr('machines.first.addHint')}</Text>
-        <View style={{ flexDirection: 'row', gap: 8, marginTop: 6 }}>
+        {/* the buttons wrap onto a second row when they don't fit (GitHub #266: French clipped both ends) */}
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', alignSelf: 'stretch', gap: 8, marginTop: 6 }}>
           <Btn primary label={tr('machines.newMachine')} onClick={onNew} />
           <Btn label={tr('machines.first.import')} onClick={onImport} />
           {onCanRun ? <Btn label={tr('machines.pi.menu')} onClick={onCanRun} /> : null}
         </View>
+       </ScrollView>
       </View>
       {side ? (
         <View style={{ flex: 1, padding: narrow ? 16 : 28, gap: 12, borderRadius: 18, backgroundColor: p.raised }}>
@@ -540,7 +549,7 @@ function FirstRun({ host, onNew, onImport, onCheck, onCanRun }) {
             <Text style={{ fontSize: 20, fontWeight: 700, color: p.text, textAlign: 'start' }}>{tr('machines.first.offTitle')}</Text>
             <Text style={{ fontSize: 14, lineHeight: 1.5, color: p.dim, textAlign: 'start' }}>{tr('machines.first.offText')}</Text>
             <View style={{ padding: 12, borderRadius: 10, backgroundColor: p.warnBg }}><Text style={{ fontSize: 13, lineHeight: 1.5, color: p.text, textAlign: 'start' }}>{tr('machines.first.emulated')}</Text></View>
-            <View style={{ flexDirection: 'row', gap: 8 }}><Btn big label={tr('machines.first.checkAgain')} onClick={onCheck} /><Btn big label={tr('machines.first.continueEmulated')} onClick={onNew} /></View>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}><Btn big label={tr('machines.first.checkAgain')} onClick={onCheck} /><Btn big label={tr('machines.first.continueEmulated')} onClick={onNew} /></View>
           </>}
         </View>
       ) : null}
@@ -739,6 +748,7 @@ export function Library() {
   const [sel, setSel] = useState(null);
   const [page, setPage] = useState('main');          // main, new, requirements, pi: the last three as sheets over the library
   const [reqSys, setReqSys] = useState(null);        // the Requirements page of the system chosen in the assistant (5.2), or null
+  const [reqFromNew, setReqFromNew] = useState(false); // opened from the assistant: Back goes back to it, as it was left
   const [cfg, setCfg] = useState(null);              // Configure as a sheet: { dir, section }
   const [newMode, setNewMode] = useState(null);
   const [menu, setMenu] = useState(null);
@@ -809,7 +819,7 @@ export function Library() {
       { label: tr('machines.imp.menu'), onClick: () => setImporting(true) },
       '-',
       { label: tr('machines.set.menu'), onClick: () => openSettings('general') },
-      { label: tr('machines.req.menu'), onClick: () => { setReqSys(null); setPage('requirements'); } },
+      { label: tr('machines.req.menu'), onClick: () => { setReqSys(null); setReqFromNew(false); setPage('requirements'); } },
       { label: tr('machines.storage.menu'), onClick: openStorage },
       { label: tr('machines.pi.menu'), onClick: () => setPage('pi') },
     ] }, { label: tr('machines.lib.view'), items: [
@@ -956,16 +966,23 @@ export function Library() {
 
   let body;
   // the assistant, the requirements and the Pi page are sheets over the library, which stays behind them
-  const sheet = page === 'new' ? (
+  // the assistant stays mounted under its Requirements page (Install what's missing → Back), so the half-filled
+  // assistant is still there (QA 0.8.9.6.2)
+  const keepNew = page === 'requirements' && reqFromNew;
+  const reqBack = () => { if (reqFromNew) { setReqFromNew(false); setPage('new'); } else setPage('main'); };
+  const sheet = page === 'new' || keepNew ? (
+    <View style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, display: keepNew ? 'none' : 'flex' }}>
     <Sheet width={940} height={700} modal onClose={() => { setPage('main'); setNewMode(null); }}>
       <Assistant host={host} mode={newMode} names={list.map((m) => m.name)} groupNames={groups.map((g) => g.name)}
         onGroup={(dir) => { setPage('main'); setNewMode(null); refresh(); const it = libraryItems(lord.vm.list(), lord.vm.groups()).groups.find((x) => x.group.dir === dir); if (it) { setSel(dir); goGroup(it); } }}
         onClose={() => { setPage('main'); setNewMode(null); refresh(); }}
         onCreated={(m) => { setPage('main'); setNewMode(null); refresh(); if (m) openMachine(m); }} onConfigure={(m) => { setPage('main'); refresh(); if (m) setCfg({ dir: m.dir, section: 'cpu' }); }}
-        onNeeds={(x) => { setReqSys(x || null); setPage('requirements'); }} />
+        onNeeds={(x) => { setReqSys(x || null); setReqFromNew(true); setPage('requirements'); }} />
     </Sheet>
-  ) : page === 'requirements' ? (
-    <Sheet width={760} height={600} onClose={() => setPage('main')}><View style={{ flex: 1, padding: 18 }}><Requirements host={host} sys={reqSys} archs={reqSys ? [reqSys.arch] : undefined} onBack={() => setPage('main')} onChanged={refresh} /></View></Sheet>
+    </View>
+  ) : null;
+  const sheet2 = page === 'requirements' ? (
+    <Sheet width={760} height={600} onClose={reqBack}><View style={{ flex: 1, padding: 18 }}><Requirements host={host} sys={reqSys} archs={reqSys ? [reqSys.arch] : undefined} onBack={reqBack} onChanged={refresh} /></View></Sheet>
   ) : page === 'pi' ? (
     <Sheet width={820} height={640} onClose={() => setPage('main')}><View style={{ flex: 1, padding: 18 }}><ThisComputer host={host} list={list} gvt={!!gpuName} onBack={() => setPage('main')} /></View></Sheet>
   ) : null;
@@ -1001,7 +1018,7 @@ export function Library() {
           <TextInput value={query} onChange={setQuery} placeholder={tr('machines.lib.searchMachines')} onCancel={() => setQuery('')} size={15}
             style={{ flex: 1, minWidth: 0, backgroundColor: 'transparent', borderWidth: 0, border: 'none' }} />
         </View>
-        {missing.length || (host.kvmDevice && !host.kvm) ? <Square icon="security" title={tr('machines.req.menu')} onClick={() => { setReqSys(null); setPage('requirements'); } } /> : null}
+        {missing.length || (host.kvmDevice && !host.kvm) ? <Square icon="security" title={tr('machines.req.menu')} onClick={() => { setReqSys(null); setReqFromNew(false); setPage('requirements'); } } /> : null}
         {host.arch === 'arm64' && host.board && !narrow ? <Square icon="general" title={tr('machines.pi.menu')} onClick={() => setPage('pi')} /> : null}
         <View style={{ flexDirection: 'row', padding: 3, borderRadius: 10, backgroundColor: p.raised }}>
           {[['grid', 'grid', 'machines.lib.viewGrid'], ['list', 'list', 'machines.lib.viewList']].map(([k, icon, l]) => (
@@ -1043,6 +1060,7 @@ export function Library() {
       ) : null}
       {menu ? <CardMenu at={menu} root={root} rl={rl} items={menu.group ? groupMenuFor(menu.group) : menuFor(menu.m)} onClose={() => setMenu(null)} /> : null}
       {sheet}
+      {sheet2}
       {cfg ? <Sheet width={1000} height={700} modal onClose={() => setCfg(null)}>
         <Configure key={cfg.dir} dir={cfg.dir} group={cfg.group} section={cfg.group ? cfg.section || 'group' : cfg.section} onMember={(d) => setCfg((c) => ({ ...c, dir: d, section: 'group' }))} onClose={() => { setCfg(null); refresh(); }} />
       </Sheet> : null}

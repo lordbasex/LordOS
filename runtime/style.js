@@ -75,7 +75,7 @@ function gradient(v) {
 }
 
 const SIDES = ['Left', 'Top', 'Right', 'Bottom', 'Start', 'End'];
-const COLOR_KEYS = new Set(['backgroundColor', 'borderColor', 'color', 'shadowColor', ...SIDES.map((s) => `border${s}Color`)]);
+const COLOR_KEYS = new Set(['backgroundColor', 'borderColor', 'color', 'shadowColor', 'wavyColor', ...SIDES.map((s) => `border${s}Color`)]);
 const DIM_KEYS = new Set(['width', 'height', 'minWidth', 'minHeight', 'maxWidth', 'maxHeight',
   'left', 'top', 'right', 'bottom', 'flexBasis', 'start', 'end']);
 // CSS logical names → the engine's (React Native) names
@@ -235,7 +235,8 @@ function expand(k, v, out) {
     case 'fontFamily':
       // three families: Inter ('sans-serif'), JetBrains Mono ('monospace', or a name containing "mono")
       // and the brand face of the LordOS wordmark ('brand': Plus Jakarta Sans, see LordOSWordmark)
-      out.fontFamily = /mono|courier|consol/i.test(String(v)) ? 'monospace' : /brand|jakarta/i.test(String(v)) ? 'brand' : 'sans-serif';
+      // and 'theme': a style pack's installed font (sdk/appskins.jsx useThemeFont; Inter while the theme brings none)
+      out.fontFamily = /mono|courier|consol/i.test(String(v)) ? 'monospace' : /brand|jakarta/i.test(String(v)) ? 'brand' : v === 'theme' ? 'theme' : 'sans-serif';
       return;
     default:
       if (COLOR_KEYS.has(k)) out[k] = color(v);

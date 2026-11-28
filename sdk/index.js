@@ -4,19 +4,31 @@ import { render, onScreenChange } from '@lordos/runtime';
 import { settings } from './settings.js';
 import { createStore, useStore } from './store.js';
 import { locale, tOptional } from './i18n.js';
-import { cleanThemeMeta } from './thememeta.js';
+import { cleanThemeMeta, themeNamespace, themeText, themeNeedsNewer, THEME_TEXT_MAX } from './thememeta.js';
+import { lordosVersion as lordosVersionOf } from './system.js';
 
 export { View, Text, Image, Terminal, Surface, MediaView, screen, addListener, useClock, system, layouts, getLayout, modifiers } from '@lordos/runtime';
 export { displays as screenDisplays, mainDisplay, displayAt, displayFor, mainBox, holdKeyboard } from '@lordos/runtime';
 export { createStore, useStore } from './store.js';
 export { cleanThemeMeta, themeOptions, themeOptionValue, themeOptionPatch, themeAuthor } from './thememeta.js';   // theme.json's sketch and options (0.8.9)
+// (0.8.9.6.2) a community theme's own texts (theme-<id>) and the release it needs (minLordOS)
+export { themeNamespace, themeText, themeLabel, lordosAtLeast, themeNeedsNewer, THEME_TEXT_MAX } from './thememeta.js';
 export { settings, useSettings, useTrackedSettings } from './settings.js';
 export { t, tOptional, useLocale, locale, languages, preferredLanguages, setPreferredLanguages, CORE_LANGUAGES, appName, formatDate, formatTime, formatNumber, weekdayName, monthName, setLanguage, reloadCatalogs, direction, textDirection } from './i18n.js';
 export { keyboard } from './keyboard.js';
 export { regionOf, localeOf, regionCountry, languageOfLocale, localeLanguage, regionLanguageCode, regionLabel } from './localename.js';   // glibc region names (installer, Settings)
 export { LANGUAGE_NAMES } from './langnames.js';   // languages not translated yet (Settings → Language & Region)
-export { useShortcuts, addShortcuts, runShortcut, shortcutList, shortcutsRev, shortcutTaken, addMenuBarKeys } from './shortcuts.js';
+export { useShortcuts, addShortcuts, runShortcut, shortcutList, shortcutsRev, shortcutTaken, shortcutInBase, addMenuBarKeys } from './shortcuts.js';
 export { ContextMenu } from './contextmenu.jsx';
+// spelling and ✨ AI on selected text (docs/SPELLING.md, docs/AI.md "Writing")
+export { spellVersion, spellOn, spellLangs, spellInstalled, spellDefaults, spellRanges, useSpellRanges, spellSuggest, spellAddWord, spellRemoveWord, spellWordsList, spellIgnore } from './spell.js';
+export { SPELL_PACKAGES, spellPackageOk, packageInstalled, toggleLang, spellLanguages, spellWords, badRanges } from './spellmodel.js';
+export { useEditorSpell, EditorSquiggles, squiggleColorFor, spellHitAt, editorMenuRows } from './editorextras.jsx';
+// Hands: an AI agent using the desktop through lordos-mcp (docs/HANDS.md)
+export { handsStatus, handsStopped, setHandsOn, setHandsAllow, handsAllowSaved, handsMotionSaved, setHandsMotion, stopHands, answerHands, refreshHands } from './hands.jsx';
+import { HandsPrompt, HandsBanner, HandsCursor } from './hands.jsx';
+export { WritingPanel, writingReady, writingOn, writingChoice, setWritingOn, writingMenuFor } from './writing.jsx';
+export { writingEnabled } from './writingmodel.js';
 export { liveSpeech } from './livespeech.jsx';
 export { speak, stopSpeaking, pauseSpeaking, replaySpeaking, closePlayer, saveSpeech, speaking, player, speakSelection, speakAvailable, registerSelection, speechMenu, speechItems, useMenusWithSpeech, voiceSettings, VOICE_DEFAULTS, previewVoice, tryVoice } from './voice.js';
 export { VOICE_LANGS, VOICES, voiceLabel, voicePackage, modelPackage, hasVoice, PREVIEWS_PACKAGE } from './voicecatalog.js';
@@ -29,7 +41,7 @@ export { VM_ACTIONS, vmWhy, vmFactLines } from './sentinelavm.js';
 export {
   sentinelaAlerts, sentinelaEngine, sentinelaPrefs, setSentinelaPrefs, refreshSentinelaEngine, runSentinelaAction, sentinelaOnBattery,
   clearSentinelaAlerts, actionLabel as sentinelaActionLabel, installLlm, removeLlm, lumoReady, investigateProcess, translateWithLumo,
-  sentinelaBlocked, refreshBlocked, blockProgram, unblockProgram, runInvestigateAction,
+  sentinelaBlocked, refreshBlocked, blockProgram, unblockProgram, runInvestigateAction, setBrainBackend, setBrainThreads,
 } from './sentinela.js';
 export { describeProgram, describeApp, saveLumoTranslation, translationKey } from './describe.js';
 export { ShieldGlyph } from './sentinelaglyph.js';
@@ -43,10 +55,11 @@ export { trackpad, useTrackpads, hasTouchpad, registerGestureActions, lastSwipe,
 export { ime, useIme } from './ime.js';
 export { wayland, x11SelfScale, setX11Scaling } from './wayland.js';
 export { useLauncherApps, launchApp, refreshApps, guestLauncherApps, isLinuxApp, linuxAppFor, shortAppName, windowAppName, windowPixelIcons, LetterIcon, iconFromFile, webAppIcon, webProfileIcon, APP_CATEGORIES, appCategory } from './apps.js';
-export { APP_GROUPS, launcherGroup, groupApps, startView, groupRows, groupKey, keepSelection } from './appgroupsmodel.js';   // Lord Classic's start menu by category
+export { APP_GROUPS, launcherGroup, groupApps, startView, groupRows, groupKey, keepSelection } from './appgroupsmodel.js';   // Classic's start menu by category
 // Web apps (docs/WEBAPPS.md): the registry through lord.webapps, profiles, the probe, the permission questions
 export { webApps, useWebApps, refreshWebApps, webAppsAvailable, webAppEntry, webRunning, launchWebApp, probeWebApp, installWebApp, webAppCall, webAppOfWindow, webAppMemory, webEngine,
-  webBadges, siteIcons, wantSiteIcon, refreshSiteIcon, siteIconBusy, webDeveloper, setWebDeveloperMode } from './webapps.js';
+  webBadges, siteIcons, wantSiteIcon, refreshSiteIcon, siteIconBusy, siteIconStatus, webDeveloper, setWebDeveloperMode, webSearchEngine, setWebSearchEngine,
+  restartWebApp, quitWebApp, restartWebEngine } from './webapps.js';
 export * as notifyTones from './notifytones.js';
 export * as webAppsModel from './webappsmodel.js';
 export * as flathubModel from './flathubmodel.js';
@@ -83,7 +96,7 @@ export { archive } from './archive.js';
 export { print, queueName } from './print.js';
 export { emoji, Grid as EmojiGrid, ToneBar as EmojiToneBar } from './emoji.jsx';
 import { PrintDialog } from './printdialog.jsx';
-import { RestorePrompt, startSessionRestore, markThemeSwitch, unmarkThemeSwitch, logOut } from './sessionrestore.jsx';
+import { RestorePrompt, startSessionRestore, markThemeSwitch, unmarkThemeSwitch, logOut, themeFellBack } from './sessionrestore.jsx';
 import { ThemeSwitchOverlay, showThemeSwitch, hideThemeSwitch, notifyThemeNotApplied } from './themeswitch.jsx';
 import { askPower, canPower } from './power.jsx';
 export { PowerDialog, powerAsk, POWER_SECONDS } from './power.jsx';
@@ -130,7 +143,7 @@ import { refreshPackages, forgetGonePackaged, packageList as packageListOf } fro
 export {
   windows, wm, openedAt, useWindows, configureWindows, getApp, listApps, isLiveSystem, appIdOf, workArea, workAreaOf, pointerWorkArea, appMenus, useAppMenus, windowTitle, windowMenuTitle, windowAccent, appRegistry, appMenuClick,
   registerBuiltinApp, isSystemApp, snapPreview, snapRect, snapZoneAt, isWindowLocked, moveGrab, SNAP_DWELL_MS, locksChanged, snapEnabled, SNAP_ZONES, useWindowHidden, windowsOutOfSight, useWindowsOutOfSight, activeDesktop, desktopList, desktopNames, renameDesktop, moveDesktop,
-  keepWindowsInWorkAreas, pointerDisplay, windowChrome,
+  keepWindowsInWorkAreas, pointerDisplay, windowChrome, windowFrameKey,
 } from './windows.js';
 // Desktops and the Overview (docs/DESKTOPS.md)
 export { desktopName, switchDesktop, nextDesktopBy, addDesktopAndShow, closeActiveDesktop, removeDesktopById, moveToDesktopItems, flowDesktopKeys, classicDesktopKeys, flowGrabs, ctrlArrowsOn, desktopSwipe, DesktopHud } from './desktops.js';
@@ -144,8 +157,9 @@ export { WindowShell, WINDOW_EDGE, useWindowButtons, titleBarPx, SeamCover } fro
 export { WINDOW_BUTTON_SIDES, windowButtonsPref, WINDOW_BUTTON_SIZES, windowButtonSizePref, buttonSizeScale, scaledBar, windowMenuTiling } from './windowbuttons.js';   // title bar buttons' side (issue #58), size (#151, #219), the Window menu's layouts (#151)
 export { DRAG_MODIFIERS, dragModifierPref } from './moddragmodel.js';   // ❖ or Alt + drag anywhere in a window (#219)
 import { startModDrag } from './moddrag.js';
+import { startStylePack } from './appskins.jsx';
 export { term } from './terminal.js';
-export { clipboard, clipboardHistory, clipboardPanel, clipboardKind, toast } from './clipboard.js';
+export { clipboard, clipboardHistory, clipboardPanel, openClipboardPanel, clipboardKind, toast } from './clipboard.js';
 export { restoreMode, setRestoreMode, restoreBrowsers, setRestoreBrowsers } from './sessionrestore.jsx';
 export { spotlight, spotlightOpen, calc as spotlightCalc, convert as spotlightConvert } from './spotlight.js';
 export { registerSpotlightSource, searchEverything } from './spotlight.js';
@@ -184,7 +198,7 @@ export { menuStep } from './focusmodel.js';
 export { slowClick, DOUBLE_CLICK_MS, SLOW_CLICK_MAX_MS, SLOW_CLICK_SLOP } from './slowclick.js';   // the slow second click that renames in place (Files)
 import { FloatingWindows } from './components.jsx';
 // One stacking order for the desktop: <Layer name>, <Overlay anchor> (docs/LAYERS.md)
-export { LAYERS, Layer, Overlay, shellLayers } from './layers.js';
+export { LAYERS, Layer, Overlay, WindowSheet, useWindowSheetArea, shellLayers } from './layers.js';
 export { useNavigateButtons, useVisitHistory, navFor, visitNote, visitStep } from './navbuttons.js';   // a mouse's back and forward buttons (#234)
 // where a small floating bar goes and comes back (the reading-aloud player's rule; Screenshots' toolbar uses it too)
 export { placePlayer as placeFloatingBar, rememberPlace as rememberFloatingBar } from './voiceplayermodel.js';
@@ -193,6 +207,7 @@ export {
   ToolbarButton, ToolbarGroup, Toolbar, ToolbarSpacer, ToolbarDivider, Hairline, MenuButton, SearchField, EmptyState, GroupBox, FormRow, spacing, typeScale, controlSize, ConfirmDialog,
   Dropdown, Checkbox, RadioGroup, Tabs, Popover, Tooltip, ProgressBar, Disclosure, DisclosureGlyph,
 } from './controls.jsx';
+export { CommandBlock } from './codeblock.jsx';   // a command shown as code, with Copy (Settings → AI → Hands)
 // (0.8.8.8) lists whose rows are chosen with the pointer and the keys: Shift ranges, Ctrl toggles, type-to-find
 export { List, Table, TABLE_HEAD, tableWindow } from './lists.jsx';
 export { media, useMedia, usePlayer, nowPlaying, useNowPlaying, linuxPlayers, useLinuxPlayers, NowPlayingTile, mediaFormatTime, thumbFor, useThumb, userDirs, openMarkup } from './media.js';
@@ -238,7 +253,7 @@ export {
   powerProfiles, usePowerProfiles, onPowerProfileResult, bluetooth, useBluetooth, onBluetoothResult, setBluetoothPower, timedate, useTimedate, menuClock, clockPrefs,
   CLOCK_DEFAULTS, applyIdle,
 } from './hardware.jsx';
-import { DisplayConfirm, BluetoothPrompt, PolkitPrompt, PortalOpenPrompt, WebAppAskPrompt, WebAppInspectPrompt, WebAppMenu, startHardware } from './hardware.jsx';
+import { DisplayConfirm, BluetoothPrompt, PolkitPrompt, PortalOpenPrompt, WebAppAskPrompt, WebAppInspectPrompt, WebAppRestartPrompt, WebAppMenu, startHardware } from './hardware.jsx';
 import { GlobalShortcutsPrompt } from './globalshortcuts.jsx';
 export { KeyComboField, useGlobalShortcuts, checkGlobalShortcut, setGlobalShortcut, forgetGlobalShortcuts } from './globalshortcuts.jsx';
 import { startTray } from './trayitems.jsx';
@@ -258,7 +273,10 @@ export { deactivateApp, activateApp, offerActivate } from './appsoffactions.js';
 import { startAppsOff } from './appsoffactions.js';
 // apps mode's guest side: inside a Machines guest, this desktop's windows go to the host one by one (guestwin.js)
 export { guestAppsMode } from './guestwin.js';
-export { guestLauncherItems, cleanGuestApps, sameGuestApps, launchAskStep, isGuestAppId } from './guestappsmodel.js';
+// what runs in Machines and what is in apps mode, as lord-server says it: no lord.vm call while nothing runs (vmlibrary.js;
+// docs/VIRTUALIZATION.md "The shell and the machines")
+export { vmState, vmAnyActive, vmLibraryChanged } from './vmlibrary.js';
+export { guestLauncherItems, cleanGuestApps, sameGuestApps, launchAskStep, isGuestAppId, keptGuestItems, shownGuestItems } from './guestappsmodel.js';
 import { startGuestWin } from './guestwin.js';
 export { notifyPrefs, appNotifyPrefs, setAppNotifyPrefs, dndActive, NOTIFY_DEFAULTS } from './notify.js';
 
@@ -268,13 +286,41 @@ export const themes = {
   list: () => lord.themes.list().map((t) => {
     let meta = {};
     try { meta = t.meta ? JSON.parse(t.meta) : {}; } catch (e) { /* invalid theme.json */ }
-    // translated name and description (shell.theme.<id>.*) or those from theme.json
+    // translated name and description: LordOS's own (shell.theme.<id>.*), then (0.8.9.6.2) the theme's own namespace
+    // (theme-<id>.theme.name/description, a community theme's locales), then theme.json; a theme's texts go through
+    // themeText (one line, no control or bidi-override characters, a fixed length)
     // (0.8.9) sketch, options and desktopArrows: what Settings shows for a theme it doesn't know by id (sdk/thememeta.js)
-    return { id: t.id, current: t.current, hidden: !!meta.hidden, name: tOptional(`shell.theme.${t.id}.name`) || meta.name || t.id,
-      description: tOptional(`shell.theme.${t.id}.description`) || meta.description || '', ...cleanThemeMeta(meta),
+    const ns = themeNamespace(t.id);
+    const own = (k, max) => themeText((ns && tOptional(`${ns}.theme.${k}`)) || meta[k], max);
+    return { id: t.id, current: t.current, hidden: !!meta.hidden, name: tOptional(`shell.theme.${t.id}.name`) || own('name', THEME_TEXT_MAX.name) || t.id,
+      description: tOptional(`shell.theme.${t.id}.description`) || own('description', THEME_TEXT_MAX.description), ...cleanThemeMeta(meta, t.id),
       // it couldn't start in this session (lord-server went back to the one before): Settings → Appearance says why
-      failed: t.failed === true, failedWhy: typeof t.failedWhy === 'string' ? t.failedWhy : '', failedCode: t.failedCode === true };
+      failed: t.failed === true, failedWhy: typeof t.failedWhy === 'string' ? t.failedWhy : '', failedCode: t.failedCode === true,
+      // (0.8.9.6.2) installed from a file by the person (docs/THEMES-GUIDE.md "Community themes"): a community theme
+      // whatever its theme.json says, confirmed or not, and the capabilities it declared
+      ...(t.user === true ? { user: true, community: true, trusted: t.trusted === true, caps: Array.isArray(t.caps) ? t.caps.map(String) : [],
+        author: cleanThemeMeta(meta).author || (typeof t.installedAuthor === 'string' ? t.installedAuthor.slice(0, 80) : '') } : null) };
   }).filter((t) => !t.hidden),         // the login screen (themes/greeter) can't be chosen
+  // (0.8.9.6.2) Install from a file: lord-themec checks and builds the .zip in its sandbox, lord-server installs what it
+  // built into the person's themes folder. Resolves with { ok, id, error, why, report } (report: the checks' findings).
+  install(path) {
+    const job = typeof lord.themes.install === 'function' ? lord.themes.install(String(path)) : 0;
+    if (!job) return Promise.resolve({ ok: false, error: 'start', report: null });
+    return new Promise((resolve) => {
+      const poll = () => {
+        let r = null;
+        try { r = lord.themes.installJob(job); } catch (e) { r = { done: true, ok: false, error: 'start' }; }
+        if (!r || r.done) resolve(r || { ok: false, error: 'start' });
+        else setTimeout(poll, 150);
+      };
+      setTimeout(poll, 100);
+    });
+  },
+  // the person confirmed "This theme isn't from LordOS…" (only Settings asks; a theme's code can't: js_theme.c)
+  trust: (id) => !!lord.themes.trust?.(id),
+  // a community theme the watchdog took off may be tried again, or removed
+  retry: (id) => !!lord.themes.retry?.(id),
+  remove: (id) => !!lord.themes.remove?.(id),
   current: () => lord.themes.list().find((t) => t.current)?.id || null,
   // the current theme's entry (null on the login screen or without lord.themes)
   info: () => { try { return themes.list().find((t) => t.current) || null; } catch (e) { return null; } },
@@ -293,6 +339,12 @@ export const themes = {
     } catch (e) { reopen = []; }
     let entry = null;
     try { entry = themes.list().find((x) => x.id === id) || null; } catch (e) { entry = null; }
+    // (0.8.9.6.2) a theme whose theme.json asks for a newer LordOS (minLordOS) isn't loaded: nothing changes, and a
+    // notification says which release it needs (Settings shows the same instead of Apply)
+    let release = '';
+    try { release = lordosVersionOf().version; } catch (e) { release = ''; }
+    const needs = themeNeedsNewer(entry, release);
+    if (needs) { notifyThemeNotApplied({ ...entry, needsLordOS: needs }); return false; }
     markThemeSwitch();
     settings.set({ theme: id, themeReopen: reopen.length ? reopen : null, themeDesktops: desktopsForThemeSwitch() });
     lord.settings.save(JSON.stringify(settings.get(), null, 2));
@@ -321,8 +373,8 @@ export const session = {
   // Restart… and Shut Down… (0.8.1): a confirmation with a 60 s countdown (sdk/power.jsx), then
   // lord-sessiond decides. canPower(): only in a session lord-sessiond shows on the monitor.
   canPower,
-  restart: () => askPower('reboot'),
-  shutdown: () => askPower('poweroff'),
+  restart: (opts) => askPower('reboot', opts),
+  shutdown: (opts) => askPower('poweroff', opts),
 };
 
 // The screen size changed: everything is redrawn with the new measurements.
@@ -335,17 +387,20 @@ export function startShell(element) {
   const wanted = settings.get().theme;
   const current = themes.current();
   if (wanted && current && wanted !== current) {
-    if (lord.themes.use(wanted)) return;
+    // lord-server loaded this theme in place of the one chosen (a community theme taken off by the watchdog, or
+    // Ctrl+Alt+Shift+Backspace, main.c community_back): this one is the choice now; asking for the other again would
+    // undo the rescue a moment later (QA ws174: back to Classic after 5 s)
+    const fellBack = themeFellBack();
+    if (!fellBack && lord.themes.use(wanted)) return;
     // the chosen theme didn't start (it threw, or was refused at login) and lord-server kept this one: the choice
     // goes back to the theme that runs, and the person is told why the style didn't change
     let entry = null;
     try { entry = themes.list().find((x) => x.id === wanted) || null; } catch (e) { entry = null; }
-    if (entry?.failed) {
-      settings.set({ theme: current });
-      notifyThemeNotApplied(entry);
-    }
+    if (fellBack || entry?.failed) settings.set({ theme: current });
+    if (entry?.failed) notifyThemeNotApplied(entry);
   }
   try { lord.input?.pointerAccent?.(null); } catch (e) { /* older server */ }   // LordOS's black arrow; a theme may tint it (setPointerAccent)
+  startStylePack();                     // the theme's pointer colours, sounds and font, or LordOS's own (appskins.jsx)
   refreshPackages();                    // after the theme's configureWindows
   startAppsOff();                       // deactivated apps open nothing; their background work stays off (appsoffactions.js)
   startGuestWin();                      // inside a Machines guest only: apps mode's endpoint (guestwin.js)
@@ -435,15 +490,16 @@ function LocaleRoot({ children }) {
     at('popover', ClipboardPanel, EmojiPanel),
     at('modal', PrintDialog, RestorePrompt, FirstStart),
     at('notification', NotificationBanner, ClipboardToast, RemoteBadge, CaptureCorner, DisplayIdentify, VoicePlayer),
-    at('system', PermissionPrompt, SharePrompt, Powerbox, KeyringPrompt, BluetoothPrompt, PolkitPrompt, PortalFilePrompt, PortalOpenPrompt, GlobalShortcutsPrompt, ScreenCastPrompt, ShotOverlay, WebAppAskPrompt, WebAppInspectPrompt, VoiceSavePrompt, DisplayConfirm, WebAppMenu),
+    at('system', HandsPrompt, PermissionPrompt, SharePrompt, Powerbox, KeyringPrompt, BluetoothPrompt, PolkitPrompt, PortalFilePrompt, PortalOpenPrompt, GlobalShortcutsPrompt, ScreenCastPrompt, ShotOverlay, WebAppAskPrompt, WebAppInspectPrompt, WebAppRestartPrompt, VoiceSavePrompt, DisplayConfirm, WebAppMenu),
+    at('agent', HandsBanner, HandsCursor),
     at('input', OskPanel, ImeOverlay, ThemeSwitchOverlay));   // the style changing: over everything (themeswitch.jsx)
 }
 // the wallpaper slideshow (0.8.9; a theme turns it on in theme.json: sdk/thememeta.js)
-export { SlideshowWallpapers, slideSrc, slideshowPrefs, slideshowPatch, slideshowStop, slideshowCategories, SLIDESHOW_EVERY } from './slideshow.jsx';
-export { setLoginStill, setLoginImage, addWallpaperImage, removeWallpaperImage, MotionWallpaper, MOTION_SECTIONS, MOTION_RATES, motionBusy, motionItems, motionThumb, motionPoster, motionDownloads, useCodecs, downloadMotion, removeMotion, setLoginMotion, variantFor } from './motion.jsx';
+export { SlideshowWallpapers, withDownloadedStills, slideSrc, slideshowPrefs, slideshowPatch, slideshowStop, slideshowCategories, SLIDESHOW_EVERY } from './slideshow.jsx';
+export { setLoginStill, setLoginImage, addWallpaperImage, removeWallpaperImage, MotionWallpaper, MOTION_SECTIONS, MOTION_RATES, motionBusy, motionItems, motionThumb, motionPoster, motionDownloads, useCodecs, downloadMotion, removeMotion, fetchCatalogFile, removeCatalogFile, setLoginMotion, variantFor } from './motion.jsx';
 export { userVideoProblem, motionCodecs, MAX_SECONDS } from './motionmodel.js';
-export { lordosWallpapers, userWallpaperName, wallpaperSrc, wallpaperThumb, findWallpaper, wallpaperIdFor, wallpaperPatch, displayWallpaperKey, displayLabel, DEFAULT_WALLPAPER, GREETER_WALLPAPER, WALLPAPER_CATEGORIES } from './wallpapers.js';
-export { appGroup, appMenuItems, runningApps, forceQuit, recentItems, storeUpdates, hideApp, hideOthers, toggleShowDesktop, appSettingsItem, webHelpItems, webAppearanceItem, webUserAgentItem } from './appcontrol.js';
+export { lordosWallpapers, userWallpaperName, USER_WALLPAPER_DIR, warmWallpapers, wallpaperSrc, wallpaperThumb, findWallpaper, wallpaperIdFor, wallpaperPatch, displayWallpaperKey, displayLabel, DEFAULT_WALLPAPER, GREETER_WALLPAPER, WALLPAPER_CATEGORIES, STILL_STORE, stillItems, twinItems, withTwinFile, stillThumb, stillStore, stillFiles, refreshStillFiles, downloadedStills } from './wallpapers.js';
+export { appGroup, appMenuItems, runningApps, forceQuit, recentItems, storeUpdates, storeUpdatesCount, storeUpdatesChanged, hideApp, hideOthers, toggleShowDesktop, appSettingsItem, webHelpItems, webAppearanceItem, webUserAgentItem } from './appcontrol.js';
 export { windowMenuItems, moveResizeItems, registerWindowMenuItems, alwaysOnTopItem } from './windowmenu.js';
 export { setDesktopCount } from './desktops.js';
 // Apps in a small window (a Workspaces tile): the window's width, a breakpoint and a sidebar that hides (sdk/narrow.jsx)
@@ -458,6 +514,9 @@ export { WidgetPicker, widgetPicker } from './widgetpicker.jsx';
 export { FirstStart, startFirstStart, firstStartState, useFirstStartOpen } from './firststart.jsx';
 export { DesktopStyleThumb, SketchThumb, knownStyleTheme } from './stylethumb.jsx';   // Add widget, in every theme (0.8.8.10)
 
-// A theme's own pointer (0.8.9, Lord Workspaces): the default arrow as a rounded tip in its accent colour ('#RRGGBB'),
+// A theme's own pointer (0.8.9, Workspaces): the default arrow as a rounded tip in its accent colour ('#RRGGBB'),
 // or null for LordOS's black arrow. Only the default pointer changes. startShell puts the black one back for every theme.
+// Style packs and app skins (part 4 of the community-themes plan, docs/THEMES-GUIDE.md "Style packs" and "App skins")
+export { registerStylePack, registerAppSkins, useStylePack, useStyleParts, stylePack, PackIcon, usePackHas, useSkin, useSkinned, SkinRegion, SkinHeader, useThemeFont, applyPack } from './appskins.jsx';
+export { APP_REGIONS, STYLE_PARTS, SOUND_EVENTS, TOOLBAR_ICONS, partOn, partPatch, packParts, commandBar, pickCommand, listPane, pickItem } from './appskinmodel.js';
 export const setPointerAccent = (color) => { try { return !!lord.input?.pointerAccent?.(color || null); } catch (e) { return false; } };

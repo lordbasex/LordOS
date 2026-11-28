@@ -10,13 +10,13 @@
 //   Inspect (developer tools)  a web app's window, while Settings → Web Apps → Developer mode is on (webapps.js)
 //   the open windows, the one in front checked
 //
-// Lord Flow shows it under Window in its menu bar; Lord Classic in each window's Window menu.
+// Flow shows it under Window in its menu bar; Classic in each window's Window menu.
 import { windows, wm, getApp, windowTitle, onActiveDesktop } from './windows.js';
 import { screen, displayFor } from '@lordos/runtime';
 import { t } from './i18n.js';
 import { moveToDesktopItems, desktopSuffix } from './desktops.js';
 import { openOverview } from './overview.jsx';
-import { webInspectItem } from './webapps.js';
+import { webInspectItem, webRestartItems } from './webapps.js';
 import { settings } from './settings.js';
 import { windowMenuTiling } from './windowbuttons.js';
 
@@ -87,8 +87,11 @@ export function windowMenuItems(id, { close = true } = {}) {
   items.push('-', { label: t('shell.desktops.moveTo'), disabled: !w, submenu: w ? moveToDesktopItems(id) : [] },
     { label: t('shell.desktops.overview'), onClick: () => openOverview() });
   items.push('-', { label: t('shell.window.bringAll'), onClick: () => { for (const x of stack()) wm.raise(x.id); if (id) wm.raise(id); } });
+  // a web app's window: Restart… and Force Quit… (each asks first), then Inspect while developer mode is on
+  const restart = w ? webRestartItems(w) : [];
+  if (restart.length) items.push('-', ...restart);
   const inspect = w ? webInspectItem(w) : null;
-  if (inspect) items.push('-', inspect);
+  if (inspect) items.push(...(restart.length ? [] : ['-']), inspect);
   if (close) items.push('-', { label: t('shell.window.close'), hint: 'Alt+F4', disabled: !w, onClick: () => wm.close(id) });
   const list = windows.get().filter(own);
   if (list.length) {

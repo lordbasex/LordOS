@@ -128,5 +128,6 @@
   "user.user": "Nama pengguna",
   "user.userHint": "Huruf kecil, nombor, - dan _. Pengguna ini akan menjadi pentadbir (sudo).",
   "welcome.text": "Pembantu ini memasang LordOS pada cakera komputer ini. Anda akan memilih bahasa, papan kekunci, cakera dan pengguna anda. Pemasangan memadam cakera yang dipilih, melainkan anda memasang bersebelahan yang sedia ada atau memilih partition sendiri.",
-  "welcome.title": "Selamat datang ke LordOS"
+  "welcome.title": "Selamat datang ke LordOS",
+  "disk.unreadable": "Penerangan sebuah cakera tidak dapat dibaca, jadi ia tidak disenaraikan. Cari semula; jika masih tiada, sila laporkan."
 }

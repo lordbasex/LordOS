@@ -357,7 +357,9 @@ entry. The orphaned-grandchild, log, signal and fd hygiene of `launch()` stays a
 **Built on 2026-11-19 (phase 1 step 6):** `flatpak` is a Dock kind (`sdk/dockmodel.js`, the rules of `fpak_id_ok`),
 so "Keep in Dock", dragging from the launcher and session restore take `flatpak:<id>` like `desktop:<id>`. Files' and
 the Terminal's "Open with" list the Flatpak apps whose export declares the type, and `apps_launch_flatpak_with`
-refuses an app whose export has no `MimeType` (as `launchWith` does for Linux apps). Not done in phase 1: Settings →
+refuses an app whose export has no `MimeType` (as `launchWith` does for Linux apps). An app's other exports, named
+after its id plus a suffix (LibreOffice's `org.libreoffice.LibreOffice.writer.desktop`), lend it their `MimeType` and
+nothing else: they are no apps of their own, and the file opens in the app by its id (ws170 QA BUG-22). Not done in phase 1: Settings →
 Default Apps doesn't offer Flatpak apps (`apps_default_for` reads only Linux apps), and MIME aliases aren't resolved
 for them either (an app that declares `audio/wav` isn't offered for a `.wav`, which the system calls
 `audio/vnd.wave`; the same holds for Linux apps).
@@ -472,7 +474,7 @@ callers are Linux apps outside Flatpak; none of them identifies a Flatpak app ye
 | `org.freedesktop.portal.Inhibit` | served (version 1; 0.8.8.8) | `Inhibit` with the idle or suspend flag counts as the compositor's idle inhibition (`wl_idle_inhibited()`, the screen-off, lock and sleep timers); released by `Request.Close` or when the caller leaves the bus. Logout and user-switch flags are accepted and do nothing; no `CreateMonitor` |
 | `org.freedesktop.portal.GlobalShortcuts` | served (version 1; 0.8.8.8) | `CreateSession`, `BindShortcuts`, `ListShortcuts`; `Activated` and `Deactivated` (press and release, for push-to-talk) and `ShortcutsChanged`, sent only to the connection that opened the session and only while it is bound. Nothing is bound until the person answers LordOS's own sheet; never a ❖ combination or a key LordOS keeps; a bound key goes only to that app. Decisions kept per app scope in `~/.config/lordos/global-shortcuts.json` (`fsops_protected`), changed or forgotten in Settings → Keyboard ([SHORTCUTS.md](SHORTCUTS.md), "Linux apps' global shortcuts") |
 | `org.freedesktop.ScreenSaver` (own bus name) | served (0.8.8.8) | `Inhibit`/`UnInhibit` with a cookie, the same hold, and `GetActive`; released when the caller leaves the bus |
-| Notification | not a portal here | apps use `org.freedesktop.Notifications` (`server/src/hw/notifyd.c`) |
+| `org.freedesktop.portal.Notification` | served (version 1; 0.8.9.6.2, approved by the maintainer 2026-11-27 with limits) | For Flatpak apps only (native apps use `org.freedesktop.Notifications`, `server/src/hw/notifyd.c`): `AddNotification` and `RemoveNotification`. The caller is known only by its root-owned `app-lordos-fp-<id>.scope`; any other caller, and an app with "no notifications", is not shown. The banner is the Notifications server's (same shell code, Settings → Notifications, Do Not Disturb), named and drawn with the icon of the app's own installed export; the `icon` it sends is read past. Title and body as plain text; at most three buttons as plain labels; their action names stay in lord-server and come back only as `ActionInvoked(app_id, id, action, [])` to the connection that added it. No targets, sounds, categories or other methods |
 | `org.freedesktop.portal.ScreenCast` | served (version 4; 0.8.8.8) | `CreateSession`, `SelectSources` (monitor and window, one or several, the pointer hidden or drawn into the picture; the cursor as metadata isn't offered), `Start` and `OpenPipeWireRemote`, and the `Session` object (`Close`, `Closed`). `Start` shows LordOS's own chooser: the displays and the open windows with a picture of each and the name of the app asking; nothing is shared until the person picks, Cancel answers 1, and an app with "no screen capture" is answered 2 without a question. `persist_mode` gives an app LordOS verified a restore token kept only in memory, valid 10 s and once, revoked by Stop or a lock ("Screenshots and the screen-share token", below); nothing is ever written. The streams come from the sandboxed `lord-screencast` (`server/src/cast/`); the fd `OpenPipeWireRemote` returns is a PipeWire connection that can see only the session's streams. While it runs, the sharing indicator shows it with a Stop; Stop, a lock, the app's `Close` or the app leaving the bus end it. See `WAYLAND.md`, "Sharing a screen or a window" |
 | Documents, Flatpak (sub-sandboxes) | not served | see below and E5 |
 | Screenshot, Camera | never offered | they would hand out the screen or the camera (see A) |
@@ -615,6 +617,12 @@ Each command is started like a connector: lord-server forks, the child enters a 
 "Flathub", with its own rules, and blocking it says that no Flatpak update arrives meanwhile (as
 `lordos:store`). Downloads of `extra-data` (proprietary apps that fetch from their vendor during
 install) go through the same scope.
+
+The scope's `memory.max` is 4096 MB (`NC_FLATHUB_MEM_MAX_MB` in `server/src/sec/netconn.h`), written the same by the
+commands and by the `flathub` connector that shares the scope (the other connectors keep 64 MB). Until 0.8.9.6.2 the
+connector's 64 MB applied to Flatpak too, and installing VS Code or Steam was OOM-killed while pulling
+`org.freedesktop.Sdk` (an OSTree static delta of a large runtime). The bound stays: a runaway `flatpak` is killed in
+its scope, not the session.
 
 **Built and checked on 2026-11-19** (`server/src/fpak.c` `fpak_cmd_argv`, `server/src/fpakrun.c`, `lord.flatpak` in
 `server/src/ui/js_flatpak.c`; the shipped file is Flathub's own, keys `6E5C…7CAE` and subkey `54A6…7EE8` checked): on

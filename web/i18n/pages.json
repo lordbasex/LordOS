@@ -149,6 +149,7 @@
       "versions": "LordOS versions",
       "reportedIn": "Reported with",
       "fixedIn": "Fixed in",
+      "toolkits": { "title": "Linux toolkits (lordos-testbench --toolkits)", "fatal": { "timeout": "timed out", "crash": "crashed", "protocol-error": "protocol error", "connection-lost": "lost its connection", "egl": "EGL error", "vulkan": "Vulkan error", "platform-plugin": "no platform plugin", "no-result": "no result" } },
       "noProblems": "No problems reported yet.",
       "state": {
         "works": "Works",
@@ -729,6 +730,7 @@
       "versions": "Versiones de LordOS",
       "reportedIn": "Reportado con",
       "fixedIn": "Resuelto en",
+      "toolkits": { "title": "Toolkits de Linux (lordos-testbench --toolkits)", "fatal": { "timeout": "no terminó a tiempo", "crash": "se cerró con un error", "protocol-error": "error de protocolo", "connection-lost": "perdió la conexión", "egl": "error de EGL", "vulkan": "error de Vulkan", "platform-plugin": "sin plugin de plataforma", "no-result": "sin resultado" } },
       "noProblems": "Todavía no hay problemas reportados.",
       "state": {
         "works": "Funciona",
@@ -1309,6 +1311,7 @@
       "versions": "Versões do LordOS",
       "reportedIn": "Relatado com",
       "fixedIn": "Resolvido em",
+      "toolkits": { "title": "Toolkits do Linux (lordos-testbench --toolkits)", "fatal": { "timeout": "não terminou a tempo", "crash": "fechou com um erro", "protocol-error": "erro de protocolo", "connection-lost": "perdeu a conexão", "egl": "erro de EGL", "vulkan": "erro de Vulkan", "platform-plugin": "sem plugin de plataforma", "no-result": "sem resultado" } },
       "noProblems": "Ainda não há problemas relatados.",
       "state": {
         "works": "Funciona",

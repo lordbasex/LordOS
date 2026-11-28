@@ -8,6 +8,7 @@ import { changedSections, sectionsMatching, atLoginToggle, stateView, memLimit, 
   portProblems, isolationGaps, newPortRule, portsForMode, portInput, defaultCard, netSummary, renameNote, folderOffer, renameOutcome, folderOf, no3dReason, gfxFor, soundOf, soundSummary, soundDevs, soundDevChosen, bootList, bootMove, bootSummary, resolutions, gvtGpu, gvtSpare, gvtType, gpuIds, memlockNeed, memlockFits, memlockMaxMemory, toolsAutoOn, vcpuAdvice, parseTags, TAGS_MAX, usbAutoRows, guestChannels, channelSet, kbootBlocked } from './model.js';
 import { usePal, has, gb, bytes, Bar, Btn, MenuBtn, OsMark, vmRefusal, soundDevText, soundDevItems, noteMoved } from './ui.jsx';
 import { readMeta, writeMeta, readCpuUse } from './meta.js';
+import { refreshGuestLauncher } from './guestlaunch.js';
 import { COLOR_HEX } from './systems.js';
 import { defaultsOf } from './store.js';
 import { SideRow, PaneHeader, Pill, Section, Sym } from './kit.jsx';
@@ -165,9 +166,9 @@ function NetworkPane({ m, cur, set, running, offNote, host, issues, onNewMac }) 
               <Off off={running}><View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8, direction: 'ltr' }}>
                 <Segmented small value={r.proto} onChange={(x) => setRule(i, { proto: x })} options={[['tcp', 'TCP'], ['udp', 'UDP']]} />
                 <Text style={{ fontSize: 12, color: p.dim }}>{tr('machines.cfg.portHost')}</Text>
-                <TextInput value={r.host ? String(r.host) : ''} onChange={(x) => setRule(i, { host: portInput(x) })} style={{ width: 64 }} />
+                <TextInput spellCheck={false} value={r.host ? String(r.host) : ''} onChange={(x) => setRule(i, { host: portInput(x) })} style={{ width: 64 }} />
                 <Text style={{ fontSize: 12, color: p.dim }}>→ {tr('machines.cfg.portGuest')}</Text>
-                <TextInput value={r.guest ? String(r.guest) : ''} onChange={(x) => setRule(i, { guest: portInput(x) })} style={{ width: 64 }} />
+                <TextInput spellCheck={false} value={r.guest ? String(r.guest) : ''} onChange={(x) => setRule(i, { guest: portInput(x) })} style={{ width: 64 }} />
                 {cur.network === 'shared' ? <Segmented small value={r.open} onChange={(x) => setRule(i, { open: x })}
                   options={[['this-computer', tr('machines.cfg.portOpen.local')], ['lan', tr('machines.cfg.portOpen.lan')]]} /> : null}
                 <Btn label={tr('machines.cfg.portRemove')} onClick={() => set({ ports: cur.ports.filter((_, k) => k !== i) })} />
@@ -437,6 +438,9 @@ export function Configure({ dir, group, onMember, section: section0, onClose }) 
         <Segmented small value={closeChoice(meta)} onChange={(x) => { writeMeta(dir, { onClose: x }); setMeta(readMeta(dir)); }}
           options={CLOSE_CHOICES.map((k) => [k, tr(`machines.cfg.close.${k}`)])} />
       </Row>
+      <Row label={tr('machines.cfg.closeOnStop')} note={tr('machines.cfg.closeOnStopNote')}>
+        <Toggle on={meta.closeOnStop === true} onChange={(x) => { writeMeta(dir, { closeOnStop: x }); setMeta(readMeta(dir)); }} />
+      </Row>
       <Row label={tr('machines.cfg.keepAwake')} note={tr('machines.cfg.keepAwakeNote')}>
         <Toggle on={meta.keepAwake !== false} onChange={(x) => { writeMeta(dir, { keepAwake: x }); setMeta(readMeta(dir)); }} />
       </Row>
@@ -449,7 +453,7 @@ export function Configure({ dir, group, onMember, section: section0, onClose }) 
       </Row>
       {/* the guest's apps in the launcher while the machine is off (6.12, guestlaunch.js): once apps mode listed them */}
       {meta.guestApps?.length ? <Row label={tr('machines.cfg.launcherApps')} last note={tr('machines.cfg.launcherAppsNote', { count: meta.guestApps.length })}>
-        <Toggle on={meta.launcherApps !== false} onChange={(x) => { writeMeta(dir, { launcherApps: x }); setMeta(readMeta(dir)); }} />
+        <Toggle on={meta.launcherApps === true} onChange={(x) => { writeMeta(dir, { launcherApps: x }); setMeta(readMeta(dir)); refreshGuestLauncher(); }} />
       </Row> : null}
     </Group>
     {m.suspended ? <Group><Row label={tr('machines.cfg.saved')} value={bytes(m.stateBytes || 0)} last note={tr('machines.cfg.savedNote')} /></Group> : null}
@@ -755,7 +759,7 @@ export function Configure({ dir, group, onMember, section: section0, onClose }) 
       <Row label={tr('machines.cfg.automation')} note={[tr('machines.cfg.automationNote'), offNote].filter(Boolean).join(' ')}>
         <Off off={running || !cur.agent}><Toggle on={!!cur.automation} onChange={(x) => (x ? setAskAuto(true) : set({ automation: false }))} /></Off>
       </Row>
-      {askAuto ? <ConfirmDialog title={tr('machines.cfg.automationAsk')} detail={tr('machines.cfg.automationAskDetail', { name: m.name })} okLabel={tr('machines.cfg.automationAllow')}
+      {askAuto ? <ConfirmDialog handsDeny title={tr('machines.cfg.automationAsk')} detail={tr('machines.cfg.automationAskDetail', { name: m.name })} okLabel={tr('machines.cfg.automationAllow')}
         cancelLabel={tr('machines.cancel')} onOk={() => { setAskAuto(false); set({ automation: true }); }} onCancel={() => setAskAuto(false)} /> : null}
       {/* the LordOS tools brought up to date by themselves (model.js toolsAutoStep): app.json, at once, also while it runs */}
       <Row label={tr('machines.cfg.toolsAuto')} last note={tr('machines.cfg.toolsAutoNote')}>
@@ -823,7 +827,7 @@ export function Configure({ dir, group, onMember, section: section0, onClose }) 
   </>;
   else if (sec === 'security') pane = <><GuestCanSee rows={guestChannels(cur, m, { running, agentState: m.agentState })} running={running} cur={cur}
     onSet={(id, on) => (id === 'automation' && on ? setAskAuto(true) : set(channelSet(id, on, cur)))} onShow={setSec} />
-  {askAuto ? <ConfirmDialog title={tr('machines.cfg.automationAsk')} detail={tr('machines.cfg.automationAskDetail', { name: m.name })} okLabel={tr('machines.cfg.automationAllow')}
+  {askAuto ? <ConfirmDialog handsDeny title={tr('machines.cfg.automationAsk')} detail={tr('machines.cfg.automationAskDetail', { name: m.name })} okLabel={tr('machines.cfg.automationAllow')}
     cancelLabel={tr('machines.cancel')} onOk={() => { setAskAuto(false); set({ automation: true }); }} onCancel={() => setAskAuto(false)} /> : null}
   <Group>
     {/* encrypted machines (8): whole (disks, UEFI variables, TPM, snapshots' memory), the key in Passwords; host swap */}

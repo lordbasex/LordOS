@@ -210,7 +210,7 @@ function IndexSheet({ fields, onCancel, onSave }) {
     <Sheet title={tr('databases.st.addIndex')} width={480} onCancel={onCancel}
       actions={[<Btn key="c" label={tr('databases.cancel')} onClick={onCancel} />, <Btn key="s" primary label={tr('databases.st.keepChange')} onClick={save} />]}>
       <Field label={tr('databases.st.indexType')} labelWidth={100}><Popup width={200} value={kind} options={indexKindOptions()} onChange={setKind} /></Field>
-      {kind !== 'PRIMARY' ? <Field label={tr('databases.st.keyName')} labelWidth={100}><TextInput value={name} onChange={setName} placeholder={cols.length ? `idx_${cols.join('_')}` : ''} /></Field> : null}
+      {kind !== 'PRIMARY' ? <Field label={tr('databases.st.keyName')} labelWidth={100}><TextInput spellCheck={false} value={name} onChange={setName} placeholder={cols.length ? `idx_${cols.join('_')}` : ''} /></Field> : null}
       <Field label={tr('databases.st.columns')} labelWidth={100} top>
         <View style={{ gap: 6, maxHeight: 220, overflow: 'hidden' }}>
           {fields.map((f) => (

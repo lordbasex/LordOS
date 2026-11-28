@@ -23,18 +23,37 @@ export function pickVariant(item, codecs, width, height) {
 }
 
 // Why the video should be paused now, or null. Each is a reason not to spend power on something nobody sees.
-export function pauseReason({ screenOff, reduceMotion, idleSec, idleMax = 300, battery, covered, fullscreen, busy }) {
+// What covers which display is lord-server's own business (media/mambient.c): every display's view is looked at on its
+// own (opaque windows over its whole area, a fullscreen app on it, the screen off), so a game in full screen on one
+// monitor pauses only that monitor's copy, and the player pauses only when no view shows. JS keeps the reasons it
+// alone knows. batteryMode: Settings' "On battery" (MOTION_BATTERY): 'pause' (the default) pauses on battery, 'lower'
+// caps the frame rate (motionFpsCap) and pauses at 20 % or less, 'keep' never pauses for the battery.
+export const MOTION_BATTERY = ['pause', 'lower', 'keep'];
+export const MOTION_FPS_CAPS = [0, 30, 15];
+export const MOTION_CACHE_MB = [0, 256, 512, 1024, 2048];
+export const onBattery = (b) => !!(b && b.discharging);
+
+export function pauseReason({ reduceMotion, idleSec, idleMax = 300, battery, batteryMode = 'pause', busy }) {
   if (reduceMotion) return 'reduceMotion';
-  if (screenOff) return 'screenOff';
-  if (fullscreen) return 'fullscreen';
-  if (covered) return 'covered';
   if (idleSec >= idleMax) return 'idle';
-  if (battery && battery.discharging && battery.percent <= 20) return 'battery';
+  if (onBattery(battery) && batteryMode !== 'keep' && (batteryMode !== 'lower' || battery.percent <= 20)) return 'battery';
   if (busy) return 'busy';
   return null;
 }
 
-// Is this display's desktop fully hidden by a window? rects: the windows on it, not minimized.
+// The frame-rate cap to ask (0 the video's own): Settings' choice, and 15 on battery in 'lower' mode. lord-server's
+// mloop_cap applies the same rule (server/tests/mloop_test.c).
+export function motionFpsCap({ cap, batteryMode = 'pause', battery }) {
+  let c = cap === 30 || cap === 15 ? cap : 0;
+  if (batteryMode === 'lower' && onBattery(battery) && (c === 0 || c > 15)) c = 15;
+  return c;
+}
+
+// Settings' motionCacheMb: one of MOTION_CACHE_MB (1 GB when never set)
+export const motionCacheMb = (v) => (MOTION_CACHE_MB.includes(v) ? v : 1024);
+
+// Is this display's desktop fully hidden by a window? rects: the windows on it, not minimized (the slideshow's rule;
+// moving wallpapers ask lord-server instead, per view).
 export function displayCovered(display, rects) {
   return rects.some((r) => r.x <= display.x && r.y <= display.y && r.x + r.w >= display.x + display.w && r.y + r.h >= display.y + display.h);
 }
@@ -54,4 +73,18 @@ export function nextRandom(ids, last, pick = Math.random) {
   const list = ids.filter((i) => i !== last);
   if (!list.length) return ids[0] || null;
   return list[Math.floor(pick() * list.length) % list.length];
+}
+
+// A player that stops by itself (its helper ended, the decoder still held by the last one) is started again after a
+// growing pause: 0.5 s, 1 s, 2 s, 4 s, then no more (-1) and the still picture stays.
+export const MOTION_RETRIES = 4;
+export const retryDelay = (tries, base = 500) => (tries >= 0 && tries < MOTION_RETRIES ? base * 2 ** tries : -1);
+// A file lord-media can't open (media.cannotOpen: damaged, not a video) is given up after OPEN_FAILS failures in a row,
+// for every display at once and until it changes (a new download) or the session ends: it was started again every
+// 0.6 s for good, a new helper each time (ws170 QA BUG-13). A play that reached "playing" clears the count.
+export const OPEN_FAILS = 3;
+export function openFailure(counts, path, message) {
+  if (message !== 'media.cannotOpen') return { counts, broken: false };
+  const n = (counts[path] || 0) + 1;
+  return { counts: { ...counts, [path]: n }, broken: n >= OPEN_FAILS };
 }

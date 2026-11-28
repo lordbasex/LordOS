@@ -17,6 +17,7 @@
 
 #define LLM_MODEL_DIR "/usr/share/lordos/llm"     /* the lordos-llm-* packages (tools/llm/mkdeb-llm.mjs) */
 #define LLM_ENGINE "/usr/bin/llama-server"        /* LordOS's llama.cpp package (Store → Artificial Intelligence) */
+#define LLM_GGML_DIR "/usr/lib/llama.cpp"        /* ggml's backend modules: libggml-cpu-*.so, -vulkan.so, -cuda.so */
 #define LLM_IDLE_MS (120 * 1000)
 #define LLM_SYSTEM_MAX 4096
 #define LLM_USER_MAX 8192
@@ -46,6 +47,15 @@ int llm_submit_facts(int pid, unsigned long long start);
 #define LLM_TRANSLATE_MAX 2048
 int llm_submit_investigate(const char *model, const char *system, const char *user, int pid, unsigned long long start);
 int llm_submit_translate(const char *model, const char *system, const char *text);
+/* (0.8.9.6.2) "✨ AI" on selected text (writing.h): one of the fixed actions ("fix", "improve", "shorter",
+ * "translate" with target a LordOS interface language) on the person's text (at most LLM_WRITE_MAX bytes); a job id or
+ * -1 (EINVAL, EBUSY). Its answer is streamed: llm_peek gives the text so far while it runs, llm_take the whole of it at
+ * the end: {"ok":true,"content":"…","truncated":b,"ms":N,"startMs":N} or {"ok":false,"error":"llm.<code>"}. */
+int llm_submit_write(const char *model, const char *action, const char *target, const char *text);
+/* {"state":"writing","text":"…"} while it streams, {"state":"queued"|"starting"} before; NULL otherwise (malloc'd) */
+char *llm_peek(int id);
+/* Drops a queued job or stops the one streaming (its result: llm.cancelled). */
+void llm_cancel(int id);
 /* evidence.c: the program's evidence for the process (pid, start): a JSON of what was read ({"kind":"script"|"inline"|
  * "binary"|"none", ...}, malloc'd, NULL on no memory) and in *block the text for the model (malloc'd, or NULL). Only the
  * user's own processes. */
@@ -55,14 +65,33 @@ char *llm_evidence(int pid, unsigned long long start, char **block);
  *   facts:   {"ok":true,"pid":N,"exe":"…","deleted":b,"pkg":"…"|null,"place":"system|home|temp|other|none",
  *             "exeUid":N,"exeMtime":N,"chain":[{"pid":N,"name":"…","exe":"…","pkg":"…"|null}]} or {"ok":false,…} */
 char *llm_take(int id);
-/* {"state":"off|starting|ready|busy","model":"…"|null,"pid":N,"idleMs":N} (malloc'd) */
+/* {"state":"off|starting|ready|busy","model":"…"|null,"pid":N,"idleMs":N,"queued":N,
+ *  (0.8.9.6.2) "mode":"auto|cpu|gpu","gpus":{"vulkan":b,"cuda":b},"backend":"cpu|vulkan|cuda"|null,"device":"…"|null,
+ *  "layers":N,"layersTotal":N,"fallback":"start|memory|untested|none"|null,
+ *  "cpus":N,"threadsAuto":N,"threads":N,"runThreads":N} (malloc'd): backend, device, layers and runThreads are the
+ * running engine's, or the last one's this session (runThreads 0 before any); fallback says why the last start didn't
+ * use a GPU it could have; cpus the online cores (the most the Brain's cores can be), threadsAuto what "automatic" is
+ * here, threads what the next start uses */
 char *llm_state_json(void);
+/* (0.8.9.6.2) Where the engine computes (Settings → AI, "Where they run"): "auto" (CUDA, else Vulkan, else the
+ * processor; on arm64 the processor unless CUDA), "cpu", or "gpu" (CUDA, else Vulkan, else the processor). A GPU that
+ * fails to start the engine, has no room for a layer or runs out of memory is skipped until the choice changes, and
+ * the job runs again on the next one, the processor last. Returns 0, or -1 for another word. A change restarts the
+ * engine at its next job. */
+int llm_set_backend(const char *mode);
+/* (0.8.9.6.2) The engine's processor threads (Settings → AI, "Where they run": the Brain's cores, settings.brain.cpuThreads):
+ * 0 automatic (half the online cores, 1..16), else that many, at most the online cores (more is clamped). Its -t, -tb
+ * and its cgroup's cpu.max follow it (lord-llm, llmjail.h). A change restarts an idle engine now, a busy one at its
+ * next job. Returns 0, or -1 (EINVAL) when negative. */
+int llm_set_threads(int n);
 /* Stops the engine now (Sentinela turned off). */
 void llm_stop(void);
 
 /* Tests: other folders and programs (NULL keeps the default). */
 void llm_set_paths(const char *model_dir, const char *engine, const char *launcher, const char *dpkg_info);
 void llm_set_idle_ms(int ms);
+/* Tests: the folder of ggml's backend modules and the device folder ("/dev") the GPUs are looked for in. */
+void llm_set_gpu_paths(const char *ggml_dir, const char *dev_dir);
 
 /* facts.c: the package that installed a file, from dpkg's lists (<info>/<pkg>[:<arch>].list), scanning them for that
  * exact line (and its /usr-merged twin); NULL when no package has it. Cached per path until the info folder changes. */

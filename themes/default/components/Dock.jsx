@@ -11,7 +11,7 @@ import {
   View, Text, Image, screen, appName, useLocale, addListener, t as tr, useStore, settings, dockDrag, dockPoof, beginDockDrag,
   registerDockTarget, dockDragJustEnded, refreshTrash, Layer, useDockCovered, dockBadgeMetrics,
 } from '@lordos/sdk';
-import { useEffect, useRef, useState } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 
 const GAP = 8, PAD = 9, MARGIN = 6;
 const SEP = GAP + 1;          // separator before the recent apps and before the Trash
@@ -23,6 +23,10 @@ const TRASH = '__trash';
 
 // What the Dock takes up from its screen edge (for the work area).
 export const dockThickness = (size) => size + PAD * 2 + MARGIN + 4;
+
+// An icon draws again only when its own size or picture changes, not with every render of the Dock (a window's title
+// in its list changing re-renders the Dock: BUG-9 of the 0.8.9.6.2 QA)
+const DockGlyph = memo(function DockGlyph({ Icon, size }) { return Icon ? <Icon size={size} /> : null; });
 
 export function LaunchpadIcon({ size: s }) {
   const colors = ['#ff5f57', '#febc2e', '#28c840', '#0a84ff', '#bf5af2', '#ff9f0a', '#30d158', '#ff375f', '#64d2ff'];
@@ -399,7 +403,7 @@ export function Dock({ t, items: list, running, onOpen, onContext, onTrash, onTr
             : { position: 'absolute', left: c, width: 1, height: BASE * 0.7, bottom: PAD + BASE * 0.15, backgroundColor: t.dockBorder }} />
         ))}
         {items.map((app, i) => (app.trash ? (
-          <View key={TRASH} dropTrash onClick={() => { if (!dockDragJustEnded()) onTrash?.(); }}
+          <View key={TRASH} dropTrash accessibilityLabel={tr('shell.trash.name')} onClick={() => { if (!dockDragJustEnded()) onTrash?.(); }}
             onContextMenu={() => onTrashContext?.(anchor(i))}
             onMouseEnter={() => setTrashHover(true)} onMouseLeave={() => setTrashHover(false)}
             onMouseUp={() => setTimeout(refreshTrash, 60)}
@@ -408,10 +412,11 @@ export function Dock({ t, items: list, running, onOpen, onContext, onTrash, onTr
             <TrashIcon size={sizes[i]} full={trashFull} />
           </View>
         ) : (
-          <View key={app.id} onClick={() => { if (!dockDragJustEnded()) onOpen(app.id); }} onContextMenu={() => onContext?.(app.id, anchor(i))}
+          <View key={app.id} accessibilityLabel={app.launcher ? tr('shell.menu.apps') : appName(app)}
+            onClick={() => { if (!dockDragJustEnded()) onOpen(app.id); }} onContextMenu={() => onContext?.(app.id, anchor(i))}
             onMouseDown={(e) => { if (!e.button) beginDockDrag({ id: app.id, Icon: app.Icon, x: e.x, y: e.y, source: 'dock' }); }}
             style={{ position: 'absolute', ...place(i), width: sizes[i], height: sizes[i] }}>
-            <app.Icon size={sizes[i]} />
+            <DockGlyph Icon={app.Icon} size={sizes[i]} />
             {/* a web app's unread count (SetBadge, docs/WEBAPPS.md): a red badge, "99+" past 99 */}
             {app.badge ? (() => {
               const b = dockBadgeMetrics(sizes[i]);      // smaller on a small Dock (issue #128)

@@ -234,6 +234,7 @@
   "fs.moveRemoveFailed": "S’ha copiat, però no s’ha pogut eliminar l’original: {errno}",
   "fs.noTrash": "No hi ha Paperera per a aquesta ubicació",
   "fs.notFile": "No és un fitxer",
+  "fs.notFolder": "No és una carpeta",
   "fs.notInTrash": "No és a la Paperera",
   "fs.notRegular": "No és un fitxer normal (és un enllaç?)",
   "fs.openFailed": "No s’ha pogut obrir el fitxer: {errno}",
@@ -243,11 +244,13 @@
   "fs.systemFolder": "Fitxers no mostra les carpetes internes del sistema (/proc, /sys, /dev i /run)",
   "fs.tooLarge": "El fitxer és massa gran (màx. {max})",
   "fs.tooManyCopies": "Hi ha massa còpies en curs; torna-ho a provar quan n’acabi una",
+  "fs.tooManyWatches": "S'estan vigilant massa carpetes (màx. {max})",
   "fs.trashBadOrigin": "La ubicació original no és vàlida",
   "fs.trashEntryFailed": "No s’ha pogut crear l’entrada de la Paperera",
   "fs.trashOriginGone": "La carpeta original ja no existeix",
   "fs.trashOtherDisk": "És en un disc diferent del de la seva Paperera",
   "fs.trashRestoreExists": "Ja hi ha un fitxer amb aquest nom a la ubicació original",
+  "fs.watchRemote": "No es poden seguir els canvis a les carpetes del núvol i de xarxa; en lloc d'això, la carpeta es torna a llistar",
   "fw.bpfConfig": "no s’ha pogut configurar BPF: {errno}",
   "fw.bpfMaps": "no s’han pogut crear els mapes BPF: {errno}",
   "fw.bpfMissing": "falta el programa {program}",
@@ -963,5 +966,9 @@
   "sentinela.notBlocked": "Aquest programa no és a la llista de bloqueig.",
   "sentinela.noAppNetwork": "Aquest procés no té cap aplicació pròpia la xarxa de la qual es pugui bloquejar.",
   "sys.failed": "Alguna cosa ha anat malament.",
-  "sys.unsupported": "Aquesta versió de LordOS no pot fer això."
+  "sys.unsupported": "Aquesta versió de LordOS no pot fer això.",
+  "theme.notAllowed": "{call} no està disponible per als temes de la comunitat",
+  "theme.noHost": "Falta la part de LordOS de l'estil d'escriptori",
+  "hands.refused": "Només tu pots fer això: mai l'entrada d'un agent d'IA",
+  "install.diskTooManyParts": "Aquest disc té massa particions perquè l’instal·lador les pugui llistar"
 }

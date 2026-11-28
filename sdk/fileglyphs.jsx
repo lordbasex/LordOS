@@ -3,6 +3,7 @@
 import { View, Text, Image } from '@lordos/runtime';
 import { useThumb } from './media.js';
 import { kindOf, extOf, isImage, thumbSrc, KIND_COLOR } from './filekinds.js';
+import { PackIcon } from './appskins.jsx';
 
 // tint: a tag's color (#rrggbb): the folder is drawn in it instead of blue
 const mix = (hex, to, k) => {
@@ -69,7 +70,8 @@ export function EntryIcon({ e, size, dark, thumb = true, tint }) {
       </View>
     );
   }
-  if (kind === 'folder') return <FolderGlyph size={size} special={e.special} tint={tint} />;
+  // a style pack's file-type icons (appskins.jsx): 'folder' and each kind (text, code, pdf, image…), else ours
+  if (kind === 'folder') return <PackIcon group="files" name="folder" size={size} fallback={<FolderGlyph size={size} special={e.special} tint={tint} />} />;
   if (thumb && isImage(e) && size >= 32 && e.size < 24 * 1024 * 1024) {
     return (
       <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
@@ -81,7 +83,7 @@ export function EntryIcon({ e, size, dark, thumb = true, tint }) {
   if (thumb && size >= 32 && (kind === 'video' || kind === 'audio' || (kind === 'image' && !isImage(e) && !/\.svg$/i.test(e.name)))) {
     return <MediaThumb e={e} size={size} kind={kind} dark={dark} />;
   }
-  return <DocGlyph size={size} kind={kind} ext={extOf(e.name)} dark={dark} />;
+  return <PackIcon group="files" name={kind} size={size} fallback={<DocGlyph size={size} kind={kind} ext={extOf(e.name)} dark={dark} />} />;
 }
 
 function MediaThumb({ e, size, kind, dark }) {

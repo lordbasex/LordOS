@@ -1,4 +1,4 @@
-// tokens.js: Lord Celeste's tokens for the apps (sdk/theme.js), in dark and light, built on every render from the
+// tokens.js: Celeste's tokens for the apps (sdk/theme.js), in dark and light, built on every render from the
 // settings (mode, accent, effects) and the colour scheme of the theme's options (cae.js). The apps' accent is the
 // user's accent from Settings → Appearance, with the names the bundled themes use so the choice survives a switch.
 import { lordosWallpapers } from '@lordos/sdk';

@@ -13,7 +13,7 @@
  *     LORDOS_WEB=1 (and LORDOS_SESSIOND=1 under lord-sessiond, so lord-web refuses to run without its scope), and
  *     LORDOS_WEB_SCHEME=light|dark once the theme has told the desktop's mode (webscheme.h).
  *     One process per app and profile; a second launch only says it is running (the shell
- *     raises its window).
+ *     raises its window, and ui/webalive.c checks it still answers).
  *   - Developer tools (docs/WEBAPPS.md, "Developer tools"; webinspect.h): developer mode is one switch,
  *     ~/.config/lordos/web/developer.json, written only here. webmgr_inspect ends that app and profile's lord-web and
  *     starts it again as "lord-web --app <app> --profile <profile> --inspect", only while the switch is on (lord-web
@@ -36,6 +36,8 @@
 #define WEB_MAX_RUNNING   32
 #define WEB_PROBE_MS      20000
 #define WEB_PROBE_SLOTS   8
+#define WEB_PROBE_RESERVED 2        /* slots a background probe (the Store's icons) never takes: the person's own probes */
+#define WEB_PROBE_BG_KEEP_MS 60000  /* a finished background probe nobody read in this long is abandoned: its slot is free */
 
 /* The folder LordOS's assets are in (the catalog and its icons). Called once, before anything else. */
 void webmgr_init(const char *assets_dir);
@@ -75,19 +77,42 @@ int  webmgr_running(WebRunning *out, int max);  /* the live processes (the ended
 /* The app and profile of the lord-web process that pid is, or descends from; 0 found, -1 not one of ours. */
 int  webmgr_owner(pid_t pid, char *app, char *profile);
 
+/* Force quit and restart (docs/WEBAPPS.md, "When a web app stops answering"): Settings → Web apps, the window's menu,
+ * and ui/webalive.c when a lord-web stops answering its ping. Only a lord-web this lord-server started for that app and
+ * profile (the kids table), never a pid from JS: its process group gets TERM, then KILL after 2 s, then each WebKit
+ * process that was under it and is still the same process (pid and start time, webmem.h) gets KILL.
+ * webmgr_quit: *was = 1 when it ran. webmgr_restart: ends it when it runs (*was = 1), then starts it again (with
+ * developer tools again only while developer mode is on). webmgr_restart_all: every running one; how many started again. */
+const char *webmgr_quit(const char *app, const char *profile, int *was);
+const char *webmgr_restart(const char *app, const char *profile, int *was);
+int  webmgr_restart_all(void);
+
 /* Developer mode (Settings → Web Apps): 1 on, 0 off (no file, or one that isn't valid). Turning it off ends every
  * lord-web started with --inspect. */
 int  webmgr_developer(void);
+/* Settings → Web apps → Search the web with: the engine (websearch.h's WEBSEARCH_*; Google without a valid file), and
+ * a new one by name (google, duckduckgo, bing, startpage) into ~/.config/lordos/web/search.json */
+int  webmgr_search_engine(void);
+const char *webmgr_set_search_engine(const char *name);
 const char *webmgr_set_developer(int on);
 /* That app and profile's window with developer tools on: its lord-web, if it runs without them, is ended, then started
  * again with --inspect. "webapps.developerOff" while developer mode is off; *already = 1 when it runs with them
  * (nothing started). */
 const char *webmgr_inspect(const char *app, const char *profile, int *already);
 
-/* A probe of url: its id (> 0), or 0 with *err set. */
+/* A probe of url: its id (> 0), or 0 with *err set ("webapps.tooMany" when every slot is taken). The person's own
+ * (Add from an address, Refresh icon) may use every slot, and take one from a finished background probe; a
+ * background one (the Store's icon of a catalog app) never takes the last WEB_PROBE_RESERVED, so the person is
+ * never kept waiting behind them (QA 0.8.9.6.2, BUG-E). webmgr_probe is webmgr_probe_ex(url, 0, err). */
 int  webmgr_probe(const char *url, const char **err);
+int  webmgr_probe_ex(const char *url, int background, const char **err);
 /* Its answer as JSON (malloc'd), or NULL while it runs; *gone = 1 for an unknown id. */
 char *webmgr_probe_result(int id, int *gone);
+/* A finished probe whose answer was read and won't be installed (an icon fetch): its slot and icon file go now
+ * instead of after the 15 minutes kept for an Install. Nothing while it runs. */
+void webmgr_probe_release(int id);
+/* -1: unknown id; 0: running; else the milliseconds since it finished (at least 1). */
+long webmgr_probe_age(int id);
 
 /* For tests: run this program instead of the lord-web next to lord-server. */
 void webmgr_set_helper(const char *path);

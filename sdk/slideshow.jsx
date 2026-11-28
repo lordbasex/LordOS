@@ -1,7 +1,7 @@
 // slideshow.jsx — the wallpaper slideshow (0.8.9; docs/WALLPAPERS.md is the collection, docs/WORKSPACES.md "Wallpaper
 // slideshow" the feature). The decisions are in slideshowmodel.js, tested with node; a theme that declares
 // "wallpaper": { "slideshow": true } in its theme.json draws <SlideshowWallpapers> instead of its still pictures while
-// settings.slideshow.on is true (Lord Workspaces only, today).
+// settings.slideshow.on is true (Workspaces only, today).
 //
 // Cost: nothing at rest. One timer per change (no interval): the next picture is decoded off the interface's thread a
 // few seconds before (a "thumb:" image, server/src/ui/image.c, at the display's size), drawn with opacity 0 until its
@@ -9,7 +9,7 @@
 // transition's 2.4 s (lord-server blits the picture at its new place: React doesn't render per frame). After it the picture
 // that left is unmounted (its pixels go to the image cache's idle budget, which drops them first-in first-out).
 // Nothing changes while nobody sees the screen, on Power Saver or a low battery, or on a display hidden by a window.
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { Image, View } from '@lordos/runtime';
 import { settings, useSettings } from './settings.js';
 import { createStore, useStore } from './store.js';
@@ -18,6 +18,7 @@ import { windowHidden } from './desktopmodel.js';
 import { battery, powerProfiles } from './hardware.jsx';
 import { displayCovered } from './motionmodel.js';
 import { displayWallpaperKey } from './wallpapermodel.js';
+import { downloadedStills, stillStore, withTwinFile } from './wallpapers.js';
 import {
   slideshowPrefs, slideshowIds, drawNext, staggerMs, nextDue, preloadAt, transitionFor, transitionFrame, slideshowPause, MARGIN,
 } from './slideshowmodel.js';
@@ -192,10 +193,17 @@ function Slide({ d, group, list, entry, onContextMenu }) {
   );
 }
 
+// The wallpapers a slideshow can go through: the theme's, and the catalog's still pictures on this computer (their
+// collections, Abstract, Epic and Anime, are categories too: Settings → Wallpaper → Use as slideshow).
+// A built-in with a catalog twin brings its 4K file once it is on disk (sdk/wallpapers.js withTwinFile).
+export const withDownloadedStills = (list) => [...(list || []).map(withTwinFile), ...downloadedStills()];
+
 // Every display's wallpaper while the slideshow is on: list is the theme's wallpapers, displays screenDisplays().
-export function SlideshowWallpapers({ list, displays, onContextMenu }) {
+export function SlideshowWallpapers({ list: themeList, displays, onContextMenu }) {
   const [s] = useSettings();
   const prefs = slideshowPrefs(s);
+  const files = useStore(stillStore);
+  const list = useMemo(() => withDownloadedStills(themeList), [themeList, files, s.wallpaperQuality]);
   const state = useStore(shown);
   const dkeys = displays.map((d) => `${displayWallpaperKey(d)}@${d.x},${d.y},${d.w}x${d.h}`).join(' ');
   useEffect(() => { start({ list, displays, prefs }); }, [list, dkeys, prefs.category, prefs.every, prefs.perDisplay]);

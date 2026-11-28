@@ -16,7 +16,9 @@
 //                 (<GlobalShortcutsPrompt />, globalshortcuts.jsx)
 //   web apps      a web app's page asks for the camera, the microphone, the screen, the location or notifications
 //                 and its registry entry says "ask" (org.lordos.WebApps1.Ask, <WebAppAskPrompt />, webapps.js); and
-//                 "Turn on developer tools for this window?" before Inspect (<WebAppInspectPrompt />)
+//                 "Turn on developer tools for this window?" before Inspect (<WebAppInspectPrompt />); "Restart …?" and
+//                 "Force quit …?" from the Window menu (<WebAppRestartPrompt />); and a notification when lord-server
+//                 restarted one that stopped answering ("webapps-restarted")
 //   timedate      NTP state from timedated (read-only)
 //   menuClock(d)  the menu bar clock with the format chosen in Settings → Date & Time
 //
@@ -38,24 +40,30 @@ import { devicesFrom, fractionOf, toneOf as deviceTone } from './devicesmodel.js
 import { batteryStep, batteryPrefs } from './batterypolicy.js';
 import { TextInput, Toggle } from './components.jsx';
 import { dialogStack, dialogKey, keyOwner } from './dialogkeys.js';
-import { webAsks, webAskEvent, answerWebAsk, webAppEntry, refreshWebApps, webBadgeEvent, webMenu, webMenuEvent, answerWebMenu, webInspectAsk, answerWebInspect } from './webapps.js';
+import { webAsks, webAskEvent, answerWebAsk, webAppEntry, refreshWebApps, webBadgeEvent, webMenu, webMenuEvent, answerWebMenu, webInspectAsk, answerWebInspect, webDeveloper, webRestartAsk, answerWebRestart, webRestartedTitle } from './webapps.js';
+import { speechMenu } from './voice.js';
+import { vmAnyActive } from './vmlibrary.js';
+import { toggleEmojiPanel } from './emoji.jsx';
 import { ContextMenu } from './contextmenu.jsx';
-import { profileOf, notifyKey, playsSystemSound, webIconPathOk, windowLabel, webMenuItems } from './webappsmodel.js';
+import { writingMenuFor, WritingPanel } from './writing.jsx';
+import { forField } from './writingmodel.js';
+import { profileOf, notifyKey, playsSystemSound, webIconPathOk, windowLabel, webMenuItems, webSpeechText } from './webappsmodel.js';
 import { webProfileIcon, iconFromFile } from './apps.js';
 import { portalFile } from './filepicker.jsx';
-import { lockBeforeSleep, lockAfterWake } from './idlemodel.js';
+import { lockBeforeSleep, lockAfterWake, keyLightsOff, keyLightsBack } from './idlemodel.js';
 import { btPowerAction } from './btpowermodel.js';
 import { openPlan, urlHost, splitPath } from './portalopenmodel.js';
 import { openUrl, openFileWithApps, revealPath } from './sysopen.js';
-import { wm, getApp } from './windows.js';
+import { wm, getApp, windows } from './windows.js';
 import { linuxPlayersChanged, userDirs } from './media.js';
 import { trayEvent } from './trayitems.jsx';
 import { globalShortcutsEvent } from './globalshortcuts.jsx';
 import { castEvent, castNames, unknownAppName } from './screencast.jsx';
 import { castAskerName, shotFreeName, shotStamp } from './screencastmodel.js';
 import { mkdir as fsMkdir, stat as fsStat } from './fs.js';
-import { linuxCapture, studioUse } from './privacy.js';
+import { linuxCapture, studioUse, cameraUse } from './privacy.js';
 import { studioUseOf } from './studiomodel.js';
+import { cameraUseOf } from './capturemodel.js';
 import { camerasChanged } from './cameras.js';
 
 const has = (name) => typeof lord !== 'undefined' && lord[name] && typeof lord[name] === 'object';
@@ -316,13 +324,33 @@ export function applyIdle() {
 }
 
 const managed = () => typeof lord.session !== 'undefined' && lord.session.managed();
-const machinesAwake = () => { try { return typeof lord.vm !== 'undefined' ? lord.vm.awake() : 0; } catch (e) { return 0; } };
+// asked only while lord-server says a machine is active (vmlibrary.js)
+const machinesAwake = () => { if (!vmAnyActive()) return 0; try { return typeof lord.vm !== 'undefined' ? lord.vm.awake() : 0; } catch (e) { return 0; } };
 // the sleep deadline came while a machine ran: looked at again every 30 s, and the computer sleeps once none runs
 // (unless someone came back first: the "wake" stage)
 let sleepHeld = null;
+// the keyboard's light goes off with the display and comes back with it (GitHub #270; idlemodel.js): the lights it
+// turned off, until the display wakes
+let keyLightsSaved = null;
+const keyLights = () => { try { return lord.display.list()?.keyboardLight || []; } catch (e) { return []; } };
+const setKeyLight = (w) => admin.run('keyboard-light', `${w.name} ${w.value}`, undefined, { quiet: true })
+  .catch((e) => console.log(`idle: keyboard light ${w.name}: ${e.message}`));
+function keyLightsIdle(stage) {
+  if (!has('display')) return;
+  if (stage === 'off' && !keyLightsSaved) {
+    const { saved, writes } = keyLightsOff(keyLights());
+    keyLightsSaved = saved;
+    writes.forEach(setKeyLight);
+  } else if (stage === 'wake' && keyLightsSaved) {
+    const back = keyLightsBack(keyLightsSaved, keyLights());
+    keyLightsSaved = null;
+    back.forEach(setKeyLight);
+  }
+}
 function onIdle(data) {
   const stage = data?.stage;
   if (stage === 'wake' && sleepHeld) { clearInterval(sleepHeld); sleepHeld = null; }
+  if (stage === 'off' || stage === 'wake') keyLightsIdle(stage);
   // the lock deadline, or logind's Lock (loginctl lock-session, lock-sessions: hw/logindlock.c, from:'logind')
   if (stage === 'lock' && managed()) lord.session.lock();
   // the computer is going to sleep (the lid, the power button, a sleep timer) or woke up: the display was
@@ -664,7 +692,9 @@ function linuxNotify(n) {
   const key = web ? web.key : n.flatpak ? `linux:${n.flatpak}` : `linux:${app?.desktopId || n.desktop || n.app || 'app'}`;
   const prev = fromLinux.get(n.id);
   if (prev) dismissNotification(prev, 'replaced');
-  const reason = { closed: 2, expired: 1, action: 2, replaced: 0, remote: 0 };
+  // a banner whose time is up isn't closed: the notification stays in the centre, and its buttons still reach the app
+  // (QA of 0.8.9.6.2: a Flatpak alarm's Stop in the centre did nothing once its banner had gone)
+  const reason = { closed: 2, expired: 0, action: 2, replaced: 0, remote: 0 };
   const hasDefault = (n.actions || []).some(([k]) => k === 'default');
   const id = notify({
     app: key, label: web ? web.label : fp ? fp.name : shortAppName(app) || n.app, icon: web ? web.icon : app?.Icon || null,
@@ -772,15 +802,98 @@ export function WebAppInspectPrompt() {
     h(View, { style: { flex: 1, height: 28, borderRadius: 7, ...ring('ok') } }, h(DialogButton, { label: t('webapps.inspect.turnOn'), primary: true, th, onClick: () => answerWebInspect(true) })))));
 }
 
+// ---- Restart… and Force Quit… from a web app's Window menu (docs/WEBAPPS.md, "When a web app stops answering") ----
+//
+// Asked every time, Cancel first: the window closes (and, for Restart, opens again), and a call or an upload in
+// progress ends. Only the confirm reaches lord-server (lord.webapps.restart or lord.webapps.quit).
+export function WebAppRestartPrompt() {
+  const q = useStore(webRestartAsk);
+  const th = useSystemTokens();
+  const [focus, setFocus] = useState('cancel');
+  const token = useRef({}).current;
+  const owner = useStore(dialogStack, (l) => keyOwner(l) === token);
+  const latest = useRef(null);
+  latest.current = { q, focus };
+  useEffect(() => {
+    if (!q) return undefined;
+    setFocus('cancel');
+    dialogStack.open(token, null, true);
+    return () => dialogStack.close(token);
+  }, [q]);
+  useEffect(() => addListener('keydown', (e) => {
+    const cur = latest.current;
+    if (!cur.q || dialogStack.owner() !== token) return;
+    const r = dialogKey(e, { destructive: true, focus: cur.focus });
+    if (r) dialogStack.take(e);
+    if (r?.focus) setFocus(r.focus);
+    else if (r?.press) answerWebRestart(r.press === 'ok');
+  }), []);
+  if (!q) return null;
+  const entry = webAppEntry(q.app);
+  const prof = profileOf(entry, q.profile);
+  const app = entry ? (entry.profiles.length > 1 && prof ? t('webapps.windowName', { app: entry.name, profile: prof.name }) : entry.name) : q.app;
+  const quit = q.kind === 'quit';
+  const ring = (which) => (owner && focus === which ? { boxShadow: `0 0 0 2px ${th.accent}` } : null);
+  return h(View, { style: { position: 'absolute', ...mainBox(), alignItems: 'center', justifyContent: 'flex-start',
+    backgroundColor: 'rgba(0,0,0,0.3)', zIndex: 100000 } },
+  h(View, { style: { marginTop: 90, width: 400, borderRadius: 14, padding: 22, gap: 10, alignItems: 'center', backgroundColor: th.windowBg,
+    border: `1px solid ${th.separator}`, boxShadow: '0 20px 60px rgba(0,0,0,0.45)' } },
+  h(Text, { style: { fontSize: 14, fontWeight: 700, color: th.text, textAlign: 'center', lineHeight: 1.4 } }, t(quit ? 'webapps.quit.title' : 'webapps.restart.title', { app })),
+  h(Text, { style: { fontSize: 12, color: th.text, textAlign: 'center', lineHeight: 1.4 } }, t(quit ? 'webapps.quit.detail' : 'webapps.restart.detail')),
+  h(View, { style: { flexDirection: 'row', gap: 10, marginTop: 8, alignSelf: 'stretch' } },
+    h(View, { style: { flex: 1, height: 28, borderRadius: 7, ...ring('cancel') } }, h(DialogButton, { label: t('webapps.settings.cancel'), onClick: () => answerWebRestart(false), th })),
+    h(View, { style: { flex: 1, height: 28, borderRadius: 7, ...ring('ok') } }, h(DialogButton, { label: t(quit ? 'webapps.quit.ok' : 'webapps.restart.ok'), primary: true, th, onClick: () => answerWebRestart(true) })))));
+}
+
 // ---- A right click in a web app's page (org.lordos.WebApps1.Menu, server/src/ui/webask.c) ----
 //
 // lord-server checked that the menu comes from that app's lord-web and that its items are names from the closed list
-// (Cut, Copy, Paste, Select All, Copy Link Address, Open Link in Browser, Copy Image): the words are LordOS's, never
-// the page's. The menu opens at the pointer; the chosen item (or "" when it closes) goes back to lord-web.
+// (sdk/webappsmodel.js WEB_MENU_ITEMS): the words are LordOS's. The only page text is the selection's few words in
+// "Search the web for “…”" and WebKit's spelling suggestions, both cleaned by lord-web and again by lord-server. The
+// menu opens at the pointer; the chosen item (or "" when it closes) goes back to lord-web. Emoji, Speech and Inspect
+// are the shell's own: Speech reads the selection lord-web made the session's primary selection (sdk/voice.js), and
+// Inspect shows only while developer mode is on, with the Window menu's question first.
+// ✨ AI on a page's selection (docs/AI.md "Writing"): the menu's selection (lord-web's, cleaned by both) goes to the
+// shell's own panel, never to the page or lord-web; Replace (only for a selection in a text field) sends the final text
+// to that lord-web, which inserts it only where that selection still is (WriteReplace, server/src/web/webmenu.c).
+const webWriting = createStore(null);          // { job, app, profile, edit, x, y }
+function WebWritingPanel() {
+  const w = useStore(webWriting);
+  if (!w) return null;
+  const all = { w: screen.width, h: screen.height };
+  const close = () => webWriting.set(null);
+  const replace = w.edit ? (text) => { try { return lord.webapps.writeReplace(w.app, w.profile, forField(text, true)) !== false; } catch (e) { return false; } } : null;
+  return h(View, { style: { position: 'absolute', left: 0, top: 0, width: all.w, height: all.h, zIndex: 100000, pointerEvents: 'box-none' } },
+    h(WritingPanel, { key: w.job.id, at: { x: w.x, y: w.y }, bounds: all, job: w.job, onClose: close, onReplace: replace }));
+}
+
+// The menu belongs to its web app's windows: when the last of them closes (close_window, its close button) while the
+// menu is open, the menu closes too. lord-web keeps running in the background (notifications), so its own "menu gone"
+// never came, and the menu stayed in the system band over every display: an AI agent's screenshots were all black and
+// every input refused until the person closed it (ws170 QA BUG-31).
+const webMenuWindows = (m) => windows.get().some((w) => w.args?.web && w.args.web.app === m.app && w.args.web.profile === m.profile);
+const closeOrphanMenu = () => { const m = webMenu.get(); if (m && m.app && !webMenuWindows(m)) answerWebMenu('', m); };
+
 export function WebAppMenu() {
   const m = useStore(webMenu);
-  if (!m) return null;
-  const items = webMenuItems(m.items, (n) => t(`shell.edit.${n}`), (n) => answerWebMenu(n, m));
+  const developer = useStore(webDeveloper);
+  useEffect(() => windows.subscribe(closeOrphanMenu), []);
+  if (!m) return h(WebWritingPanel);
+  const later = (fn) => setTimeout(fn, 0);
+  const items = webMenuItems(m, (n, vars) => (n === 'inspect' ? t('webapps.inspect.menu') : t(`shell.edit.${n}`, vars)), (n) => answerWebMenu(n, m), {
+    developer,
+    // the menu's own selection (a contenteditable message box's too, ws162); else the primary selection, as ❖Esc reads
+    speech: () => { const s = webSpeechText(m); return speechMenu(s ? () => s : null); },
+    emoji: () => later(toggleEmojiPanel),
+    inspect: () => later(() => webInspectAsk.set({ app: m.app, profile: m.profile })),
+    // the search row's quoted words fit the menu's widest row (contextmenu.jsx MENU_ROW_MAX_W)
+    measure: (s, size) => lord.measureText(s, size, 400),
+    // never a password field's: lord-web's page script reports no selection there
+    writing: (text, edit) => writingMenuFor({ secure: false, selected: text, open: (o) => {
+      answerWebMenu('', m);
+      webWriting.set({ job: { ...o, text, id: m.id }, app: m.app, profile: m.profile, edit, x: m.x, y: m.y });
+    } }),
+  });
   if (!items.length) return null;
   const all = { w: screen.width, h: screen.height };
   // a press anywhere else closes it and goes no further (not into the page), as a browser's menu does
@@ -820,9 +933,11 @@ globalThis.__lordHw = (kind, data) => {
     // what Linux apps capture through PipeWire (server/src/sec/pwguard.c): the capture indicator (capturestatus.jsx)
     case 'capture-use': linuxCapture.set(captureUseList(data)); break;
     case 'studio-use': studioUse.set(studioUseOf(data)); break;          // LordOS Studio's camera device (capturestatus.jsx)
+    case 'camera-use': cameraUse.set(cameraUseOf(data)); break;          // a camera opened directly: a web app (capturestatus.jsx)
     case 'webapps-ask': case 'webapps-ask-gone': webAskEvent(kind, data); break;
     case 'webapps-badge': webBadgeEvent(data); break;
     case 'webapps-menu': case 'webapps-menu-gone': webMenuEvent(kind, data); break;
+    case 'webapps-restarted': { const title = webRestartedTitle(data); if (title) notify({ app: 'settings', title }); break; }
     case 'notify': linuxNotify(data); break;
     case 'sni': case 'sni-gone': case 'sni-menu': trayEvent(kind, data); break;   // Linux apps' tray icons (trayitems.jsx)
     case 'notify-close': { const own = fromLinux.get(data?.id); if (own) dismissNotification(own, 'remote'); break; }

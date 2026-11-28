@@ -13,6 +13,7 @@ import { webWindowTitles, profileHex } from './webappsmodel.js';
 import { SNAP_ZONES, snapRect, zoneAt, snapNext, dwellZone, SNAP_DWELL_MS, snapAllowed } from './snap.js';
 import { protectOnOpen, protectOnReopen, protectPatch } from './protectmodel.js';
 import { settings } from './settings.js';
+import { packAppIcon } from './appskins.jsx';
 import { FIRST_DESKTOP, onDesktop, visibleOn, mountedOn, focusedOn, keyboardWindow, windowHidden, addDesktop, removeDesktop, withName, moveDesktopTo, cleanLayer, outOfSight } from './desktopmodel.js';
 
 export { SNAP_ZONES, snapRect };
@@ -24,6 +25,8 @@ let packageApps = [];
 // Changes when an app is installed or removed (to redraw the app launcher).
 export const appRegistry = createStore(0);
 const rebuild = () => {
+  // a style pack's app icons (appskins.jsx): each native app's icon draws the pack's when it has one
+  for (const a of themeApps) if (a && a.Icon && !a.Icon.__packed) a.Icon = packAppIcon(a.id, a.Icon);
   registry = new Map([...themeApps, ...packageApps, ...builtins].map((a) => [a.id, a]));
   appRegistry.set((v) => v + 1);
 };
@@ -41,7 +44,7 @@ export function workAreaOf(d) {
   if (areaFn) return areaFn(d);
   return d.main ? area : { x: d.x, y: d.y, w: d.w, h: d.h };
 }
-// The display under the pointer (the main one before the pointer moves): Lord Classic opens the start menu there
+// The display under the pointer (the main one before the pointer moves): Classic opens the start menu there
 // from the keyboard.
 export const pointerDisplay = () => (pointer.x >= 0 ? displayAt(pointer.x, pointer.y) : mainDisplay());
 // Work area of the display under the pointer (where a new window opens).
@@ -71,8 +74,8 @@ export const appContentNodes = new Map();
 // Window id → the corner radius its frame is drawn with (WindowShell's borderRadius; 0 when square):
 // a window capture leaves the corners outside it transparent (apps/screenshots, issue #70).
 export const frameRadii = new Map();
-// Window id → the nodes of its sheets in a shell layer (a <Layer name="modal"> drawn by the window's app, such as
-// Settings → Wallpaper's file dialog; sdk/layers.js): a window capture paints them over the window (issue #58).
+// Window id → the nodes of its sheets in a shell layer (a <Layer name="modal"> drawn inside the window's app; sdk/layers.js;
+// an app's own sheets are <WindowSheet>s, inside the window): a window capture paints them over the window (issue #58).
 const sheets = new Map();
 // Session restore (sdk/sessionrestore.jsx): a new Linux window of a Dock id may have a saved place.
 let linuxPlacement = null;
@@ -143,7 +146,7 @@ onScreenChange((now, old) => {
 
 // Every window inside its display's work area: one left on a display that is gone (or outside every display) moves
 // to the main one; the others stay on their display, below its bar and within reach. Run when the screen changes and
-// when a theme changes what the work areas reserve (Lord Flow's menu bar on every display turned on).
+// when a theme changes what the work areas reserve (Flow's menu bar on every display turned on).
 export function keepWindowsInWorkAreas() {
   // a window left on a display that is gone (or outside every display) moves to the main one; the
   // others stay on their display, inside its work area
@@ -166,10 +169,10 @@ export const appMenus = createStore({});
 // returns it now (the title bar's height follows Settings → Appearance → Window options → Window buttons, windowbuttons.js);
 // used to open Linux app windows at the size they requested.
 // snap: true turns on window snapping (dragging a window to an edge of the screen, see "Snapping"
-// below); Lord Flow, Lord Classic and Lord Workspaces do. The person can still turn it off (settings.windowSnap).
-// locked: (window) => true for a window the person has locked in place (Lord Workspaces' padlock): the person's own
+// below); Flow, Classic and Workspaces do. The person can still turn it off (settings.windowSnap).
+// locked: (window) => true for a window the person has locked in place (Workspaces' padlock): the person's own
 // ways to move, resize, maximize, minimize, snap or close it refuse (see "Locked windows" below).
-// snapThirds: true (Lord Workspaces) turns a left or right half into a third after the pointer rests on that edge for
+// snapThirds: true (Workspaces) turns a left or right half into a third after the pointer rests on that edge for
 // SNAP_DWELL_MS while dragging; off, nothing changes for the other themes.
 export function configureWindows({ apps, workArea, chrome: c, snap, locked, snapThirds }) {
   themeApps = apps;
@@ -289,7 +292,7 @@ let snapOn = false;
 let thirdsOn = false;
 export { SNAP_DWELL_MS };
 // { id, edges } while a window is moved (edges 0) or resized by the person in C, else null: a theme may follow the
-// pointer meanwhile (lord.wm.pointer), as Lord Workspaces does to show where a tiled window will land
+// pointer meanwhile (lord.wm.pointer), as Workspaces does to show where a tiled window will land
 export const moveGrab = createStore(null);
 // { id, zone, rect: { x, y, w, h } } while a dragged window would snap, else null
 export const snapPreview = createStore(null);
@@ -595,6 +598,8 @@ export const wm = {
   // marked node, maximized, or no button held): the theme can continue with its own JS drag.
   // edges as in xdg_toplevel.resize: 1 top, 2 bottom, 4 left, 8 right (5 = top-left…).
   frameRef,
+  // the native node of a window's frame (its WindowShell), or 0: Hands' reader and screenshots (sdk/hands.jsx)
+  frameNode: (id) => frameNodes.get(id)?.node || 0,
   beginMove: (id) => beginGrab(id, 0),
   // ends a move or resize of this window still under way, where it is (minimizing it: GitHub #189)
   cancelGrab: (id) => {
@@ -658,6 +663,13 @@ export function useWindowHidden(id) {
 // opaque window. Opaque as for the Linux windows' pacing (wayland.js): a web app's window, or a LordOS window whose app
 // isn't transparent.
 const opaqueWindow = (w) => !!w.args?.web || (!w.args?.surface && !getApp(w.id)?.transparent);
+// What a memoized window frame (the themes' Window) must draw again for besides its own props: a maximized window's
+// work area (the Dock or a bar moved), '' for any other window, whose frame is its own x, y, w, h.
+export function windowFrameKey(w) {
+  if (!w || !w.maximized) return '';
+  const f = wm.frame(w);
+  return `${f.x},${f.y},${f.w},${f.h}`;
+}
 export const windowsOutOfSight = (ids, list = windows.get()) => outOfSight(list, activeDesktop.get(), overviewShowing.get(), ids, (w) => wm.frame(w), opaqueWindow);
 export function useWindowsOutOfSight(ids) {
   const desktop = useStore(activeDesktop);

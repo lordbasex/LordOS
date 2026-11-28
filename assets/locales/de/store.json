@@ -167,6 +167,7 @@
     "other": "{count} zu aktualisieren"
   },
   "remove": "Entfernen",
+  "removeAsk": "{name} entfernen?",
   "rescue.ask": "Kein Konto auf diesem Computer ist Administrator. Wenn du das root-Passwort kennst, kannst du dieses Konto dazu machen. Es wird erst nach einem Neustart des Computers wirksam.",
   "rescue.button": "Mich zum Administrator machen",
   "rescue.noSudo": "Kein Konto auf diesem Computer ist Administrator, und das Paket sudo ist nicht installiert. Führe als root apt install sudo aus und versuche es dann hier erneut.",
@@ -233,7 +234,7 @@
   },
   "suggest.nvidiaDriver.detail": "Derzeit wird nouveau verwendet, der in LordOS enthaltene freie Treiber. Der Treiber des Herstellers ({packages}) bietet meist bessere 3D-Leistung und Energieverwaltung.",
   "suggest.nvidiaDriver.note.nouveau": "Bis du ihn installierst, bleibt der freie Treiber nouveau in Verwendung; das Entfernen des Pakets kehrt zu ihm zurück.",
-  "suggest.nvidiaDriver.note.older": "Karten, die älter als etwa 2014 sind, werden von dieser Treiberversion nicht unterstützt; behalte bei ihnen den freien Treiber. Der LordOS-Schreibtisch wurde mit diesem Treiber noch nicht getestet.",
+  "suggest.nvidiaDriver.note.older": "Karten, die älter als etwa 2014 sind, werden von dieser Treiberversion nicht unterstützt; behalten Sie dort den freien Treiber. Der LordOS-Desktop mit diesem Treiber ist experimentell: Ein Community-Bericht zeigt ihn auf der Karte zusammengesetzt (eine GTX 1070 mit Treiber 580); ein früherer wurde vom Prozessor zusammengesetzt.",
   "suggest.nvidiaDriver.note.secureBoot": "Der Treiber wird auf diesem Computer für deinen Kernel gebaut (DKMS) und nach jedem Kernel-Update erneut. Mit aktiviertem Secure Boot musst du beim nächsten Neustart seinen Signaturschlüssel registrieren, sonst wird der Treiber nicht geladen.",
   "suggest.nvidiaDriver.title": "Proprietärer Grafiktreiber",
   "suggest.nvidiaDriver.unavailable": "Der Treiber des Herstellers benötigt die Debian-Komponenten contrib und non-free, und diese sind nicht beide in den Paketquellen dieses Computers aktiviert. Der freie Treiber nouveau funktioniert weiterhin.",

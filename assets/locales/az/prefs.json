@@ -202,6 +202,7 @@
   "power.healthNormal": "Batareyanın sağlamlığı: {pct}% (normal)",
   "power.healthService": "Batareyanın sağlamlığı: {pct}% (servis tövsiyə olunur)",
   "power.healthUnknown": "Batareyanın sağlamlığı: naməlum",
+  "power.h": "{h} saat",
   "power.hm": "{h} saat {m} dəq",
   "power.immediately": "Dərhal",
   "power.left": "{time} qalıb",

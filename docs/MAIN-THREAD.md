@@ -34,6 +34,15 @@ Always on, in every session (`server/src/ui/js.c`):
 The watchdog (`server/src/wdog.h`) is still what stops a task that runs for seconds; the stall detector is about
 the pauses people feel, from 50 ms up.
 
+The main loop watches the page flips too: a display whose flip has not completed for 2 s is logged
+(`watchdog: Virtual-1: its page flip has not completed for 2.4 s`) and, since 0.8.9.6.2 (BUG-B of the ws171 QA:
+virtio-gpu never completed one after an s2idle suspend and the login screen never showed), recovered: the flip is
+taken as done (`kms_flip_abandon`, `server/src/kms.c`), everything is painted again and the next frame is a full
+modeset (`SETCRTC`) instead of a page flip (`... the flip is dropped and the next frame is a full modeset (1 of 3)`).
+At most three times until one of that display's flips completes again (then `still no page flip after 3 full
+modesets: left as it is`), and never while the displays are off after idle, which a modeset would light. A late
+event for the dropped flip completes nothing. Test: `build/kms-recover-test`.
+
 ### Reading a stack
 
 The bundles are minified, so a stack names places like `theme.bundle.js:26:8524`. A source map made from the
@@ -120,7 +129,7 @@ Longest single run of the main thread per scenario (ms), before the fixes (commi
 and after. The numbers vary by a few ms between runs (other work on the machine); the Store's sidebar and its
 categories had been fixed already (0efdde63).
 
-| Scenario | Lord Flow | Lord Classic | Lord Workspaces |
+| Scenario | Flow | Classic | Workspaces |
 |---|---|---|---|
 | A setting changed, Store, Settings and Files open | 161 → 20 | 163 → 18 | 171 → 27 |
 | A setting changed, no window open | 29 → 31 (noise) | 51 → 13 | 43 → 4 |
@@ -265,6 +274,17 @@ was shared with builds). No native call over 50 ms in any of them; the only nati
   security check needs the real path); the existing check for a share that stopped answering guards it.
 - Test: `tests/files_info_nofreeze.sh` (in `make test`, about 30 s) opens Get Info twice on a home folder of 100 000
   files and fails on a `call fs.du` stall line, a card that never shows the size, or an opening over 250 ms.
+
+## The Raspberry Pi's session start (0.8.9.6.2)
+
+The ws171 QA on a Raspberry Pi 5 (SD card) logged a 1095 ms first `__lordTick` of the shell. Slow native calls' stall
+lines now carry their JavaScript caller (the stall detector above), which named the work inside it:
+
+| What | Before | After | What it was |
+|---|---|---|---|
+| The shell's first `__lordTick` | 1095 | 92–100 (two boots) | `fs.recent` (1006 ms; now `recentCached` on the workers), then `pkg.upgrades` (655 ms) |
+| `pkg.available` while the theme loads (`sdk/updates.js`) | 640 | under 0.1 | it opened the index; now only its header is read |
+| The crown menu's update count (`storeUpdates`) | 648 once, on the main thread | the call only | `lord.pkg.upgradeCountAsync` on a worker, 15 s after the start, then at most once a minute (`sdk/lazycount.js`) |
 
 ## What remains
 

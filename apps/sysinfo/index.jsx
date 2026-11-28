@@ -8,16 +8,17 @@
 import {
   View, Text, ScrollView, Button, useTheme, useLocale, LordOSLogo, systemReport, systemInfo, lordosVersion, formatBytes, formatNumber,
   Toolbar, ToolbarSpacer, ToolbarButton, Segmented, SidebarItem, GroupBox, FormRow, EmptyState, Hairline, spacing, typeScale,
-  fs, userDirs, clipboard, wm, admin, remote, codeStatus, launchApp, useAppWindow, useBluetooth, formatDate,
-  Dropdown, useNarrow, useSidebar, SidebarToggle, SidebarOverlay,
+  fs, userDirs, clipboard, wm, admin, remote, codeStatus, launchApp, useAppWindow, useBluetooth, formatDate, formatTime,
+  Dropdown, useNarrow, useSidebar, SidebarToggle, SidebarOverlay, Checkbox, SkinRegion, useSkinned, commandBar, pickCommand,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useState } from 'react';
 import { evaluate as evaluateChecks, evaluateProbe, evaluateBench, PENDING as PENDING_CHECKS, PROBE_CHECKS } from './checks.js';
-import Performance, { NARROW_AT } from './performance.jsx';
+import Performance, { NARROW_AT, dateTime } from './performance.jsx';
 import { Scene } from './scene.jsx';
 import { cardLayers, sessionLayers, compatibility, hardwareSections, piStatus, piBoard, machineName, compositionReason, reportFileName, reportJson, parseMemoryLines, parseSerialLines, peripherals, firmwareDate } from './model.js';
 import { buildShareReport, summaryRows, issueUrl, shareFileNames, shareJson, sharePage, bootInfo } from './share.js';
 import { communityFor, communitySummary } from './community.js';
+import { toolkitSection, isAudit, isFresh } from './toolkits.js';
 import HWREPORT_SCHEMA from './hwreport.schema.json';
 
 // The app's icon: a chip on the brand gradient.
@@ -580,7 +581,7 @@ function BenchGroup() {
         <Button label={tr('sysinfo.bench.reload')} onClick={() => setN(n + 1)} />
         <Button primary label={tr('sysinfo.bench.open')} onClick={() => launchApp('desktop:lordos-testbench')} />
       </View>
-      <GroupBox footer={b && b.at ? tr('sysinfo.probe.when', { time: new Date(b.at).toLocaleString() }) : null}>
+      <GroupBox footer={b && b.at ? tr('sysinfo.probe.when', { time: dateTime(new Date(b.at)) }) : null}>
         {rows ? rows.map((c) => <CheckRow key={c.id} c={c} />)
           : <CheckRow c={{ id: 'wayland', level: 'effective', state: 'pending', paper: '§3.4' }} />}
       </GroupBox>
@@ -615,7 +616,7 @@ function Checks({ r }) {
             <Button primary label={probe.busy ? tr('sysinfo.probe.running') : probe.result ? tr('sysinfo.probe.again') : tr('sysinfo.probe.run')} disabled={probe.busy} onClick={runProbe} />
           </View>
           {probe.error ? <Text style={{ fontSize: typeScale.callout, color: '#ff453a', textAlign: 'start' }}>{tr(`sysinfo.probe.error.${probe.error}`)}</Text> : null}
-          <GroupBox footer={probe.result ? tr('sysinfo.probe.when', { time: new Date(probe.result.at).toLocaleTimeString() }) : null}>
+          <GroupBox footer={probe.result ? tr('sysinfo.probe.when', { time: formatTime(new Date(probe.result.at), { seconds: true }) }) : null}>
             {(probeRows || PROBE_CHECKS.map((id) => ({ id, level: 'effective', state: 'pending' }))).map((c) => <CheckRow key={c.id} c={c} />)}
           </GroupBox>
         </View>
@@ -649,7 +650,7 @@ function Preview({ text }) {
 
 // ---- Share on GitHub (0.8.7) ----
 
-const SHARE_ROWS = ['machine', 'kind', 'cpu', 'gpu', 'memory', 'arch', 'lordos', 'kernel', 'live', 'boot', 'bench', 'compat'];
+const SHARE_ROWS = ['machine', 'kind', 'cpu', 'gpu', 'memory', 'arch', 'lordos', 'kernel', 'live', 'boot', 'bench', 'compat', 'toolkits'];
 const PAGE_KEYS = ['title', 'lead', 'summaryHead', 'sharedHead', 'shared1', 'shared2', 'shared3', 'shared4', 'neverHead', 'never1', 'never2', 'never3',
   'stepsHead', 'step1', 'step2', 'step3', 'step4', 'open', 'fileLabel', 'footer'];
 
@@ -673,16 +674,68 @@ function shareRows(tr, rep) {
       : k === 'kind' && ['board', 'desktop', 'laptop', 'server', 'vm'].includes(v) ? tr(`sysinfo.share.kind.${v}`) : v]);
 }
 
+// "Include framework compatibility" (docs/TOOLKIT-AUDIT.md): the last `lordos-testbench --toolkits`, saved by it in
+// ~/.cache/lordos/toolkit-audit.json. A result from the last day is used as it is; otherwise the audit is opened in a
+// Terminal window (its own launcher entry, lordos-toolkit-audit.desktop: this app runs no command) and the file is
+// read again until a newer result appears. toolkits.js and the schema keep only ids and numbers from it.
+// "Watch the tests" runs it again, fresh result or not, in the Test Bench's Frameworks screen instead: the desktop
+// action "frameworks" of lordos-testbench.desktop (lordos-testbench --frameworks) through lord.apps.launchAction, the
+// launcher's own path, with the slower show mode (every harness up to 20 s), so it waits longer.
+const TOOLKIT_WAIT_MS = 180000;
+const TOOLKIT_WATCH_WAIT_MS = 300000;
+function readToolkitAudit() {
+  try { const a = JSON.parse(fs.read(`${fs.home()}/.cache/lordos/toolkit-audit.json`)); return isAudit(a) ? a : null; } catch (e) { return null; }
+}
+
+function useToolkitAudit(on, watch) {
+  const [st, setSt] = useState({ busy: false, audit: null, error: null, watch: false });
+  useEffect(() => {
+    if (!on) { setSt({ busy: false, audit: null, error: null, watch: false }); return undefined; }
+    const saved = readToolkitAudit();
+    if (!watch && isFresh(saved)) { setSt({ busy: false, audit: saved, error: null, watch: false }); return undefined; }
+    const since = Date.now() - 1000;
+    let ok = false;
+    try {
+      ok = watch ? lord.apps.launchAction('lordos-testbench', 'frameworks') === true : !!launchApp('desktop:lordos-toolkit-audit');
+    } catch (e) { ok = false; }
+    if (!ok) { setSt({ busy: false, audit: null, error: 'failed', watch }); return undefined; }
+    setSt({ busy: true, audit: null, error: null, watch });
+    const t0 = Date.now();
+    const limit = watch ? TOOLKIT_WATCH_WAIT_MS : TOOLKIT_WAIT_MS;
+    const id = setInterval(() => {
+      const a = readToolkitAudit();
+      if (a && a.at >= since) { clearInterval(id); setSt({ busy: false, audit: a, error: null, watch }); }
+      else if (Date.now() - t0 > limit) { clearInterval(id); setSt({ busy: false, audit: null, error: 'timeout', watch }); }
+    }, 1000);
+    return () => clearInterval(id);
+  }, [on, watch]);
+  return st;
+}
+
+function toolkitStatus(tr, st) {
+  if (st.busy) return tr(st.watch ? 'sysinfo.share.toolkits.watching' : 'sysinfo.share.toolkits.running');
+  if (st.error) return tr(`sysinfo.share.toolkits.${st.error}`);
+  if (!st.audit) return tr('sysinfo.share.toolkits.hint');
+  const time = dateTime(new Date(st.audit.at));
+  return typeof st.audit.score === 'number'
+    ? tr('sysinfo.share.toolkits.included', { time, score: formatNumber(st.audit.score, 1) })
+    : tr('sysinfo.share.toolkits.includedNone', { time });
+}
+
 // Preview first, explicit consent on every share (nothing is remembered); then the report and the page are saved to
 // Documents and the page opens in the default browser through lord.apps.launchWith('', path). LordOS sends nothing.
 function Share({ r, onClose }) {
   const t = useTheme();
   const { t: tr, lang, dir } = useLocale();
   const [msg, setMsg] = useState(null);
+  const [withToolkits, setWithToolkits] = useState(false);
+  const [watchToolkits, setWatchToolkits] = useState(false);
+  const tk = useToolkitAudit(withToolkits, withToolkits && watchToolkits);
   const rep = useMemo(() => buildShareReport({
     report: r, bench: savedBench(0), desktop: savedBench(2), compat: compatibility(r), schema: HWREPORT_SCHEMA,
+    toolkits: withToolkits && tk.audit ? toolkitSection(tk.audit) : null,
     date: /^\d{4}-\d{2}-\d{2}$/.test(r.date || '') ? r.date : '',
-  }), [r]);
+  }), [r, withToolkits, tk.audit]);
   const json = useMemo(() => shareJson(rep), [rep]);
   const rows = useMemo(() => shareRows(tr, rep), [rep, tr]);
   const narrow = useNarrow(NARROW_AT);
@@ -709,11 +762,23 @@ function Share({ r, onClose }) {
       <GroupBox footer={[rep.live ? tr('sysinfo.share.live') : '', rep.bench || rep.desktop ? tr('sysinfo.share.withBench') : tr('sysinfo.share.noBench')].filter(Boolean).join(' ')}>
         {rows.map(([k, v]) => <Row key={k} label={k} value={v} />)}
       </GroupBox>
+      <View style={{ gap: 4 }}>
+        <Checkbox checked={withToolkits} label={tr('sysinfo.share.toolkits.include')} onChange={(v) => { setWithToolkits(v); setMsg(null); }} />
+        <Text style={{ fontSize: typeScale.callout, color: tk.error ? '#ff453a' : t.textDim, textAlign: 'start', lineHeight: 1.4, paddingStart: 20 }}>
+          {withToolkits ? toolkitStatus(tr, tk) : tr('sysinfo.share.toolkits.hint')}
+        </Text>
+        {withToolkits ? (
+          <View style={{ paddingStart: 20, gap: 2 }}>
+            <Checkbox checked={watchToolkits} disabled={tk.busy} label={tr('sysinfo.share.toolkits.watch')} onChange={(v) => { setWatchToolkits(v); setMsg(null); }} />
+            <Text style={{ fontSize: typeScale.callout, color: t.textDim, textAlign: 'start', lineHeight: 1.4, paddingStart: 20 }}>{tr('sysinfo.share.toolkits.watchHint')}</Text>
+          </View>
+        ) : null}
+      </View>
       {narrow ? <Text style={{ fontSize: typeScale.callout, color: t.textDim, textAlign: 'start' }}>{tr('sysinfo.share.exact')}</Text> : null}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.s }}>
         {narrow ? <View style={{ flex: 1 }} /> : <Text style={{ flex: 1, minWidth: 0, fontSize: typeScale.callout, color: t.textDim, textAlign: 'start' }}>{tr('sysinfo.share.exact')}</Text>}
         <Button label={tr('sysinfo.share.back')} onClick={onClose} />
-        <Button primary label={tr('sysinfo.share.go')} onClick={save} />
+        <Button primary label={tr('sysinfo.share.go')} disabled={withToolkits && tk.busy} onClick={save} />
       </View>
       {msg ? (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.s }}>
@@ -787,10 +852,15 @@ function SystemInformationMain({ startTab }) {
   const info = useMemo(() => systemInfo(), [n]);
   const narrow = useNarrow(NARROW_AT);
   const side = useSidebar(640, 'sysinfo-hardware');
+  const skinned = useSkinned('sysinfo');    // (0.8.9.6.2) app skins: the tabs and Refresh as a command bar
   if (!r) return <EmptyState mascot="confused" title={tr('sysinfo.unavailable')} />;
   const tabs = [['overview', tr('sysinfo.tab.overview')], ['hardware', tr('sysinfo.tab.hardware')], ['compat', tr('sysinfo.tab.compat')], ['checks', tr('sysinfo.tab.checks')], ['perf', tr('sysinfo.tab.perf')], ['report', tr('sysinfo.tab.report')]];
+  // the tabs' content, the checks, the benchmark and the report stay System Information's
+  const bar = skinned ? commandBar({ commands: [...tabs.map(([id, label]) => ({ id, label, active: id === tab, group: 'tabs' })), { id: 'refresh', label: tr('sysinfo.refresh'), group: 'r' }] }) : null;
+  const vm = bar ? { app: 'sysinfo', ...bar, actions: { command: (id) => { const c = pickCommand(bar, id); if (c === 'refresh') setN((x) => x + 1); else if (c) setTab(c); } } } : null;
   return (
     <View style={{ flex: 1 }}>
+      <SkinRegion app="sysinfo" region="toolbar" model={vm}>
       <Toolbar>
         {tab === 'hardware' && side.narrow ? <SidebarToggle shown={side.shown} onClick={side.toggle} /> : null}
         <ToolbarSpacer />
@@ -799,6 +869,7 @@ function SystemInformationMain({ startTab }) {
         <ToolbarSpacer />
         <ToolbarButton icon="↻" title={tr('sysinfo.refresh')} onClick={() => setN(n + 1)} />
       </Toolbar>
+      </SkinRegion>
       {tab === 'overview' ? <Overview r={r} info={info} /> : tab === 'hardware' ? <Hardware r={r} side={side} /> : tab === 'compat' ? <Compatibility r={r} /> : tab === 'checks' ? <Checks r={r} /> : tab === 'perf' ? <Performance r={r} /> : <Report r={r} />}
     </View>
   );

@@ -1,4 +1,4 @@
-// windowlistmodel.js — a window's title as a one-line label in a window list (the Dock's menu, Lord Workspaces' bar).
+// windowlistmodel.js — a window's title as a one-line label in a window list (the Dock's menu, Workspaces' bar).
 // Pure: tested with node (server/tests/windowlist_model_test.mjs).
 //
 // The title is whatever the app set (a Linux app's xdg_toplevel.set_title or WM_NAME), so it is untrusted: a label never

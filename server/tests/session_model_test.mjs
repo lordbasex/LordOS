@@ -97,5 +97,13 @@ eq('second display', fitFrame({ x: 1400, y: 100, w: 400, h: 300 }, [...D, { x: 1
   eq('ask first: the terminal yes, a Linux app no', [M.asksFirst(L[1]), M.asksFirst(L[2])], [true, false]);
 }
 
+// QA 0.8.9.6.2 (BUG-H, BUG-I): back in this desktop after a theme fell back is the same session; the marker's saves
+eq('a theme switch is the same session', M.sameSession({ clean: 'theme' }, false), true);
+eq('a fall back is the same session, its unclean marker no crash', M.sameSession({ clean: false }, true), true);
+eq('an unclean end without a fall back asks', M.sameSession({ clean: false }, false), false);
+eq('nothing saved', M.sameSession(undefined, false), false);
+eq('the last word is synchronous', M.markerSave(true), true);
+eq('the autosave is queued and durable', [M.markerSave(false), M.markerSave('theme')], ['queued', 'queued']);
+
 console.log(bad ? `session-model: ${bad}/${n} failed` : `session-model: ${n} ok`);
 process.exit(bad ? 1 : 0);

@@ -1,0 +1,22 @@
+{
+  "menu.looking": "Naghahanap ng mga mungkahi…",
+  "menu.none": "Walang mungkahi",
+  "menu.add": "Idagdag ang “{word}” sa diksyunaryo",
+  "menu.ignore": "Huwag pansinin",
+  "settings.title": "Pagbaybay",
+  "settings.hint": "Ang mga maling baybay na salita ay may pulang pakulot na salungguhit sa mga text field ng LordOS; i-right-click ang isa para sa mga mungkahi. Sinusuri sa computer na ito, hindi kailanman online. Hindi sinusuri ang mga field ng password, paghahanap at address.",
+  "settings.check": "Suriin ang baybay habang nagta-type",
+  "settings.languages": "Pagbaybay: mga wika",
+  "settings.defaultHint": "Walang pinili: ang wika ng iyong interface at Ingles, kapag naka-install ang kanilang mga diksyunaryo. Ganoon din ang ginagamit ng mga web app.",
+  "settings.chosenHint": "Tama ang isang salita kapag kilala ito ng alinman sa mga wikang pinili mo (hanggang 4). Ginagamit ng mga web app ang wika ng iyong interface at Ingles.",
+  "settings.none": "Walang naka-install na diksyunaryo. Mag-install ng isa sa ibaba.",
+  "settings.useDefault": "Gamitin ang mga default",
+  "settings.more": "Higit pang wika",
+  "settings.moreHint": "Mga diksyunaryo mula sa Debian. Kailangan ng password ng administrator para mag-install.",
+  "settings.installing": "Nag-i-install…",
+  "settings.install": "I-install",
+  "settings.words": "Ang iyong diksyunaryo",
+  "settings.wordsHint": "Mga salitang idinagdag mo gamit ang “Idagdag sa diksyunaryo”, dito o sa isang web app.",
+  "settings.remove": "Alisin",
+  "settings.noWords": "Wala pang salita."
+}

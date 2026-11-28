@@ -6,7 +6,7 @@
 // Settings → Desktop & Dock → Title bars puts the buttons on that side (useWindowButtons, issue #58). Its Size makes the
 // bar, the lights, their glyphs and their hit areas larger (px, GitHub #151 and #219); index.jsx's chrome follows it.
 import { View, Text, addListener, wm, snapZoneAt, AppHost, windowTitle, windowAccent, WindowShell, moveToDesktopItems, alwaysOnTopItem, t as tr, solidOver, useWindowButtons, SeamCover } from '@lordos/sdk';
-import { useEffect, useRef, useState } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import { Menu } from './Menu.jsx';
 
 export const TITLE_H = 40;   // at the normal size (px(TITLE_H) is the bar now)
@@ -61,7 +61,7 @@ function fxStyle(fx, geo) {
   return { transform: `translate(${dx}px, ${dy}px) scale(${1 - 0.9 * e})`, opacity: 1 - 0.7 * e, pointerEvents: 'none' };
 }
 
-export function Window({ win, app, t, focused, fx }) {
+function WindowFrame({ win, app, t, focused, fx }) {
   const drag = useRef(null);
   const { atStart, order, px } = useWindowButtons(true);
   const bar = px(TITLE_H);
@@ -150,3 +150,7 @@ export function Window({ win, app, t, focused, fx }) {
     </WindowShell>
   );
 }
+
+// memo: a window draws again for its own changes (win, focused, the tokens, the minimize effect, a maximized one's work
+// area: frameKey), never because another window's title or the desktop around it changed (0.8.9.6.2 QA, BUG-9)
+export const Window = memo(WindowFrame);

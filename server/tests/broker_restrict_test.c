@@ -19,6 +19,8 @@
 #include "media/media_int.h"
 #include "errcode.h"
 
+#include "sec/brokerclip.h"
+#include <time.h>
 #include <fcntl.h>
 #include <poll.h>
 #include <stdarg.h>
@@ -225,6 +227,13 @@ static void restrict_app(const char *fwid, uint32_t flags) {
 static uint32_t local_added;
 static void local_hook(uint32_t added) { local_added |= added; }
 
+/* Hands (hands/hands.h) and the clipboard's secret mark (term.c): not under test here; no agent is connected */
+int hands_injecting(void) { return 0; }
+int hands_active(void) { return 0; }
+static int agent_owns;                  /* the paste gesture's test sets it */
+int hands_agent_owns_input(void) { return agent_owns; }
+int term_clipboard_sensitive(void) { return 0; }
+
 int main(void) {
     char home[] = "/tmp/broker-restrict-XXXXXX";
     if (!mkdtemp(home)) { perror("mkdtemp"); return 1; }
@@ -245,6 +254,8 @@ int main(void) {
     /* ---- clipboard ---- */
     check(call(BOP_COMPANION, NULL, 0) && got_status == BST_DENIED && !spawned, "companion: an app from the home folder is refused, nothing started");
     check(call(BOP_STATUS, "{}", 2) && got_status == BST_DENIED, "status item: refused without the permission");
+    /* lord.fs.watch has no broker operation (docs/drafts/DESKTOP-ICONS.md 5.1): any op outside the closed list is an error */
+    check(call(99, "Desktop", 7) && got_status == BST_ERROR && got_len == 0, "fs.watch: an op outside the broker's list is refused");
     check(call(BOP_CLIP_GET, NULL, 0) && got_status == BST_OK && !strcmp(got, "clipboard text"), "clipboard: read with the permission");
     restrict_app("lpk:game", FW_R_NO_CLIPBOARD);
     check(call(BOP_CLIP_GET, NULL, 0) && denied_with("fw.restricted.clipboard"), "clipboard: no-clipboard refuses it with fw.restricted.clipboard");
@@ -390,6 +401,18 @@ int main(void) {
     snprintf(cmd, sizeof cmd, "rm -rf '%s'", home);
     if (system(cmd)) {}
     fw_store_free(store);
+    /* Hands: an AI agent's input (as long as it owns the input) is never a paste gesture of the person's */
+    {
+        struct timespec ts;
+        clock_gettime(CLOCK_MONOTONIC, &ts);
+        double now = (double)ts.tv_sec + ts.tv_nsec / 1e9;
+        agent_owns = 1;
+        brokersrv_paste_gesture("mail");
+        check(!bclip_paste_take("mail", now), "an agent's Ctrl+V is no paste gesture (it owns the input)");
+        agent_owns = 0;
+        brokersrv_paste_gesture("mail");
+        check(bclip_paste_take("mail", now + 0.1), "the person's Ctrl+V is one");
+    }
     printf("%d/%d %s\n", total - fails, total, fails ? "FAILED" : "passed");
     return fails ? 1 : 0;
 }

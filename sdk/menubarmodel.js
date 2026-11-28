@@ -1,4 +1,4 @@
-// menubarmodel.js — what the bar shows, with no screen (issue #58). Lord Flow's menu bar and Control Center and the
+// menubarmodel.js — what the bar shows, with no screen (issue #58). Flow's menu bar and Control Center and the
 // Classic taskbar's tray read these choices; Settings → Desktop & Dock → Menu Bar (or Taskbar) writes them. Tested by
 // server/tests/menubar_model_test.mjs.
 //
@@ -9,8 +9,8 @@
 //   monthCells(year, month, first) the days of a month calendar, padded to whole weeks
 //   monthWeeks(year, month, first) the same cells as weeks of seven (one row each)
 //
-// A bar on every display (0.8.8.6): Lord Flow draws one full menu bar per display, each with its own clock, status
-// items and panels; only the display with the focused window has the app's menus lit. Lord Classic draws a whole
+// A bar on every display (0.8.8.6): Flow draws one full menu bar per display, each with its own clock, status
+// items and panels; only the display with the focused window has the app's menus lit. Classic draws a whole
 // taskbar per display under the same setting (themes/classic/placement.js).
 //
 //   menuBarEveryDisplay(settings)            on unless the user turned it off (settings.menuBarAllDisplays)
@@ -31,7 +31,7 @@ export const MENUBAR_DEFAULTS = {
   osk: true,            // the on-screen keyboard's item
   bell: true,           // the notifications' bell next to the clock
   calendar: true,       // the month calendar in the clock's panel
-  ccSystem: true,       // Lord Flow's Control Center: CPU and memory
+  ccSystem: true,       // Flow's Control Center: CPU and memory
   ccNetwork: true,      //   the network and VPN tile
   ccWifi: true,         //   the Wi-Fi tile (only with a Wi-Fi radio)
   ccBluetooth: true,    //   the Bluetooth tile (only with an adapter)

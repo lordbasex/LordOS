@@ -1,12 +1,15 @@
 // Add widget, for every theme: the desktop widget catalog (sdk/deskwidgets.jsx) in a panel centred on a display, opened
-// from a theme's "Add widget" (Lord Workspaces' empty state, the wallpaper's right-click menu in each theme). A search field on top (name and description, in the
+// from a theme's "Add widget" (Workspaces' empty state, the wallpaper's right-click menu in each theme). A search field on top (name and description, in the
 // person's language), the categories with their counts on the side, and the cards in a scrolling list, by category.
 // Each card has a button per size (small 1×1, medium 2×1, large 2×2, wide 4×1, extra large 4×2, drawn as its block of
 // cells); a click puts the widget on the first free block of that display's grid, in the activity in view. The arrow
 // keys move between cards and Enter adds the highlighted one at its first size; Escape or a click outside closes it.
-// A theme can give its own panel (Panel: a component taking ref, style and children; Lord Workspaces passes its glass
+// A theme can give its own panel (Panel: a component taking ref, style and children; Workspaces passes its glass
 // Surface); otherwise a plain one in the theme's colours. Its tokens are the theme's (useTheme), chipBg falling back to
 // the control colour.
+// A kind with a Chooser (registerWidgetKind, sdk/deskwidgets.jsx; the Notes app's sticky note: a new note or one of
+// the notes already made) shows it in the same panel after its card is clicked, under a ‹ Back row with the kind's
+// name: <Chooser t x y display area done /> where x, y is where the widget goes and done() closes the catalog.
 import { forwardRef, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, addListener } from '@lordos/runtime';
 import { Layer } from './layers.js';
@@ -213,6 +216,18 @@ function CategoryRow({ t, label, count, on, onPick }) {
   );
 }
 
+function BackButton({ t, onClick }) {
+  const [hover, setHover] = useState(false);
+  return (
+    <View onClick={onClick} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
+      style={{ flexDirection: 'row', alignItems: 'center', gap: 4, height: 32, paddingHorizontal: 10, borderRadius: 10, backgroundColor: hover ? t.hover : t.chipBg }}>
+      {/* ‹ is a mirrored character: right to left it is drawn as › by itself */}
+      <Text style={{ fontSize: 15, fontWeight: 600, color: t.text }}>‹</Text>
+      <Text style={{ fontSize: 13, fontWeight: 600, color: t.text }}>{tr('shell.widgets.back')}</Text>
+    </View>
+  );
+}
+
 export function WidgetPicker({ t: given, Panel = PlainPanel }) {
   const th = useTheme() || {};
   const base = given || th;
@@ -224,7 +239,8 @@ export function WidgetPicker({ t: given, Panel = PlainPanel }) {
   const [query, setQuery] = useState('');
   const [cat, setCat] = useState('all');
   const [hi, setHi] = useState(-1);
-  useEffect(() => { setFull(false); setQuery(''); setCat('all'); setHi(-1); }, [p]);
+  const [choosing, setChoosing] = useState(null);       // { kind, x, y } while a kind's Chooser is shown
+  useEffect(() => { setFull(false); setQuery(''); setCat('all'); setHi(-1); setChoosing(null); }, [p]);
   useEffect(() => {
     if (!p) return undefined;
     const offDown = addListener('pointerdown', (e) => { for (let n = e.target; n; n = n.parent) if (n === ref.current) return; widgetPicker.set(null); });
@@ -251,8 +267,10 @@ export function WidgetPicker({ t: given, Panel = PlainPanel }) {
   const H = Math.min(Math.max(320, area.h - 64), 720);
   const pick = (k, size) => {
     if (!k.sizes) {
+      const x = p.x ?? area.x + area.w - 340 - (cascade % 5) * 24, y = p.y ?? area.y + 40 + (cascade % 5) * 24;
+      if (typeof k.Chooser === 'function') { setChoosing({ kind: k, x, y }); return; }
       widgetPicker.set(null);
-      k.add?.(p.x ?? area.x + area.w - 340 - (cascade % 5) * 24, p.y ?? area.y + 40 + (cascade % 5) * 24);
+      k.add?.(x, y);
       cascade++;
       return;
     }
@@ -268,6 +286,24 @@ export function WidgetPicker({ t: given, Panel = PlainPanel }) {
     if (e.key === 'Enter') { const k = flat[hi < 0 ? 0 : Math.min(hi, n - 1)]; if (k) pick(k, k.sizes ? k.sizes[0] : null); }
   };
   const cats = ['all', ...CATEGORIES.filter((c) => counts[c])];
+  if (choosing) {
+    const C = choosing.kind.Chooser;
+    const done = () => { widgetPicker.set(null); cascade++; };
+    return (
+      <Layer name="overlay">
+        <Panel ref={ref} t={t} radius={22} style={{ position: 'absolute', left: Math.round(area.x + (area.w - W) / 2), top: Math.round(area.y + (area.h - H) / 2),
+          width: W, height: H, overflow: 'hidden' }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: PAD + 4, paddingTop: PAD, paddingBottom: 14, borderBottom: `1px solid ${t.separator}` }}>
+            <BackButton t={t} onClick={() => setChoosing(null)} />
+            <Text style={{ flex: 1, fontSize: 17, fontWeight: 700, color: t.text, textAlign: 'start' }}>{tr(choosing.kind.nameKey)}</Text>
+          </View>
+          <View style={{ flex: 1, minHeight: 0 }}>
+            <C t={t} x={choosing.x} y={choosing.y} display={p.display} area={area} done={done} />
+          </View>
+        </Panel>
+      </Layer>
+    );
+  }
   return (
     <Layer name="overlay">
       <Panel ref={ref} t={t} radius={22} style={{ position: 'absolute', left: Math.round(area.x + (area.w - W) / 2), top: Math.round(area.y + (area.h - H) / 2),

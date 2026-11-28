@@ -93,6 +93,12 @@ export function keyFocused() {
   const s = a ? stateOf(a.root) : NO_FOCUS;
   return s.visible ? s.focus : null;
 }
+// The node with the keyboard focus whether or not its ring shows (Hands asks where a key would go: sdk/hands.jsx).
+export function focusedNode() {
+  const a = area();
+  const s = a ? stateOf(a.root) : NO_FOCUS;
+  return s.focus || null;
+}
 // fn() after each move of the keyboard focus; returns the function that stops it.
 export function onFocusMove(fn) { movers.add(fn); return () => movers.delete(fn); }
 
@@ -124,12 +130,20 @@ function press(n) {
   }
 }
 
+// Hands (docs/HANDS.md): the key is an AI agent's, and a node is out of its reach (handsDeny or protected, or inside one)
+const agentKey = () => typeof lord !== 'undefined' && typeof lord.hands?.injecting === 'function' && !!lord.hands.injecting();
+function deniedUp(n) {
+  for (let p = n, d = 0; p && d < 4096; p = p.host || p.parent || null, d++) if (p.props?.handsDeny || p.props?.protected) return true;
+  return false;
+}
+
 // Before the listeners: the focused node's keys. true takes the key.
 function before(e) {
   if (e.forwarded || dialogStack.owner() !== null || text.owner() !== null) return false;
   const a = area();
   const n = a && stateOf(a.root).focus;
   if (!n || !canFocus(n) || !within(n, a.root) || hiddenUp(n)) return false;
+  if (agentKey() && deniedUp(n)) return true;      // a person-only control never acts on an agent's key: swallowed
   e.target = n;
   if (n.props.onKeyDown?.(e)) return true;
   if (activates(e) && typeof n.props.onClick === 'function') { if (!e.repeat) press(n); return true; }
@@ -146,8 +160,10 @@ function after(e) {
   const a = area();
   if (!a) return;
   const s = stateOf(a.root);
-  const to = nextStop(a.root, field || s.focus || s.anchor, d < 0);
-  if (!to) return;
+  let to = nextStop(a.root, field || s.focus || s.anchor, d < 0);
+  // an agent's Tab never lands on a person-only control: it goes past them
+  for (let i = 0; agentKey() && to && deniedUp(to) && i < 512; i++) to = nextStop(a.root, to, d < 0);
+  if (!to || (agentKey() && deniedUp(to))) return;
   if (field && to !== field) text.blur();
   setState(a.root, focusAfter(s, { type: 'tab', to }));
   reveal(to, a.root);

@@ -18,6 +18,7 @@
 #include "../media/mstudio.h"
 #include "ui.h"
 #include "../media/proto.h"
+#include "../gpu/gpu.h"
 #include "../media/hwdec.h"
 #include "../media/imgops.h"
 #include "../doc/doc.h"
@@ -26,6 +27,7 @@
 #include "../sec/perms.h"
 #include "../sec/restrict.h"
 #include "../fw/rules.h"
+#include "../hands/hands.h"
 #include "ui.h"
 #include "js_err.h"
 
@@ -153,9 +155,21 @@ static JSValue f_play(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
     if (s->audio) maudio_volume(s->audio, opt_num(c, o, "volume", 1));
     int hw = opt_int(c, o, "hw", 1, 0, 1);
     if (hw) render = media_render_fd();
-    char params[256];
-    snprintf(params, sizeof params, "native=%d\nloop=%d\nautoplay=%d\naudio=%d\nhw=%d\nhwonly=%d\nrate=%d\nhwaccel=%s\n", opt_int(c, o, "native", 0, 0, 1),
-             opt_int(c, o, "loop", 0, 0, 1), opt_int(c, o, "autoplay", 1, 0, 1), s->audio ? 1 : 0, hw && render >= 0, opt_int(c, o, "hwOnly", 0, 0, 1), opt_int(c, o, "rate", 100, 10, 100), media_hwaccel());
+    /* a moving wallpaper (sdk/motion.jsx): a loop without sound, paused where nobody sees it, cached on the GPU
+     * (media/mambient.c, docs/MOVING-WALLPAPERS.md) */
+    int loop = opt_int(c, o, "loop", 0, 0, 1), ambient = loop && !s->audio && opt_int(c, o, "ambient", 0, 0, 1);
+    int fpscap = opt_int(c, o, "fpsCap", 0, 0, 30);
+    if (fpscap != 15 && fpscap != 30) fpscap = 0;
+    s->rate = opt_int(c, o, "rate", 100, 10, 100);
+    s->nv_capable = 1;
+    /* the frame format: a moving wallpaper's NV12 (then zero-copy dmabufs) only while the GPU composes; BGRA otherwise and
+     * for the Player (its window's rounded corners clip it on the CPU path) */
+    s->fmt_sent = !ambient || !gpu_active() || (getenv("LORD_MEDIA_NV12") && !strcmp(getenv("LORD_MEDIA_NV12"), "0")) ? MF_BGRA : MF_NV12;
+    char params[320];
+    snprintf(params, sizeof params, "native=%d\nloop=%d\nautoplay=%d\naudio=%d\nhw=%d\nhwonly=%d\nrate=%d\nhwaccel=%s\nnv12=%d\nfpscap=%d\n", opt_int(c, o, "native", 0, 0, 1),
+             loop, opt_int(c, o, "autoplay", 1, 0, 1), s->audio ? 1 : 0, hw && render >= 0, opt_int(c, o, "hwOnly", 0, 0, 1), s->rate, media_hwaccel(),
+             s->fmt_sent == MF_NV12, ambient ? fpscap : 0);
+    if (ambient) media_ambient_new(s, real, opt_int(c, o, "cacheMb", 1024, 0, 65536), fpscap);
     int fds[3] = { in, ring, render };
     s->sock = media_spawn(MK_PLAY, params, fds, 3, &s->pid);
     close(in);
@@ -240,13 +254,17 @@ out:
 static JSValue f_control(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t;
     MediaSrc *s = argc >= 2 ? media_src_get(arg_id(c, argv[0])) : NULL;
-    if (!s || s->sock < 0) return JS_FALSE;
+    /* a moving wallpaper stopped while unseen (mambient.c) has no helper and still takes its controls */
+    if (!s || (s->sock < 0 && !s->amb)) return JS_FALSE;
     const char *cmd = JS_ToCString(c, argv[1]);
     if (!cmd) return JS_EXCEPTION;
     double v = 0;
     if (argc > 2 && JS_IsNumber(argv[2])) JS_ToFloat64(c, &v, argv[2]);
     else if (argc > 2 && JS_IsBool(argv[2])) v = JS_ToBool(c, argv[2]);
     int r = -1;
+    /* a moving wallpaper's pause, cache and frame-rate cap are lord-server's (media/mambient.c) */
+    if (s->amb && media_ambient_control(s, cmd, v)) { JS_FreeCString(c, cmd); return JS_TRUE; }
+    if (s->sock < 0) { JS_FreeCString(c, cmd); return JS_FALSE; }
     if (!strcmp(cmd, "play")) { r = mp_sendv(s->sock, MM_PLAY, 0, 0, 0, 0, 0); if (s->audio) maudio_playing(s->audio, 1); }
     else if (!strcmp(cmd, "pause")) { r = mp_sendv(s->sock, MM_PAUSE, 0, 0, 0, 0, 0); if (s->audio) maudio_playing(s->audio, 0); }
     else if (!strcmp(cmd, "seek") && v >= 0 && v < 1e10) r = mp_sendv(s->sock, MM_SEEK, 0, (int64_t)v, 0, 0, 0);
@@ -440,6 +458,15 @@ static JSValue f_transcode(JSContext *c, JSValueConst t, int argc, JSValueConst 
 
 /* ---- screenshots ---- */
 
+/* A capture taken while an AI agent owned the input (Hands; security scan 0.8.9.6.2, F1): lord.media.screenshot is
+ * refused to the agent's own runs (hands_native_guard), and a capture another run took meanwhile is marked and never
+ * leaves lord-server: no copy, no file, no text read from it. 1 (and the error thrown) for such a picture. */
+static int agent_capture(JSContext *c, const MediaSrc *s) {
+    if (!s || !s->agent_cap) return 0;
+    js_throw_code(c, "hands.refused", NULL);
+    return 1;
+}
+
 /* screenshot(app, { x, y, width, height, display, until, also }?) → id (with protected windows as the protected fill). until: the
  * node of a window's frame (wm.frameNode): what is above that window is left out (Screenshots' window capture).
  * also: with until, up to PAINT_ALSO_MAX node ids painted over the window (its sheets, wm.sheetNodes); others ignored. */
@@ -472,6 +499,7 @@ static JSValue f_screenshot(JSContext *c, JSValueConst t, int argc, JSValueConst
                                        opt_int(c, o, "width", 0, 0, 65536), opt_int(c, o, "height", 0, 0, 65536),
                                        (uint32_t)opt_int(c, o, "display", 0, 0, 1 << 30), opt_int(c, o, "until", 0, 0, 1 << 30),
                                        also, nalso, &refused);
+        if (s && hands_agent_owns_input()) s->agent_cap = 1;    /* the agent's doing: kept inside (agent_capture) */
         /* a protected window asked for alone is refused as such (the app must not crop a capture of it instead) */
         ret = s ? JS_NewInt32(c, s->id) : js_throw_code(c, refused ? "media.protectedWindow" : "media.captureFailed", NULL);
     }
@@ -554,6 +582,7 @@ static JSValue f_ocr(JSContext *c, JSValueConst t, int argc, JSValueConst *argv)
     (void)t;
     MediaSrc *s = argc >= 2 ? media_src_get(arg_id(c, argv[0])) : NULL;
     if (s && !media_src_exportable(s)) return js_throw_code(c, "media.protectedWindow", NULL);   /* a protected window's picture */
+    if (agent_capture(c, s)) return JS_EXCEPTION;
     if (!s || !s->px || (s->kind != SK_CAPTURE && s->kind != SK_IMAGE) || s->w < 1 || s->h < 1) return JS_NULL;
     const char *langs = JS_ToCString(c, argv[1]);
     if (!langs) return JS_EXCEPTION;
@@ -632,6 +661,7 @@ static JSValue f_annotate(JSContext *c, JSValueConst t, int argc, JSValueConst *
         dst->h = base->h;
     }
     dst->opaque = base->opaque;          /* a picture opened with transparency keeps it */
+    if (base->agent_cap) dst->agent_cap = 1;   /* the markup of an agent's capture is one too */
     memcpy(dst->px, base->px, (size_t)base->w * base->h * 4);
     JSValue lenv = JS_GetPropertyStr(c, argv[1], "length");
     int32_t n = 0;
@@ -670,6 +700,7 @@ static JSValue f_save_image(JSContext *c, JSValueConst t, int argc, JSValueConst
     (void)t;
     MediaSrc *s = argc >= 2 ? media_src_get(arg_id(c, argv[0])) : NULL;
     if (s && !media_src_exportable(s)) return js_throw_code(c, "media.protectedWindow", NULL);   /* a protected window's picture */
+    if (agent_capture(c, s)) return JS_EXCEPTION;
     const char *out = argc >= 2 ? arg_path(c, argv[1]) : NULL;
     if (!s || !s->px || !out) { if (out) JS_FreeCString(c, out); return js_throw_code(c, "media.invalidArguments", NULL); }
     char tmp[PATH_MAX + 64], dst[PATH_MAX], fmt[8], params[64];
@@ -691,6 +722,7 @@ static JSValue f_copy_image(JSContext *c, JSValueConst t, int argc, JSValueConst
     (void)t;
     MediaSrc *s = argc ? media_src_get(arg_id(c, argv[0])) : NULL;
     if (s && !media_src_exportable(s)) return js_throw_code(c, "media.protectedWindow", NULL);   /* a protected window's picture */
+    if (agent_capture(c, s)) return JS_EXCEPTION;
     if (!s || !s->px) return js_throw_code(c, "media.invalidImage", NULL);
     const char *rt = getenv("XDG_RUNTIME_DIR");
     if (!rt) return js_throw_code(c, "media.noRuntimeDir", NULL);
@@ -1038,5 +1070,5 @@ void js_media_node(Node *n, int id) {
     if (!n || n->type != NODE_MEDIA) return;
     n->term = id;
     MediaSrc *s = media_src_get(id);
-    if (s) { s->node = n->id; s->sent_w = s->sent_h = 0; }
+    if (s) { s->node = n->id; s->sent_w = s->sent_h = 0; if (!n->crop) media_src_view_note(s, n->id, 0, 0); }
 }

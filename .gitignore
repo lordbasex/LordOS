@@ -6,6 +6,7 @@ __pycache__/
 node_modules/
 themes/*/theme.bundle.js
 assets/app-host.bundle.js
+assets/theme-host.bundle.js
 *.iso
 *.img
 *.img.xz
@@ -15,7 +16,8 @@ assets/app-host.bundle.js
 .idea/
 assets/sysapps/
 assets/locales/*.tgz
-logs/
+# agents' progress logs at the top only: apps/logs and server/src/logs are source folders
+/logs/
 /code-manifest.json
 /code-manifest.sig
 /assets/hwreport/snapshot.json.sig

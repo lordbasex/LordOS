@@ -28,6 +28,17 @@ eq('a stack line keeps its indent', r[3].m, '    at f (theme.js:1)');
 eq('line numbers', r.map((x) => x.line), [1, 2, 3, 4, 6, 7]);
 eq('unstamped: no time, its prefix', [r[4].t, r[4].id, r[4].p], [0, 'Gtk-WARNING', 4]);
 eq('unstamped: the file name', [r[5].id, r[5].p], ['org.gnome.Calculator', 6]);
+// a web app's log (lord-web's lord-log child, lordlog_stamp_start): lord-web's own lines and WebKit's, both stamped
+const wl = parseLordLog([
+  'lord-web: an older, unstamped line',
+  '2026-11-26T18:22:03.713-03:00 WARN  lord-web: WebKit says the page stopped responding',
+  '2026-11-26T18:22:04.001-03:00 WARN  webkit: ** (WPEWebProcess:2): WARNING **: 18:22:04.001: odd',
+  '2026-11-26T18:22:07.913-03:00 INFO  lord-web: the page responds again after 4.2 s',
+].join('\n'), 'web/whatsapp-personal.log');
+eq('web: unstamped older line', [wl[0].t, wl[0].id], [0, 'lord-web']);
+eq('web: stamped', wl.slice(1).map((x) => [x.id, x.p]), [['lord-web', 4], ['webkit', 4], ['lord-web', 6]]);
+eq('web: time', wl[3].t, Date.UTC(2026, 10, 26, 21, 22, 7, 913) * 1000);
+eq('web: WebKit\'s text kept whole', wl[2].m, '** (WPEWebProcess:2): WARNING **: 18:22:04.001: odd');
 eq('empty', parseLordLog('', 'x.log'), []);
 eq('not a stamp', parseLordLog('2026-11-11 12:00 INFO x: y', 'a.log')[0].t, 0);
 

@@ -95,7 +95,7 @@
   "menu.emptyTrash": "Papierkorb leeren",
   "menu.file": "Datei",
   "menu.forward": "Vorwärts",
-  "menu.getInfo": "Informationen",
+  "menu.getInfo": "Eigenschaften",
   "menu.go": "Gehe zu",
   "menu.groupBy": "Gruppieren nach",
   "menu.newFolder": "Neuer Ordner",
@@ -342,5 +342,9 @@
   "readOnly.denied": "Dieser Ordner ist schreibgeschützt: Seine Zugriffsrechte erlauben dir keine Änderungen. Verwende zum Ändern das Terminal oder eine andere App.",
   "fromMachineNoRun": "„{name}“ kam von der Maschine {machine}. Dateien öffnet keine Programme oder Installationsprogramme aus einer Maschine: Nutze „Öffnen mit“, wenn du ihr vertraust.",
   "info.from": "Herkunft",
-  "info.fromMachine": "Die Maschine {machine}"
+  "info.fromMachine": "Die Maschine {machine}",
+  "skin.address": "Adresse",
+  "skin.tasks": "Datei- und Ordneraufgaben",
+  "skin.otherPlaces": "Andere Orte",
+  "skin.details": "Details"
 }

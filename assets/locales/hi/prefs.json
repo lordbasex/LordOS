@@ -202,6 +202,7 @@
   "power.healthNormal": "बैटरी स्वास्थ्य: {pct}% (सामान्य)",
   "power.healthService": "बैटरी स्वास्थ्य: {pct}% (सर्विस की सलाह दी जाती है)",
   "power.healthUnknown": "बैटरी स्वास्थ्य: अज्ञात",
+  "power.h": "{h} घं",
   "power.hm": "{h} घं {m} मिनट",
   "power.immediately": "तुरंत",
   "power.left": "{time} शेष",

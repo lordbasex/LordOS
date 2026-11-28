@@ -12,5 +12,9 @@
   "inspect.title": "Geliştirici araçları açık",
   "inspect.body": "Tarayıcınızda açıldı ve bu pencereyi kapatana kadar açık kalır.",
   "inspect.open": "Tarayıcıda aç",
-  "inspect.failed": "Geliştirici araçları başlatılamadı"
+  "inspect.failed": "Geliştirici araçları başlatılamadı",
+  "save.image": "Görseli kaydet",
+  "save.video": "Videoyu kaydet",
+  "save.audio": "Sesi kaydet",
+  "hang.reloaded": "Sayfa yanıt vermiyordu ve yeniden yüklendi"
 }

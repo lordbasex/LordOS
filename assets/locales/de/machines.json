@@ -712,6 +712,7 @@
   "agent.toolsAutoFailed": "Die automatische Aktualisierung hat nicht funktioniert ({have} → {want}).",
   "agent.toolsUpdateBtn": "Aktualisieren",
   "agent.st.needsTools": "Braucht die Werkzeuge",
+  "agent.st.oldLordos": "LordOS darin aktualisieren",
   "agent.st.needsXclip": "Braucht xclip",
   "agent.toolsInstalled": "Die LordOS-Werkzeuge sind in der Maschine installiert und laufen; sie starten bei jeder Anmeldung erneut.",
   "agent.timesync": "Uhr stellen",
@@ -880,6 +881,8 @@
   "un.how.preseed": "Die Antworten kommen in die eigenen Startdateien des Installationsprogramms, dein Passwort nur als Hash, und sie werden entfernt, sobald das System installiert ist.",
   "un.how.autoinstall": "Die Antworten kommen auf einen kleinen Datenträger, den das Installationsprogramm liest, dein Passwort nur als Hash, und der Datenträger wird entfernt, sobald das System installiert ist.",
   "un.how.kickstart": "Die Antworten kommen auf einen kleinen Datenträger, den das Installationsprogramm liest, dein Passwort nur als Hash, und der Datenträger wird entfernt, sobald das System installiert ist.",
+  "un.how.kali": "Die Antworten kommen in die eigenen Startdateien des Installationsprogramms, dein Passwort nur als Hash, und sie werden entfernt, sobald das System installiert ist.",
+  "un.how.lordos": "Die Antworten kommen auf einen kleinen Datenträger, den das Installationsprogramm liest, dein Passwort nur als Hash, und der Datenträger wird entfernt, sobald das System installiert ist.",
   "un.image": "Installiert aus {file}, ebenfalls mit der signierten Liste seines Herstellers abgeglichen",
   "un.review": "Ohne Rückfragen: Konto {user} auf {host}",
   "un.reviewOff": "Du beantwortest die Fragen des Installationsprogramms",
@@ -1100,6 +1103,7 @@
   "apps.menu": "Programme",
   "apps.needsAgent": "Der App-Modus braucht den verbundenen Agenten der Maschine",
   "win.appsNeedsTools": "Der App-Modus braucht LordOS oder Windows in der Maschine, mit den LordOS-Werkzeugen",
+  "win.appsOldLordos": "Der App-Modus braucht LordOS {version} oder neuer in der Maschine. Aktualisiere LordOS in der Maschine; die LordOS-Werkzeuge allein reichen nicht.",
   "apps.noApps": "Die Maschine hat ihre Apps noch nicht aufgelistet",
   "apps.gone": "Dieses Fenster wurde in der Maschine geschlossen",
   "apps.dropTitle": "Ablegen, um diese Dateien diesem Fenster in der Maschine zu geben",
@@ -2027,5 +2031,7 @@
   "req.row.answers": "Installationsantworten",
   "req.use.answers": "Von Machines selbst erstellt: nichts zu installieren",
   "req.st.download": "Beim Erstellen",
-  "req.st.builtin": "Eingebaut"
+  "req.st.builtin": "Eingebaut",
+  "cfg.closeOnStop": "Fenster schließen, wenn die Maschine anhält",
+  "cfg.closeOnStopNote": "Nach dem Herunterfahren oder Ausschalten. Hält sie wegen eines Problems an, bleibt das Fenster offen und zeigt, was passiert ist."
 }

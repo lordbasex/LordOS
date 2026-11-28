@@ -234,6 +234,7 @@
   "fs.moveRemoveFailed": "Nukopijuota, bet originalo pašalinti nepavyko: {errno}",
   "fs.noTrash": "Šiai vietai šiukšlinės nėra",
   "fs.notFile": "Tai ne failas",
+  "fs.notFolder": "Tai ne aplankas",
   "fs.notInTrash": "To nėra šiukšlinėje",
   "fs.notRegular": "Tai ne įprastas failas (galbūt nuoroda?)",
   "fs.openFailed": "Nepavyko atidaryti failo: {errno}",
@@ -243,11 +244,13 @@
   "fs.systemFolder": "Failai nerodo vidinių sistemos aplankų (/proc, /sys, /dev ir /run)",
   "fs.tooLarge": "Failas per didelis (daugiausia {max})",
   "fs.tooManyCopies": "Vyksta per daug kopijavimų; bandykite dar kartą, kai vienas baigsis",
+  "fs.tooManyWatches": "Stebima per daug aplankų (daugiausia {max})",
   "fs.trashBadOrigin": "Pradinė vieta netinkama",
   "fs.trashEntryFailed": "Nepavyko sukurti šiukšlinės įrašo",
   "fs.trashOriginGone": "Pradinio aplanko nebėra",
   "fs.trashOtherDisk": "Tai yra kitame diske nei jo šiukšlinė",
   "fs.trashRestoreExists": "Pradinėje vietoje jau yra failas tokiu pavadinimu",
+  "fs.watchRemote": "Debesies ir tinklo aplankų pakeitimų sekti negalima; vietoj to aplankas išvardijamas iš naujo",
   "fw.bpfConfig": "nepavyko sukonfigūruoti BPF: {errno}",
   "fw.bpfMaps": "nepavyko sukurti BPF žemėlapių: {errno}",
   "fw.bpfMissing": "trūksta programos {program}",
@@ -964,5 +967,9 @@
   "sentinela.notBlocked": "Šios programos nėra blokavimo sąraše.",
   "sentinela.noAppNetwork": "Šis procesas neturi savos programos, kurios tinklą būtų galima blokuoti.",
   "sys.failed": "Kažkas nepavyko.",
-  "sys.unsupported": "Ši LordOS versija to padaryti negali."
+  "sys.unsupported": "Ši LordOS versija to padaryti negali.",
+  "theme.notAllowed": "{call} nepasiekiamas bendruomenės temoms",
+  "theme.noHost": "Trūksta darbalaukio stiliaus LordOS dalies",
+  "hands.refused": "Tai galite padaryti tik jūs: niekada DI agento įvestis",
+  "install.diskTooManyParts": "Šiame diske per daug skaidinių, kad diegimo programa galėtų juos išvardyti"
 }

@@ -1,55 +1,35 @@
 // NoteEditor — a note's editor: markdown with line wrapping, one cursor with selection,
 // undo, markdown shortcuts and emoji suggestions with ":". The font is monospaced
-// (JetBrains Mono): each character's width is measured with lord.measureText (once per non-ASCII
-// character) and lines are wrapped at words according to the area's width. It takes the SDK text
-// focus (takeTextFocus), so it works the same in the window and in a desktop note.
-import { View, Text, ime, clipboard, takeTextFocus, releaseTextFocus, textFocusOwner, addListener } from '@lordos/sdk';
-import { useEffect, useRef, useState } from 'react';
+// (JetBrains Mono): a row is measured the way it is drawn, as one string (wrapmodel.js), and lines are wrapped at
+// words according to the area's width. It takes the SDK text focus (takeTextFocus), so it works the same in the window
+// and in a desktop note.
+// Fluid on long notes (0.8.9.6.2): the editor keeps the text itself and tells onChange, which no longer redraws the
+// window (store.js editBody); only the line being edited is wrapped again (a per-line cache); only the rows in sight
+// are drawn, each a memoized Row that redraws only when its text, place or style changes; the caret and the selection
+// are drawn over them.
+import { View, Text, ime, clipboard, takeTextFocus, releaseTextFocus, textFocusOwner, addListener, useTheme, useEditorSpell, EditorSquiggles, squiggleColorFor, spellHitAt } from '@lordos/sdk';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
+import { makeMeasure, wrapText, rowAt, xIn, offsetAt, display } from './wrapmodel.js';
 
-const MONO = 1400;
-const charW = new Map();
-// lord.measureText rounds a width up to a whole pixel: one 8.4 px character alone reads 9, and the
-// caret drifted 0.6 px to the right of the text with every character. REP copies make that < 0.02 px.
-const REP = 64;
-const cw = (ch, size) => {
-  const k = `${size}:${ch}`;
-  if (!charW.has(k)) charW.set(k, lord.measureText((ch === '\t' ? '    ' : ch).repeat(REP), size, MONO) / REP || size * 0.6);
-  return charW.get(k);
-};
+const MONO = 1400, MONO_BOLD = 1700;   // JetBrains Mono, regular and bold (TEXT_MONO in server/src/ui/ui.h)
+// lord.measureText rounds a width up to a whole pixel: one 8.4 px cell alone reads 9, so a cell is measured over 64
+const measurers = new Map();
+function measurerFor(size) {
+  let m = measurers.get(size);
+  if (!m) {
+    const cell = lord.measureText('0'.repeat(64), size, MONO) / 64 || size * 0.6;
+    const boldCell = lord.measureText('0'.repeat(64), size, MONO_BOLD) / 64 || cell;
+    m = makeMeasure((s, bold) => lord.measureText(s, size, bold ? MONO_BOLD : MONO), cell, boldCell);
+    measurers.set(size, m);
+  }
+  return m;
+}
 const WORD = /[\p{L}\p{N}_]/u;
 
-// Visual lines: [{ start, end, line }] (end without the line break).
-function wrapRows(text, width, size) {
-  const rows = [];
-  let off = 0;
-  const lines = text.split('\n');
-  lines.forEach((ln, li) => {
-    if (!ln.length) { rows.push({ start: off, end: off, line: li }); off += 1; return; }
-    let rs = 0, w = 0, lastSpace = -1;
-    for (let i = 0; i < ln.length;) {
-      const cp = ln.codePointAt(i);
-      const n = cp > 0xffff ? 2 : 1;
-      const ch = ln.slice(i, i + n);
-      const adv = cw(ch, size);
-      if (w + adv > width && i > rs) {
-        const cut = lastSpace >= rs ? lastSpace + 1 : i;
-        rows.push({ start: off + rs, end: off + cut, line: li });
-        w = 0;
-        for (let j = cut; j < i;) { const c2 = ln.codePointAt(j); const n2 = c2 > 0xffff ? 2 : 1; w += cw(ln.slice(j, j + n2), size); j += n2; }
-        rs = cut;
-        lastSpace = -1;
-      }
-      if (ch === ' ') lastSpace = i;
-      w += adv;
-      i += n;
-    }
-    rows.push({ start: off + rs, end: off + ln.length, line: li });
-    off += ln.length + 1;
-  });
-  return rows;
-}
-
-const widthOf = (s, size) => { let w = 0; for (const ch of s) w += cw(ch, size); return w; };
+// one drawn row: redrawn only when its text, place or style changes
+const Row = memo(function Row({ text, left, top, size, weight, color }) {
+  return <Text style={{ position: 'absolute', left, top, fontFamily: 'monospace', fontSize: size, whiteSpace: 'nowrap', fontWeight: weight, color }}>{text}</Text>;
+});
 
 // Style of a line according to its markdown (the editor does not highlight inside the line).
 function lineStyle(s, inCode) {
@@ -62,55 +42,74 @@ function lineStyle(s, inCode) {
   return 'text';
 }
 
-export function NoteEditor({ value, onChange, size = 14, colors, onPasteImage, emojiSearch, onEscape, autoFocus, padding = 10, apiRef, onBlur, onCommand, onContextMenu }) {
+export function NoteEditor({ value, onChange, size = 14, colors, onPasteImage, emojiSearch, onEscape, autoFocus, padding = 10, apiRef, onBlur, onCommand, onContextMenu, spellCheck = true, initialSize }) {
   const area = useRef(null);
   const token = useRef({}).current;
-  const st = useRef({ undo: [], redo: [], last: 0, w: 300, h: 200 });
+  // the first frame's size: the place it opens in (Notes' reading view, measured), until lord-server has laid the area out
+  const size0 = initialSize && initialSize.w > 1 && initialSize.h > 1 ? { w: initialSize.w, h: initialSize.h } : { w: 300, h: 200 };
+  const st = useRef({ undo: [], redo: [], last: 0, ...size0 });
+  // the text is the editor's own: each change goes to onChange, and a value from outside (another program changed the
+  // note, a checkbox ticked elsewhere) replaces it only when it is not what the editor itself last gave
+  const [text, setText] = useState(value);
+  const emitted = useRef(value), seen = useRef(value);
+  if (value !== seen.current) {
+    seen.current = value;
+    if (value !== emitted.current && value !== text) { emitted.current = value; setText(value); }
+  }
   const [sel, setSel] = useState({ a: value.length, b: value.length });
   const [scroll, setScroll] = useState(0);
   const [focus, setFocusState] = useState(false);
   const [blink, setBlink] = useState(true);
-  const [dims, setDims] = useState({ w: 300, h: 200 });
+  const [dims, setDims] = useState(size0);
   const [sugg, setSugg] = useState(null);           // { q, start, items, i }
   const LH = Math.round(size * 1.55);
-  const text = value;
+  const measure = measurerFor(size);
+  const wraps = useRef(new Map()).current;       // per line: its rows at a width (wrapmodel.js wrapText)
+  const change = (next) => { emitted.current = next; setText(next); onChange(next); };
 
   const readSize = () => {
     if (!area.current) return;
     const [, , w, h] = lord.getLayout(area.current.id);
+    // a node not laid out yet answers 0 × 0: wrapping at that width broke every line every few characters for a frame
+    // (Read → Edit, QA ws168); keep the size we have and look again on the next frame
+    if (!(w > 1 && h > 1)) { if (!st.current.again) st.current.again = setTimeout(() => { st.current.again = 0; readSize(); }, 16); return; }
     if (Math.abs(w - st.current.w) > 0.5 || Math.abs(h - st.current.h) > 0.5) { st.current.w = w; st.current.h = h; setDims({ w, h }); }
   };
-  useEffect(() => { readSize(); const id = setInterval(readSize, 400); return () => clearInterval(id); }, []);
+  useEffect(() => {
+    readSize();
+    const id = setInterval(readSize, 400);
+    return () => { clearInterval(id); if (st.current.again) clearTimeout(st.current.again); };
+  }, []);
 
-  const rows = wrapRows(text, Math.max(40, dims.w - padding * 2 - 6), size);
-  const rowOf = (off) => {
-    for (let r = 0; r < rows.length; r++) {
-      const row = rows[r];
-      const next = rows[r + 1];
-      if (off >= row.start && (off < row.end || (off === row.end && (!next || next.line !== row.line || next.start > off)))) return r;
-      if (off === row.end && next && next.line === row.line && next.start === off) return r + 1;
+  // each line's markdown kind (headings are drawn and measured bold), then the rows: only changed lines are wrapped
+  const lineKinds = useMemo(() => {
+    const out = [];
+    let inCode = false;
+    for (const ln of text.split('\n')) {
+      const fence = /^(`{3,}|~{3,})/.test(ln);
+      out.push(lineStyle(ln, inCode && !fence));
+      if (fence) inCode = !inCode;
     }
-    return rows.length - 1;
-  };
-  const xOf = (off) => { const r = rows[rowOf(off)]; return widthOf(text.slice(r.start, off), size); };
+    return out;
+  }, [text]);
+  const boldLine = (li) => (lineKinds[li] || 'text')[0] === 'h';
+  const wrapW = Math.max(40, dims.w - padding * 2 - 6);
+  const rows = useMemo(() => wrapText(text, wrapW, measure, wraps, (li) => boldLine(li)), [text, wrapW, measure, lineKinds]);
+  const rowOf = (off) => rowAt(rows, off);
+  const xOf = (off) => { const r = rows[rowOf(off)]; return xIn(text, r, off, measure, boldLine(r.line)); };
   const offAt = (x, y) => {
     const r = Math.max(0, Math.min(rows.length - 1, Math.floor(y / LH)));
     const row = rows[r];
-    const s = text.slice(row.start, row.end);
-    let w = 0;
-    for (let i = 0; i < s.length;) {
-      const cp = s.codePointAt(i);
-      const n = cp > 0xffff ? 2 : 1;
-      const adv = cw(s.slice(i, i + n), size);
-      if (x < w + adv / 2) return row.start + i;
-      w += adv;
-      i += n;
-    }
-    return row.end;
+    const off = offsetAt(text, row, x, measure, boldLine(row.line));
+    // a soft-wrapped row's end is the next row's start: a click past its text stays on this row
+    const next = rows[r + 1];
+    return off === row.end && next && next.line === row.line && row.end > row.start ? row.end - 1 : off;
   };
 
   // ---- editing ----
   const lo = Math.min(sel.a, sel.b), hi = Math.max(sel.a, sel.b);
+  const theme = useTheme();
+  const spellR = useEditorSpell(text, spellCheck, focus ? sel.b : -1);
   const pushUndo = (kind) => {
     const now = Date.now(), s = st.current;
     if (kind !== 'type' || now - s.last > 900 || s.kind !== kind) s.undo.push({ text, sel });
@@ -125,7 +124,7 @@ export function NoteEditor({ value, onChange, size = 14, colors, onPasteImage, e
   };
   const commit = (next, a, b = a, kind = 'edit') => {
     pushUndo(kind);
-    onChange(next);
+    change(next);
     setSel({ a, b });
     setBlink(true);
     setTimeout(() => ensureVisible(b), 0);
@@ -169,7 +168,10 @@ export function NoteEditor({ value, onChange, size = 14, colors, onPasteImage, e
     const out = lines.map((l, i) => make(l, i));
     const next = text.slice(0, a) + out.join('\n') + text.slice(b);
     const delta = next.length - text.length;
-    commit(next, a, b + delta);
+    // a caret (nothing selected) stays a caret, at the end of its line, so what is typed next goes after "- [ ] "
+    // instead of replacing it; a selection keeps covering the lines it changed
+    if (lo === hi) commit(next, b + delta, b + delta);
+    else commit(next, a, b + delta);
   };
   const STRIP = /^(\s*)(#{1,6}\s+|[-*+]\s+\[[ xX]\]\s+|[-*+]\s+|\d+[.)]\s+)?/;
   const heading = (n) => linePrefix((l) => { const m = STRIP.exec(l); const body = l.slice(m[0].length); const had = m[2] && m[2].startsWith('#'.repeat(n) + ' ') && m[2].trim() === '#'.repeat(n); return had ? body : `${'#'.repeat(n)} ${body}`; });
@@ -208,8 +210,8 @@ export function NoteEditor({ value, onChange, size = 14, colors, onPasteImage, e
     setSugg(null);
   };
 
-  const undo = () => { const s = st.current; const u = s.undo.pop(); if (!u) return; s.redo.push({ text, sel }); onChange(u.text); setSel(u.sel); s.last = 0; };
-  const redo = () => { const s = st.current; const r = s.redo.pop(); if (!r) return; s.undo.push({ text, sel }); onChange(r.text); setSel(r.sel); s.last = 0; };
+  const undo = () => { const s = st.current; const u = s.undo.pop(); if (!u) return; s.redo.push({ text, sel }); change(u.text); setSel(u.sel); s.last = 0; };
+  const redo = () => { const s = st.current; const r = s.redo.pop(); if (!r) return; s.undo.push({ text, sel }); change(r.text); setSel(r.sel); s.last = 0; };
 
   const onKey = (e) => {
     const prim = e.ctrl || e.meta;
@@ -293,6 +295,9 @@ export function NoteEditor({ value, onChange, size = 14, colors, onPasteImage, e
   st.current.caret = caretRect;
   // send: a key from the Edit and Format menus (editmenu.js), handled as if it were typed
   if (apiRef) apiRef.current = { insert: (txt) => insert(txt, 'edit'), focus: () => take(), selection: () => text.slice(lo, hi),
+    // spelling and ✨ AI (sdk/editorextras.jsx): the misspelled word under a right click, the selection's offsets, a range replaced
+    spellHit: (e) => { try { return spellHitAt(spellR, text, posFromEvent(e)); } catch (err) { return null; } }, selRange: () => [lo, hi], textNow: () => text,
+    replaceRange: (a, b, s) => replace(a, b, s, 'edit'),
     send: (e) => { take(); st.current.onKey(e); } };
   const take = () => {
     if (textFocusOwner() === token) return;
@@ -349,13 +354,6 @@ export function NoteEditor({ value, onChange, size = 14, colors, onPasteImage, e
   // ---- drawing ----
   const first = Math.max(0, Math.floor(scroll / LH) - 2);
   const last = Math.min(rows.length - 1, first + Math.ceil(dims.h / LH) + 4);
-  const lineKinds = [];
-  let inCode = false;
-  for (const ln of text.split('\n')) {
-    const fence = /^(`{3,}|~{3,})/.test(ln);
-    lineKinds.push(lineStyle(ln, inCode && !fence));
-    if (fence) inCode = !inCode;
-  }
   const kindStyle = (kind) => {
         if (kind[0] === 'h') return { fontWeight: 700, color: colors.heading };
     if (kind === 'code') return { color: colors.code };
@@ -371,18 +369,21 @@ export function NoteEditor({ value, onChange, size = 14, colors, onPasteImage, e
     const y = padding + r * LH - scroll;
     if (hi > lo && row.end >= lo && row.start <= hi) {
       const a = Math.max(lo, row.start), b2 = Math.min(hi, row.end);
-      const x0 = widthOf(text.slice(row.start, a), size);
-      const x1 = widthOf(text.slice(row.start, b2), size) + (hi > row.end ? size * 0.4 : 0);
+      const x0 = xIn(text, row, a, measure, boldLine(row.line));
+      const x1 = xIn(text, row, b2, measure, boldLine(row.line)) + (hi > row.end ? size * 0.4 : 0);
       if (x1 > x0) selRects.push(<View key={`s${r}`} style={{ position: 'absolute', left: padding + x0, top: y, width: x1 - x0, height: LH, backgroundColor: colors.selection }} />);
     }
     // headings are drawn a bit larger, but on the same grid (the cursor follows the base font)
-    out.push(<Text key={r} style={{ position: 'absolute', left: padding, top: y + (LH - size * 1.3) / 2, fontFamily: 'monospace', fontSize: size, whiteSpace: 'nowrap', ...kindStyle(kind) }}>{text.slice(row.start, row.end)}</Text>);
+    const ks = kindStyle(kind);
+    out.push(<Row key={r} text={display(text.slice(row.start, row.end))} left={padding} top={y + (LH - size * 1.3) / 2} size={size} weight={ks.fontWeight || 400} color={ks.color} />);
   }
   const caretRow = rowOf(sel.b);
   return (
     <View ref={area} onMouseDown={onMouseDown} onWheel={onWheel} onContextMenu={onContextMenu} style={{ flex: 1, overflow: 'hidden', direction: 'ltr' }}>
       {selRects}
       {out}
+      <EditorSquiggles ranges={spellR} rows={rows} first={first} last={last} left={padding} color={squiggleColorFor(theme.mode)}
+        xOf={(row, off) => xIn(text, row, off, measure, boldLine(row.line))} top={(r) => Math.round(padding + r * LH - scroll + (LH + size * 1.3) / 2) - 2} />
       {focus && blink && caretRow >= first && caretRow <= last && (
         <View style={{ position: 'absolute', left: padding + xOf(sel.b) - 1, top: padding + caretRow * LH - scroll + 2, width: 2, height: LH - 4, backgroundColor: colors.caret }} />
       )}

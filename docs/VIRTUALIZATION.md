@@ -2814,7 +2814,7 @@ read from world-readable sysfs (`lord.vm.sensors()`); a microSD library and an e
 
 ### 5.8 Menus, shortcuts
 
-Follows `docs/SHORTCUTS.md`: app menus, ❖ shortcuts for the host while the app has focus outside capture, all passed to the guest while captured. The release combination (❖Esc or Ctrl+Alt) is shown when capture starts; it is fixed on purpose (6.25: lord-server's own keys, so the pointer can always be taken back), not configurable (`capture.js`). In Lord Classic the same table.
+Follows `docs/SHORTCUTS.md`: app menus, ❖ shortcuts for the host while the app has focus outside capture, all passed to the guest while captured. The release combination (❖Esc or Ctrl+Alt) is shown when capture starts; it is fixed on purpose (6.25: lord-server's own keys, so the pointer can always be taken back), not configurable (`capture.js`). In Classic the same table.
 
 Since 0.8.8.8 the VM window can also take the desktop's shortcuts (❖, ⌥Tab and the rest) while it has the keyboard, so they reach the guest (`apps/machines/vmwindow.jsx` → `sdk/kbinhibit.js`, `sdk/kbinhibitmodel.js`). It follows the same rule as a Linux app's keyboard-shortcuts inhibitor: the person allows it once (the `shortcuts` permission, Settings → Privacy → Keyboard shortcuts), ❖Esc turns it off for that window and back on, and the lock, the console switch and the media keys always stay LordOS's.
 
@@ -3657,6 +3657,11 @@ fresh list holds that exact token (`launchAskStep`); lord-vm checks the token ag
 the app isn't there any more, or that apps mode didn't start (10 minutes, or tools that can't list windows), and launches
 nothing. Tests: `guest_apps_test.mjs`. Not checked on screen yet. While apps mode runs, the guest's open apps are in the Dock
 as before (`vm:<machine>:<app>`).
+The entries come without asking Machines (since 2026-11-26, "The shell and the machines" in 6.14): every entry of every
+machine that shows its apps is kept in `settings.json` (`guestLauncherKept`, checked again as it is read back:
+`keptGuestItems`) and the launcher leaves out the machines lord-server says run (`shownGuestItems`). The list is read again
+only when apps mode saved a new one, Configure's switch changed, or the library changed while there are entries; once at
+the first login that has nothing kept.
 
 ### 6.13 Nested virtualization
 
@@ -3702,6 +3707,62 @@ development*, "Machines to 100 %"):
 - **Reclaim space from Cleaner** (*in development*): Cleaner's Storage view, on the Machines library, a machine's folder or a
   group's, offers **Reclaim in Machines** in place of Review, which opens Machines' Storage window (6.16), where a machine's
   disks are compacted safely (`apps/cleaner/vmspace.js` `machinesSpace`, the same places `clean_machine_path` refuses).
+
+#### The list's cache
+
+`lord.vm.list()` reads every machine folder (`machine.json`, `run.json`, `operation.json`, `identity.json`,
+`suspend.state`, a group's `group.json`, …) on lord-server's main thread. Since 2026-11-26 (*in development*) the list is
+kept as JSON (`server/src/vm/vmlistcache.c`) and given again while nothing changed: an inotify watch on the library, on each
+machine folder and its `disks/`, and on each group folder and its members says when something did (names that never
+change the list are left out: `thumb.png`, `*.log`, hidden and temporary names, which are renamed to a real name that is
+seen). A kept list is also dropped after 10 s (what no file says: the system's UEFI code updated, an idle macvtap or vGPU)
+and as soon as an active machine's lord-vm is gone (a supervisor that died writes nothing). Without inotify (no watch left)
+nothing is kept and every call reads the folders, as before. Each call returns a new array (the callers add fields to
+its objects).
+
+The firmware check (does a UEFI machine's `firmware_code` still hash to its `firmware_sha256`?) hashes each system file
+once per version (device, inode, size, change time), not once per machine: the old 16-slot table was keyed by the machine
+id's first byte, so ids starting with `1` and `a` (or `2` and `b`) evicted each other and every list hashed the 3.5 MB
+`OVMF_CODE_4M.fd` again for those machines.
+
+Measured on the development PC (headless lord-server, 12 machine folders of which 8 UEFI with colliding ids, and a
+Whonix-like group; nothing running): a call cost 110 ms before (the maintainer's own library: 25.7 ms, logged as
+`stall: ~27 ms call vm.list` more than 4,000 times a day). Now the first call costs 14 ms (the one firmware hash), a read
+after a change 0.9 ms, and a kept list 0.21 ms (median of 200; 0.35 ms at most). Tests: `build/vmlistcache-test` (the
+watch, the 10 s limit, a lord-vm gone, the firmware hashed once per file version) and `tests/vm_list_headless.sh`.
+
+#### The shell and the machines
+
+The maintainer's rule (2026-11-26): outside the Machines window (the launcher's guest apps, the battery notice, "Pause
+while I'm away", a group's link, Sentinela, the idle sleep's check, deactivating Machines, Hands) the shell makes no
+`lord.vm` call while no machine runs, and nothing polls. lord-server says what runs instead (`ui/js_vm.c`, "the machines'
+state for the shell"; `sdk/vmlibrary.js`):
+
+- `__lordVm('state', json)`, `{ active: [dir…], apps: [dir…] }`, when the set of active machines (`run.json` starting,
+  running, paused or stopping, its lord-vm alive) or of sessions in apps mode changes, and once to every new JS context.
+  What wakes it: the list cache's inotify watch, set when lord-server starts (a start and a stop are `run.json` renamed
+  into place), a pidfd per active lord-vm (at most 8; one that dies writes nothing), and apps mode turned on or off or a
+  session that ended (sent through an eventfd, so the event never runs inside the JS call that caused it). Nothing is
+  read while nothing changes. The login screen has none of it.
+- `__lordVm('library')` when something in the library changed.
+
+The SDK keeps them as `vmState` (`vmAnyActive()`) and `vmLibraryChanged`. What reads the list now, and when:
+
+| Caller | Before | Now |
+|---|---|---|
+| Launcher's guest apps (`guestlaunch.js`) | `lord.vm.list()` every 3 s | kept entries filtered by `vmState`; read again only after apps mode saved a list, Configure's switch, or a library change while there are entries |
+| A group's link (`cli.js`) | `lord.vm.groups()` and `list()` every 2 s, with any group in the library | only while two machines or more are active |
+| Battery notice and "Pause while I'm away" (`ties.js`) | `list()` every 15 s | only while a machine is active; the session's starts read it only when some machine chose to start with the session |
+| Sentinela's machines (`sdk/sentinela.js`, when on) | `list()` every tick | only while a machine is active, and once after the last one stopped (so its end is seen) |
+| The idle sleep's check (`lord.vm.awake`), deactivating Machines | at the moment | not at all while nothing is active |
+
+Measured with `tests/vm_idle_headless.sh` (the same library, the real Lord Flow theme, 90 s idle after a 12 s start, every
+`lord.vm` call counted by caller): before, 81 calls of about 110 ms each in those 90 s (30 from the guest launcher, 45
+`list()` and 45 `groups()` from the group link, 6 from the battery and away checks: about 78,000 a day) and a stall line
+for each; now none, and no stall line. What remains is the `machines` command's channel (`lord.vmcli.poll()`, `cli.js`,
+every 300 ms: a non-blocking `accept` on its socket, 13 µs, no file read), which is not `lord.vm`. `make test` runs both
+headless checks (`vm-list-cache`, `vm-idle`); the model parts are in `guest_apps_test.mjs` and
+`sentinela_notify_scene.mjs`.
 
 **No balloon (decided 2026-11-24).** A `virtio-balloon` device would let the host take memory back from an idle guest, but the
 guest decides how much it gives (a hostile one gives nothing), it is one more device model parsing what the guest writes, and
@@ -4788,7 +4849,7 @@ checked in a running guest: the Windows Search scripts and the Linux helper's pa
 
 ### 7.2 Apps mode (seamless)
 
-**Built (2026-11-20, since 0.8.9.5).** Each window of the guest is its own LordOS window: its title (with the machine's name, so a guest's window is always told apart), its app's icon in the Dock, the taskbar and the switcher (one Dock icon per app of each machine, `vm:<machine>:<app>`), and the guest's own desktop hidden. The machine's window becomes a controller panel (about 420 × 520; since 0.8.9.5, 2026-11-22, like VMware Fusion's Unity launcher): the machine's name and **Leave Apps Mode** (Esc there leaves too, after clearing the search); **Running**, the guest's own windows (not its popups or owned windows), each with its icon (the one the Dock shows, `LAG_WINICON`) and title: a click brings its LordOS window to the front (restored if minimized; the guest follows as from the Dock), × asks the guest to close it (`LAG_WINACT` close, as the window's own close button: the guest may ask about unsaved work); and the guest's apps (`LAG_APPLIST`) with a search (each word, accents and case ignored, names that start with it first; Enter opens the first), each with a plain initial since the guest lists no app icons. The menu bar's **Applications** menu lists the same Running windows above the apps. The lists' logic is `runningWindows`, `appsMatching` and `appInitial` in `model.js`. Each machine in apps mode also has a **status item by the clock** (`apps/machines/appsstatus.jsx`, since 0.8.9.5, 2026-11-22, like Fusion's Unity menu in the menu bar): an SDK status item (`registerStatusItem`, so every theme that draws `<StatusItems />` shows it on each bar: Lord Flow's menu bar, the Classic taskbar when horizontal, Workspaces' top bar), its glyph the machine's mark (`OsMark`) and its tooltip the machine's name. Its menu works like the guest's Start menu: a search (focused; Enter opens the first match, Esc clears then closes), Running (hidden while searching), the guest's apps, then the machine's name, **Show the Machine's Window** and **Leave Apps Mode**; it uses the same list components as the controller (`appslist.jsx`), and while it is open a guest window in front doesn't take the keys. An app row takes an icon (`launcherApps`: `appIcons` by token) once the guest sends app icons; until then the initial. The item goes when apps mode ends (`appsStatusDiff` over `guests`). Both launchers give feedback: a launched app's row shows **Opening…** and ignores clicks (`launchGuest`, also for Enter and the Applications menu) until a new window of that app is listed (`windowOfApp`: its program's name holds a word of the app's name, or its title the whole name) or 5 s pass, so an app whose window opens out of sight isn't launched again and again; the status menu closes when that window appears. After ×, the row shows **Closing…**, and a note when the window is still listed 3 s later or the guest reports a refusal (`closeRefused[gid] = { reason, at }` in `guests`, reason `elevated` for a Windows window that runs as administrator: the tools' report is to come; `closeView`). The toolbar's Apps button and **Actions → Apps Mode** turn it on; the choice is kept per machine (`app.json` `appsMode`) and the window opens in it next time. It's offered only when the agent is connected and the guest's helper says `windows` in its hello (`LAG_CAP_WINDOWS`, 256, in `VM_AGENT_STATE`); otherwise the button says why: the agent is off, or the guest needs LordOS or Windows inside, with the LordOS tools.
+**Built (2026-11-20, since 0.8.9.5).** Each window of the guest is its own LordOS window: its title (with the machine's name, so a guest's window is always told apart), its app's icon in the Dock, the taskbar and the switcher (one Dock icon per app of each machine, `vm:<machine>:<app>`), and the guest's own desktop hidden. The machine's window becomes a controller panel (about 420 × 520; since 0.8.9.5, 2026-11-22, like VMware Fusion's Unity launcher): the machine's name and **Leave Apps Mode** (Esc there leaves too, after clearing the search); **Running**, the guest's own windows (not its popups or owned windows), each with its icon (the one the Dock shows, `LAG_WINICON`) and title: a click brings its LordOS window to the front (restored if minimized; the guest follows as from the Dock), × asks the guest to close it (`LAG_WINACT` close, as the window's own close button: the guest may ask about unsaved work); and the guest's apps (`LAG_APPLIST`) with a search (each word, accents and case ignored, names that start with it first; Enter opens the first), each with a plain initial since the guest lists no app icons. The menu bar's **Applications** menu lists the same Running windows above the apps. The lists' logic is `runningWindows`, `appsMatching` and `appInitial` in `model.js`. Each machine in apps mode also has a **status item by the clock** (`apps/machines/appsstatus.jsx`, since 0.8.9.5, 2026-11-22, like Fusion's Unity menu in the menu bar): an SDK status item (`registerStatusItem`, so every theme that draws `<StatusItems />` shows it on each bar: Flow's menu bar, the Classic taskbar when horizontal, Workspaces' top bar), its glyph the machine's mark (`OsMark`) and its tooltip the machine's name. Its menu works like the guest's Start menu: a search (focused; Enter opens the first match, Esc clears then closes), Running (hidden while searching), the guest's apps, then the machine's name, **Show the Machine's Window** and **Leave Apps Mode**; it uses the same list components as the controller (`appslist.jsx`), and while it is open a guest window in front doesn't take the keys. An app row takes an icon (`launcherApps`: `appIcons` by token) once the guest sends app icons; until then the initial. The item goes when apps mode ends (`appsStatusDiff` over `guests`). Both launchers give feedback: a launched app's row shows **Opening…** and ignores clicks (`launchGuest`, also for Enter and the Applications menu) until a new window of that app is listed (`windowOfApp`: its program's name holds a word of the app's name, or its title the whole name) or 5 s pass, so an app whose window opens out of sight isn't launched again and again; the status menu closes when that window appears. After ×, the row shows **Closing…**, and a note when the window is still listed 3 s later or the guest reports a refusal (`closeRefused[gid] = { reason, at }` in `guests`, reason `elevated` for a Windows window that runs as administrator: the tools' report is to come; `closeView`). The toolbar's Apps button and **Actions → Apps Mode** turn it on; the choice is kept per machine (`app.json` `appsMode`) and the window opens in it next time. It's offered only when the agent is connected and the guest's helper says `windows` in its hello (`LAG_CAP_WINDOWS`, 256, in `VM_AGENT_STATE`); otherwise the button says why: the agent is off, or the guest needs LordOS or Windows inside, with the LordOS tools.
 
 **How.** The guest's helper lists its windows (`LAG_WINDOWS`: id, place in the guest's pixels, focused, minimized, on top, owner, pid, title, app; at most 64), their icons (`LAG_WINICON`, at most 64 × 64 RGBA) and its apps (`LAG_APPLIST`, name and an opaque token), all in `server/src/vm/vmagent.h`. lord-vm parses each with strict parsers (exact lengths, counts, sane rectangles, UTF-8 without control characters), writes it again and hands it to lord-server as a sealed memfd (`VM_WINDATA`), which parses it again. The host sends `LAG_APPS` (on/off: the guest hides its own desktop), `LAG_WINACT` (focus, close, minimize, restore, move to x, y, w, h) and `LAG_LAUNCH` with a token the guest listed (lord-server names the app by its place in the list and the list's generation; lord-vm sends the token from its own copy). The guest's screen is asked to be as large as this display (`lord.vm.resize`), so no window is cut. Each LordOS window shows its part of the machine's one picture: `<MediaView crop={[x, y, w, h]}>` (`Node.crop`, `media/mview.c`), drawn straight from the shared picture (2D) or the picture read back from the 3D dmabuf, copied as rows at 1:1; a new frame damages each window only where its part changed (`media_src_damage_rect`), and a frame that touches no shown part counts as read at once. The pointer goes to the guest at the window's place (`cropPoint`), the keyboard while the window is in front. Moving or resizing the LordOS window moves the guest's (`move`), minimizing, focusing and closing do the same in the guest; a window the guest moves or resizes itself is followed. A menu or tooltip (owned and on top) is a small frameless window over the others. *Popups* (global security pass,
 2026-11-24, in development): the guest is hostile, so a popup is cut to 60 % of its display's work area wide and 70 % high
@@ -4801,7 +4862,7 @@ the whole screen and its bars. *Rates* (same pass): lord-vm takes `LAG_WINDOWS` 
 gets the last lists. The guest's programs are written into `app.json` at most once per 2 s per machine. The guest's
 clipboard (`AGK_CLIP`, `AGK_CLIPX`, 6.8) is held to 4 at once, then one per 250 ms.
 
-**LordOS guests.** `lordos-guest` asks the guest's own lord-server through a local endpoint for its user only (`server/src/ui/js_guestwin.c`, `$XDG_RUNTIME_DIR/lordos-guestwin.sock`, same uid, only inside a Machines guest), which lists the windows of its window manager, applies the listed actions and launches only its launcher's apps; in apps mode it hides its Dock, bar and wallpaper. **Windows guests:** `lordos-guest-win` (7.1.2): it lists the top-level windows (Win32), hides the taskbar in apps mode, and launches only a Start menu shortcut it listed. **Other Linux systems** (GNOME, KDE on Wayland) don't list their windows: apps mode isn't offered there, and the button says it needs LordOS or Windows in the machine.
+**LordOS guests.** `lordos-guest` asks the guest's own lord-server through a local endpoint for its user only (`server/src/ui/js_guestwin.c`, `$XDG_RUNTIME_DIR/lordos-guestwin.sock`, same uid, only inside a Machines guest), which lists the windows of its window manager, applies the listed actions and launches only its launcher's apps; in apps mode it hides its Dock, bar and wallpaper. That endpoint exists since LordOS 0.8.9.5: in a guest running an older LordOS, `lordos-guest` 11 reads the installed `lordos` package's version from dpkg's status file (`ag_dpkg_lordos`, `ag_lordos_older` against `AG_APPS_LORDOS` in `vmagent.h`) and says `oldlordos` in its hello while there is no endpoint (`VAC_OLD_LORDOS`, 8388608, in `VM_AGENT_STATE`); Machines' Apps button and the agent's popover then say that apps mode needs LordOS 0.8.9.5 or later inside the machine and that LordOS must be updated there (the tools alone can't add it), instead of "Needs the tools" (`appsBlocker` → `oldLordos`). **Windows guests:** `lordos-guest-win` (7.1.2): it lists the top-level windows (Win32), hides the taskbar in apps mode, and launches only a Start menu shortcut it listed. **Other Linux systems** (GNOME, KDE on Wayland) don't list their windows: apps mode isn't offered there, and the button says it needs LordOS or Windows in the machine.
 
 **The work area.** The guest's screen is laid over the whole display, so a guest window near its top edge would put its LordOS title bar under the menu bar (a Store app opens at y = −10). Such a window opens, and follows the guest, just below the menu bar (or a bar at the start side), and the guest is asked to move its window there too (`insideWork` in `model.js`, once per place): the window keeps showing its own part of the picture 1:1, and if the guest keeps it where it was the crop is still its rectangle.
 
@@ -5897,6 +5958,11 @@ reach only that socket. Our code and kernel rule that out:
   Shared's card already does with passt (`lordvm.c`: `hubport` + `stream,addr.type=fd`). The card exists from the
   start; the backend comes and goes. A card without a backend is a pulled cable: the Workstation then has **no network
   at all**, which is the fail-closed state.
+- The hub also has a port with nothing behind it (`lnkz`; QA 0.8.9.6.2, BUG-N). QEMU's hub can't receive while the card
+  is its only port: the card's first frame stays queued there and its transmit queue waits for it for good, so a member
+  that ran alone for a while (the Workstation before its Gateway, or a Gateway minutes before its Workstation) never
+  sent on the link again. With the peerless port the pulled cable drops frames, and the member sends again as soon as
+  the link is made, whichever started first.
 - When both members run, lord-server makes a pair and sends one end to each `lord-vm` with a new control message,
   **`VM_LINK`** (one descriptor). `lord-vm` checks the descriptor (`SO_DOMAIN` AF_UNIX, `SO_TYPE` SOCK_STREAM, the peer's
   `SO_PEERCRED` uid its own), passes it to QEMU with QMP `getfd`, puts it on the hub (`netdev_add` + `hubport`) and

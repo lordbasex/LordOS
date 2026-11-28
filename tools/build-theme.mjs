@@ -89,6 +89,36 @@ async function buildAppHost() {
   console.log(`app-host: ${(bytes / 1024).toFixed(0)} KB in ${Date.now() - t0} ms`);
 }
 
+// (0.8.9.6.2) The theme host: React + runtime + SDK + every app + the system layer, for a community theme's session
+// (runtime/theme-host.js, sdk/themeapi.js; docs/THEMES-GUIDE.md "Community themes"). Strict mode for the whole bundle:
+// none of LordOS's functions hands its realm's global object to a theme as `this`.
+// React's elements recorded (runtime/react-made.cjs): the host guard refuses a host node whose element LordOS's code
+// didn't make, so a forged one fails wherever it got in
+const madePlugin = {
+  name: 'lordos-react-made',
+  setup(b) {
+    const nm = path.join(root, 'node_modules', 'react');
+    b.onResolve({ filter: /^react$/ }, () => ({ path: path.join(root, 'runtime', 'react-made.cjs') }));
+    b.onResolve({ filter: /^react\/jsx-runtime$/ }, () => ({ path: path.join(root, 'runtime', 'react-made-jsx.cjs') }));
+    b.onResolve({ filter: /^react-original$/ }, () => ({ path: path.join(nm, 'index.js') }));
+    b.onResolve({ filter: /^react-original\/jsx-runtime$/ }, () => ({ path: path.join(nm, 'jsx-runtime.js') }));
+  },
+};
+async function buildThemeHost() {
+  const t0 = Date.now();
+  const result = await build({
+    entryPoints: [path.join(root, 'runtime', 'theme-host.js')],
+    outfile: path.join(root, 'assets', 'theme-host.bundle.js'),
+    bundle: true, format: 'iife', target: 'es2020', minify: !process.env.LORD_NOMINIFY, jsx: 'automatic',
+    banner: { js: '"use strict";' },
+    alias: { '@lordos/runtime': path.join(root, 'runtime', 'index.js'), '@lordos/sdk': path.join(root, 'sdk', 'index.js') },
+    plugins: [appsPlugin, madePlugin],
+    define: { 'process.env.NODE_ENV': '"production"' }, metafile: true, logLevel: 'warning',
+  });
+  const bytes = Object.values(result.metafile.outputs).find((o) => o.bytes).bytes;
+  console.log(`theme-host: ${(bytes / 1024).toFixed(0)} KB in ${Date.now() - t0} ms`);
+}
+
 // Built-in apps with "process": "isolated" (Passwords): their app.js for `lord-server --app <id>`,
 // built like an .lpk (React and the SDK come from the app host), into assets/sysapps/<id>/.
 // lord-server prefers this read-only system package over any user package with the same id.
@@ -131,8 +161,9 @@ async function buildSysApps() {
 
 const all = fs.readdirSync(path.join(root, 'themes'))
   .filter((d) => fs.existsSync(path.join(root, 'themes', d, 'index.jsx')));
-for (const name of (names.length ? names : all).filter((n) => n !== 'app-host' && n !== 'sysapps')) await buildTheme(name);
+for (const name of (names.length ? names : all).filter((n) => n !== 'app-host' && n !== 'sysapps' && n !== 'theme-host')) await buildTheme(name);
 if (!names.length || names.includes('app-host')) await buildAppHost();
+if (!names.length || names.includes('theme-host')) await buildThemeHost();
 if (!names.length || names.includes('sysapps')) await buildSysApps();
 // the verified-code manifest of what was just built (unsigned: a development build until
 // tools/release/sign-code.sh signs it on the maintainer's machine)

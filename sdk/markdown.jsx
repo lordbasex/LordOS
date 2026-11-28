@@ -8,6 +8,9 @@
 //   resolveImage (optional): (target) → the file to draw, or null to show [alt] instead. Without it an image is a file
 //     relative to base (never an address with a scheme). Notes passes one that allows only the note's own PNG and JPEG
 //     files (GitHub #238).
+//   taskStyle (optional): 'round' draws a checklist item as a circle (a ring when open; filled with taskTint, default
+//     the accent, and a white ✓ when done; a 28 px hit target on the first line; the done text not dimmed), as Notes
+//     does. Without it, the 16 px square box, done items dimmed (every other app).
 //   markdownHeadings(text) → [{ level, text, id, line }]   (for a table of contents)
 //
 // Blocks: headings, paragraphs, quotes, lists (with levels), numbered lists, checkboxes (- [ ] / - [x]),
@@ -197,7 +200,7 @@ const H_SIZE = [0, 22, 18, 16, 14, 13, 13];
 
 function Block({ b, props }) {
   const t = useTheme();
-  const { size = 14, color = t.text, width, base, onLink, onToggleTask, onHeadingRef, emoji, fitWidth, resolveImage } = props;
+  const { size = 14, color = t.text, width, base, onLink, onToggleTask, onHeadingRef, emoji, fitWidth, resolveImage, taskStyle, taskTint } = props;
   const inl = (text, extra = {}) => <Inline text={text} size={size} color={color} width={width} base={base} onLink={onLink} emoji={emoji} resolveImage={resolveImage} {...extra} />;
   switch (b.type) {
     case 'heading':
@@ -235,6 +238,23 @@ function Block({ b, props }) {
             const n = counters[it.depth]++;
             counters.length = it.depth + 1;
             const mark = it.task !== null ? null : it.ordered ? `${n}.` : ['•', '◦', '▪'][it.depth % 3];
+            if (it.task !== null && taskStyle === 'round') {
+              // round (Notes, like a phone's notes app): a 21 px circle, a ring when open, filled with the tint and a white
+              // ✓ when done, in a 28 px hit target centred on the item's first line; the done text stays readable
+              const lineH = Math.round(size * 1.3), D = 21, HIT = 28;
+              return (
+                <View key={i} style={{ flexDirection: 'row', alignItems: 'flex-start', marginStart: it.depth * 18 }}>
+                  <View onClick={(e) => { e.stopPropagation?.(); onToggleTask?.(it.line); }}
+                    style={{ width: HIT, height: HIT, marginTop: Math.round((lineH - HIT) / 2), marginEnd: 4, alignItems: 'center', justifyContent: 'center' }}>
+                    <View style={{ width: D, height: D, borderRadius: D / 2, alignItems: 'center', justifyContent: 'center',
+                      backgroundColor: it.task ? taskTint || t.accent : 'transparent', border: it.task ? `1.5px solid ${taskTint || t.accent}` : `1.5px solid ${t.textDim}` }}>
+                      {it.task && <Text style={{ fontSize: 13, fontWeight: 700, color: '#ffffff' }}>✓</Text>}
+                    </View>
+                  </View>
+                  <View style={fitWidth && width ? { width: width - 18 * it.depth - HIT - 4 } : { flex: 1 }}>{inl(it.text)}</View>
+                </View>
+              );
+            }
             return (
               <View key={i} style={{ flexDirection: 'row', alignItems: 'flex-start', marginLeft: it.depth * 18 }}>
                 {it.task !== null ? (

@@ -3,10 +3,12 @@
 #include "draw.h"
 
 #include <ctype.h>
+#include <stdlib.h>
 #include <string.h>
 
-/* 5×7 glyphs, bit 4 = left column; ASCII 32..95 (lowercase is drawn as uppercase). */
-static const uint8_t FONT[64][7] = {
+/* 5×7 glyphs, bit 4 = left column; ASCII 32..126. d_text draws lowercase as uppercase (the bench's look);
+ * d_textl draws it as it is (ids, variables and paths, where the case matters). */
+static const uint8_t FONT[95][7] = {
     [' ' - 32] = { 0, 0, 0, 0, 0, 0, 0 },
     ['!' - 32] = { 0x04, 0x04, 0x04, 0x04, 0x04, 0x00, 0x04 }, ['"' - 32] = { 0x0A, 0x0A, 0x0A, 0, 0, 0, 0 },
     ['#' - 32] = { 0x0A, 0x0A, 0x1F, 0x0A, 0x1F, 0x0A, 0x0A }, ['$' - 32] = { 0x04, 0x0F, 0x14, 0x0E, 0x05, 0x1E, 0x04 },
@@ -41,6 +43,21 @@ static const uint8_t FONT[64][7] = {
     ['[' - 32] = { 0x0E, 0x08, 0x08, 0x08, 0x08, 0x08, 0x0E }, ['\\' - 32] = { 0x10, 0x10, 0x08, 0x04, 0x02, 0x01, 0x01 },
     [']' - 32] = { 0x0E, 0x02, 0x02, 0x02, 0x02, 0x02, 0x0E }, ['^' - 32] = { 0x04, 0x0A, 0x11, 0, 0, 0, 0 },
     ['_' - 32] = { 0, 0, 0, 0, 0, 0, 0x1F },
+    ['a' - 32] = { 0, 0, 0x0E, 0x01, 0x0F, 0x11, 0x0F }, ['b' - 32] = { 0x10, 0x10, 0x16, 0x19, 0x11, 0x11, 0x1E },
+    ['c' - 32] = { 0, 0, 0x0E, 0x10, 0x10, 0x11, 0x0E }, ['d' - 32] = { 0x01, 0x01, 0x0D, 0x13, 0x11, 0x11, 0x0F },
+    ['e' - 32] = { 0, 0, 0x0E, 0x11, 0x1F, 0x10, 0x0E }, ['f' - 32] = { 0x06, 0x09, 0x08, 0x1C, 0x08, 0x08, 0x08 },
+    ['g' - 32] = { 0, 0, 0x0F, 0x11, 0x0F, 0x01, 0x0E }, ['h' - 32] = { 0x10, 0x10, 0x16, 0x19, 0x11, 0x11, 0x11 },
+    ['i' - 32] = { 0x04, 0, 0x0C, 0x04, 0x04, 0x04, 0x0E }, ['j' - 32] = { 0x02, 0, 0x06, 0x02, 0x02, 0x12, 0x0C },
+    ['k' - 32] = { 0x10, 0x10, 0x12, 0x14, 0x18, 0x14, 0x12 }, ['l' - 32] = { 0x0C, 0x04, 0x04, 0x04, 0x04, 0x04, 0x0E },
+    ['m' - 32] = { 0, 0, 0x1A, 0x15, 0x15, 0x11, 0x11 }, ['n' - 32] = { 0, 0, 0x16, 0x19, 0x11, 0x11, 0x11 },
+    ['o' - 32] = { 0, 0, 0x0E, 0x11, 0x11, 0x11, 0x0E }, ['p' - 32] = { 0, 0, 0x1E, 0x11, 0x1E, 0x10, 0x10 },
+    ['q' - 32] = { 0, 0, 0x0F, 0x11, 0x0F, 0x01, 0x01 }, ['r' - 32] = { 0, 0, 0x16, 0x19, 0x10, 0x10, 0x10 },
+    ['s' - 32] = { 0, 0, 0x0E, 0x10, 0x0E, 0x01, 0x1E }, ['t' - 32] = { 0x08, 0x08, 0x1C, 0x08, 0x08, 0x09, 0x06 },
+    ['u' - 32] = { 0, 0, 0x11, 0x11, 0x11, 0x13, 0x0D }, ['v' - 32] = { 0, 0, 0x11, 0x11, 0x11, 0x0A, 0x04 },
+    ['w' - 32] = { 0, 0, 0x11, 0x11, 0x15, 0x15, 0x0A }, ['x' - 32] = { 0, 0, 0x11, 0x0A, 0x04, 0x0A, 0x11 },
+    ['y' - 32] = { 0, 0, 0x11, 0x11, 0x0F, 0x01, 0x0E }, ['z' - 32] = { 0, 0, 0x1F, 0x02, 0x04, 0x08, 0x1F },
+    ['{' - 32] = { 0x02, 0x04, 0x04, 0x08, 0x04, 0x04, 0x02 }, ['|' - 32] = { 0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04 },
+    ['}' - 32] = { 0x08, 0x04, 0x04, 0x02, 0x04, 0x04, 0x08 }, ['~' - 32] = { 0, 0, 0x08, 0x15, 0x02, 0, 0 },
 };
 
 void d_fill(Surf *s, int x, int y, int w, int h, uint32_t c) {
@@ -67,12 +84,13 @@ void d_circle(Surf *s, int cx, int cy, int r, uint32_t c) {
             }
 }
 
-int d_text(Surf *s, int x, int y, int scale, uint32_t c, const char *t) {
+static int text(Surf *s, int x, int y, int scale, uint32_t c, const char *t, int upper) {
     int x0 = x;
     for (; *t; t++) {
-        int ch = toupper((unsigned char)*t);
+        int ch = (unsigned char)*t;
+        if (upper) ch = toupper(ch);
         if (ch == '`') ch = '\'';              /* the grave accent: drawn as the apostrophe */
-        if (ch < 32 || ch > 95) ch = '?';
+        if (ch < 32 || ch > 126) ch = '?';
         const uint8_t *g = FONT[ch - 32];
         for (int row = 0; row < 7; row++)
             for (int col = 0; col < 5; col++)
@@ -80,6 +98,37 @@ int d_text(Surf *s, int x, int y, int scale, uint32_t c, const char *t) {
         x += 6 * scale;
     }
     return x - x0;
+}
+
+int d_text(Surf *s, int x, int y, int scale, uint32_t c, const char *t) { return text(s, x, y, scale, c, t, 1); }
+int d_textl(Surf *s, int x, int y, int scale, uint32_t c, const char *t) { return text(s, x, y, scale, c, t, 0); }
+
+void d_line(Surf *s, int x0, int y0, int x1, int y1, int thick, uint32_t c) {
+    int dx = x1 - x0, dy = y1 - y0, n = abs(dx) > abs(dy) ? abs(dx) : abs(dy);
+    if (!n) n = 1;
+    for (int i = 0; i <= n; i++)
+        d_fill(s, x0 + dx * i / n - thick / 2, y0 + dy * i / n - thick / 2, thick, thick, c);
+}
+
+void d_tick(Surf *s, int x, int y, int sz, uint32_t c) {
+    int t = sz / 6 > 1 ? sz / 6 : 2;
+    d_line(s, x + sz / 6, y + sz / 2, x + sz * 5 / 12, y + sz * 3 / 4, t, c);
+    d_line(s, x + sz * 5 / 12, y + sz * 3 / 4, x + sz * 5 / 6, y + sz / 4, t, c);
+}
+
+void d_cross(Surf *s, int x, int y, int sz, uint32_t c) {
+    int t = sz / 6 > 1 ? sz / 6 : 2;
+    d_line(s, x + sz / 4, y + sz / 4, x + sz * 3 / 4, y + sz * 3 / 4, t, c);
+    d_line(s, x + sz * 3 / 4, y + sz / 4, x + sz / 4, y + sz * 3 / 4, t, c);
+}
+
+void d_ring(Surf *s, int cx, int cy, int r, int thick, uint32_t c) {
+    int ri = r - thick;
+    for (int y = -r; y <= r; y++)
+        for (int x = -r; x <= r; x++) {
+            int d = x * x + y * y;
+            if (d <= r * r && d > ri * ri) d_fill(s, cx + x, cy + y, 1, 1, c);
+        }
 }
 
 int d_text_w(const char *t, int scale) { int n = (int)strlen(t); return n ? n * 6 * scale - scale : 0; }

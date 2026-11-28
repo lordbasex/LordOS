@@ -6,6 +6,11 @@
 #include <sys/types.h>
 
 #define ADMIN_ARG_MAX 65536             /* argument of an action (may have several lines) */
+/* Longest reply line, "<id> <KIND> <text>\n" included (#280: install-disks' JSON for a disk with seven partitions
+ * didn't fit the old 1200 bytes and was cut). Every hop keeps whole lines up to this size: the helper's own lines,
+ * its A_FORK children's, lord-netd's and lord-server's reader. A longer text is cut to fit; a longer line arriving
+ * at a reader is dropped whole (up to its newline), never split into a second line. */
+#define ADMIN_LINE_MAX 65536
 
 /* ---- server side (lord-server, without root) ---- */
 

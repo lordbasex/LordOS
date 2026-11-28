@@ -162,6 +162,7 @@
     "other": "{count} 个待更新"
   },
   "remove": "移除",
+  "removeAsk": "要删除 {name} 吗？",
   "rescue.ask": "这台电脑上没有任何账户是管理员。如果你知道 root 密码，可以将此账户设为管理员。重新启动电脑后才会生效。",
   "rescue.button": "将我设为管理员",
   "rescue.noSudo": "这台电脑上没有任何账户是管理员，并且未安装 sudo 软件包。请以 root 身份运行 apt install sudo，然后在这里重试。",
@@ -226,7 +227,7 @@
   },
   "suggest.nvidiaDriver.detail": "目前它使用 nouveau，即 LordOS 自带的免费驱动程序。厂商的驱动程序（{packages}）通常能提供更好的 3D 性能和电源管理。",
   "suggest.nvidiaDriver.note.nouveau": "在你安装之前，会继续使用免费的 nouveau 驱动程序；移除该软件包即可恢复使用它。",
-  "suggest.nvidiaDriver.note.older": "此驱动程序版本不支持大约 2014 年以前的显卡；这类显卡请继续使用免费驱动程序。LordOS 桌面尚未在此驱动程序上测试过。",
+  "suggest.nvidiaDriver.note.older": "约 2014 年之前的显卡不受此版本驱动支持，请继续使用自由驱动。LordOS 桌面配合此驱动属于实验性：一份社区报告显示桌面在显卡上合成（GTX 1070，驱动 580）；更早的一份由处理器合成。",
   "suggest.nvidiaDriver.note.secureBoot": "驱动程序会在这台电脑上为你的内核构建（DKMS），并在每次内核更新后重新构建。如果开启了安全启动，你必须在下次重新启动时注册其签名密钥，否则驱动程序将无法加载。",
   "suggest.nvidiaDriver.title": "专有显卡驱动程序",
   "suggest.nvidiaDriver.unavailable": "厂商的驱动程序需要 Debian 的 contrib 和 non-free 组件，而这台电脑的软件源中并未同时启用这两个组件。免费驱动程序 nouveau 仍可继续工作。",

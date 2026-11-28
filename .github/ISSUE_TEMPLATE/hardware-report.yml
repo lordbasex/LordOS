@@ -8,7 +8,7 @@ body:
       value: |
         Thanks for sharing how LordOS runs on your hardware. **System Information → Report → Share on GitHub** fills in this form for you and saves the report file to your Documents folder.
 
-        The report holds the hardware, the drivers, what works and, if you ran it, LordBench's numbers. It never holds serial numbers, addresses, user or computer names, network names or your files. Reports and this issue are public.
+        The report holds the hardware, the drivers, what works, if you ran it LordBench's numbers and, if you ticked "Include framework compatibility", how GTK and Qt apps scored (`lordos-testbench --toolkits`: ids and numbers only). It never holds serial numbers, addresses, user or computer names, network names or your files. Reports and this issue are public.
   - type: input
     id: lordos
     attributes:

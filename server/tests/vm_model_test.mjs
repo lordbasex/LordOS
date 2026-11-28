@@ -4,6 +4,7 @@
 //   node tests/vm_model_test.mjs        (from server/; run_suites.sh runs it when node exists)
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { readFileSync as readSrc } from 'node:fs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const M = await import(path.join(here, '../../apps/machines/model.js'));
@@ -31,6 +32,11 @@ eq('3D abort at a shutdown: a plain stop', stateView('stopped', 'guest-shutdown'
 eq('3D abort at a stop LordOS asked for: a plain stop', stateView('stopped', 'host-shutdown').why, null);
 eq('3D abort, guest stop without tools: off, no error', stateView('stopped', 'qemu-3d-stop'), { key: 'stopped', tone: 'off', active: false, why: null });
 eq('3D abort, guest stop without tools: no 2D offer', offers2d(stateView('stopped', 'qemu-3d-stop').why), false);
+// GitHub #267: the window closes once the machine stops cleanly, only when asked; a failure keeps it open
+eq('close on stop: off by default', M.closesOnStop({}, 'stopped', 'guest-shutdown'), false);
+eq('close on stop: clean stops', ['guest-shutdown', 'host-shutdown', 'poweroff'].map((r) => M.closesOnStop({ closeOnStop: true }, 'stopped', r)), [true, true, true]);
+eq('close on stop: never a failure, a reset or the installer\'s restart', [M.closesOnStop({ closeOnStop: true }, 'crashed', 'qemu-3d-crash'), M.closesOnStop({ closeOnStop: true }, 'stopped', 'qemu-exit'),
+  M.closesOnStop({ closeOnStop: true }, 'stopped', 'reset'), M.closesOnStop({ closeOnStop: true }, 'stopped', 'installed'), M.closesOnStop({ closeOnStop: true }, 'failed', 'guest-shutdown')], [false, false, false, false, false]);
 eq('restart again: stopped by a reset only', [restartsAgain('stopped', 'reset'), restartsAgain('crashed', 'qemu-3d-crash'), restartsAgain('stopped', 'qemu-3d-stop'),
   restartsAgain('stopped', 'guest-shutdown'), restartsAgain('running', 'reset'), restartsAgain('stopped', 'installed')], [true, false, false, false, false, false]);
 eq('off hint after a guest stop without tools', [offHint('qemu-3d-stop'), offHint('guest-shutdown'), offHint(undefined)],
@@ -551,6 +557,14 @@ eq('auto setup', [M.autoTransferSetup({ transferSetup: true }, 'setup'), M.autoT
 // ---- apps mode (7.2) ----
 eq('apps blocker', [M.appsBlocker(null, { agent: true }), M.appsBlocker({ state: 'connected', caps: 32 }, { agent: false }), M.appsBlocker({ state: 'connected', caps: 32 }, { agent: true }),
   M.appsBlocker({ state: 'connected', caps: 288 }, { agent: true })], ['needsAgent', 'needsAgent', 'needsTools', null]);
+// (tools 11) a LordOS guest older than apps mode needs: update LordOS in it, not the tools; with "windows" it works anyway
+eq('apps blocker: old LordOS', [M.appsBlocker({ state: 'connected', caps: 32 | M.AGENT_CAPS.oldLordos }, { agent: true }),
+  M.appsBlocker({ state: 'connected', caps: 288 | M.AGENT_CAPS.oldLordos }, { agent: true }), M.APPS_GUEST_LORDOS], ['oldLordos', null, '0.8.9.5']);
+eq('apps mode needs LordOS = vmagent.h AG_APPS_LORDOS', M.APPS_GUEST_LORDOS,
+  (/#define AG_APPS_LORDOS "([^"]+)"/.exec(readSrc(path.join(here, '../../server/src/vm/vmagent.h'), 'utf8')) || [])[1]);
+eq('the oldLordos cap = vmproto.h VAC_OLD_LORDOS', M.AGENT_CAPS.oldLordos,
+  Number((/VAC_OLD_LORDOS = ([0-9]+)/.exec(readSrc(path.join(here, '../../server/src/vm/vmproto.h'), 'utf8')) || [])[1]));
+eq('the apps line says to update LordOS', M.agentLines({ state: 'connected', caps: M.AGENT_CAPS.oldLordos }, { agent: true }).find((x) => x[0] === 'apps')[1], 'oldLordos');
 eq('agent lines say apps', agentLines({ state: 'connected', caps: 256 }, { agent: true }).find((x) => x[0] === 'apps')[1], 'works');
 eq('apps guest size', [M.appsGuestSize({ w: 1920, h: 1080 }), M.appsGuestSize({ w: 1367, h: 769 }), M.appsGuestSize({ w: 100, h: 50 }), M.appsGuestSize({ w: 10000, h: 9000 })],
   [[1920, 1080], [1366, 768], [320, 200], [8192, 8192]]);
@@ -1171,6 +1185,17 @@ eq('boot summary', [M.bootSummary('auto'), M.bootSummary(undefined), M.bootSumma
   eq('menu below when it fits', M.menuSpot({ x: 100, y: 200, above: 160 }, 220, 300, { x: 0, y: 0, w: 1920, h: 1080 }), { left: 100, top: 200 });
   eq('menu too tall both ways: as low as fits', M.menuSpot({ x: 1150, y: 420, above: 380 }, 220, 450, { x: 0, y: 0, w: 1920, h: 860 }), { left: 1150, top: 402 });
   eq('menu above the button', M.menuSpot({ x: 10, y: 800, above: 760 }, 220, 450, { x: 0, y: 0, w: 1920, h: 1080 }), { left: 10, top: 310 });
+  // (QA of 0.8.9.6.2) at 1280 × 800 the machine's menu stays in the work area (under the menu bar, above the Dock), and
+  // is as wide as its longest label
+  const area = M.menuBounds({ x: 0, y: 0, w: 1280, h: 800 }, { x: 0, y: 28, w: 1280, h: 692 });
+  eq('menu bounds: the work area', area, { x: 0, y: 28, w: 1280, h: 692 });
+  eq('menu bounds: no work area, the display', M.menuBounds({ x: 0, y: 0, w: 1280, h: 800 }, null), { x: 0, y: 0, w: 1280, h: 800 });
+  const longItems = Array.from({ length: 17 }, (_, i) => ({ label: i === 3 ? 'Iniciar en pantalla completa sin ventana' : 'Configurar…' })).concat(['-', '-']);
+  const mw = M.popMenuWidth(longItems), mh = M.popMenuHeight(longItems);
+  const sp = M.menuSpot({ x: 1218, y: 412, above: 372 }, mw, mh, area);
+  eq('menu: wider for a long label, within the max', mw > 232 && mw <= 380, true);
+  eq('menu at the right edge: inside the work area on every side', sp.left >= 8 && sp.left + mw <= 1272 && sp.top >= 36 && sp.top + mh <= 712, true);
+  eq('menu: short labels keep the minimum width', M.popMenuWidth([{ label: 'Start' }, '-', { label: 'Remove…' }]), 232);
   eq('menu with room neither way: as low as fits', M.menuSpot({ x: 10, y: 300, above: 260 }, 220, 900, { x: 0, y: 0, w: 1920, h: 1000 }), { left: 10, top: 92 });
   eq('menu kept off the right edge', M.menuSpot({ x: 1800, y: 10 }, 220, 100, { x: 0, y: 0, w: 1920, h: 1080 }).left, 1920 - 220 - 8);
   eq('menu kept off the left and top edges', M.menuSpot({ x: -20, y: -5 }, 220, 100, { x: 0, y: 0, w: 1920, h: 1080 }), { left: 8, top: 8 });

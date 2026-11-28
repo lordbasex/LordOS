@@ -75,6 +75,9 @@ eq('nvidia without non-free sources', ids(run(nv, { nonfree: false })), ['nvidia
 eq('nvidia already on the vendor driver', ids(run(nv, { installed: ['nvidia-driver'] })), ['nvidiaDriver=installed']);
 eq('nvidia audio function only (class 0403)', ids(run(facts({ pci: [{ vendor: '10de', device: '10fa', class: '040300', driver: 'snd_hda_intel' }] }))), []);
 eq('nvidia 3D controller (0302)', ids(run(facts({ pci: [{ vendor: '10de', device: '1eb8', class: '030200', driver: '' }] }))), ['nvidiaDriver=install']);
+// any NVIDIA display device while the free driver (or none) is in use: every generation, a VGA (0300) or another display controller (0380)
+for (const [dev, cls, drv] of [['1b81', '030000', 'nouveau'], ['1b81', '030000', ''], ['2c02', '030000', ''], ['1401', '030000', 'nouveau'], ['1f9d', '038000', 'nouveau']])
+  eq(`nvidia ${dev} (${cls}, ${drv || 'no driver'}) is offered the driver`, ids(run(facts({ pci: [...base().pci, { vendor: '10de', device: dev, class: cls, driver: drv }] }))), ['nvidiaDriver=install']);
 eq('nvidia on arm64: nothing', ids(run({ ...nv, arch: 'aarch64' })), []);
 eq('nvidia: plan impossible (contrib missing) → explained', ids(run(nv, {}, { check: (names) => !names.includes('nvidia-driver') })), ['nvidiaDriver=unavailable']);
 eq('nvidia: plan impossible names what it would install', one(run(nv, {}, { check: () => false }), 'nvidiaDriver').missing, ['linux-headers-amd64', 'nvidia-driver', 'firmware-misc-nonfree', 'mokutil']);

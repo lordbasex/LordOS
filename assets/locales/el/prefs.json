@@ -202,6 +202,7 @@
   "power.healthNormal": "Υγεία μπαταρίας: {pct}% (κανονική)",
   "power.healthService": "Υγεία μπαταρίας: {pct}% (συνιστάται σέρβις)",
   "power.healthUnknown": "Υγεία μπαταρίας: άγνωστη",
+  "power.h": "{h} ώρ.",
   "power.hm": "{h} ώρ. {m} λεπ.",
   "power.immediately": "Αμέσως",
   "power.left": "Απομένουν {time}",

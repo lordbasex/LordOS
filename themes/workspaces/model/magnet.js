@@ -1,4 +1,4 @@
-// magnet.js — Lord Workspaces' magnet for the free layout, as plain data (tested by server/tests/workspaces_model_test.mjs).
+// magnet.js — Workspaces' magnet for the free layout, as plain data (tested by server/tests/workspaces_model_test.mjs).
 // The runtime part is ../magnet.js; nothing here moves anything.
 //
 // A window snapped to the left or right half of a display looks for its other half:

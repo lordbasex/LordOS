@@ -1,4 +1,4 @@
-// "Lord Flow" theme (id default) — a menu bar and dock layout, with its own assets.
+// "Flow" theme (id default) — a menu bar and dock layout, with its own assets.
 // The theme builds the desktop (wallpaper, bar, dock, app launcher, Control Center) and the
 // window frames. Apps come from apps/ through the SDK.
 import {
@@ -11,9 +11,10 @@ import {
   openOverview, closeOverview, toggleOverview, LevelHud, useStore, notifyHistory, menuBarEveryDisplay, hasBar, displayAt, keepWindowsInWorkAreas,
   snapPreview, titleBarPx,
   guestAppsMode,
+  windowFrameKey, windowAppName,
 } from '@lordos/sdk';
 import { apps } from '@lordos/apps';
-import { useEffect, useRef, useState, Fragment } from 'react';
+import { useEffect, useMemo, useRef, useState, Fragment } from 'react';
 import { makeTheme } from './tokens.js';
 import { minimizeStarts } from './minimize.js';
 import { MenuBars } from './components/MenuBar.jsx';
@@ -91,7 +92,7 @@ function useMinimizing(windows) {
     .filter((x) => x.win && x.win.minimized);
 }
 
-// Lord Flow's own shortcuts (the common ones are in sdk/shortcuts.js).
+// Flow's own shortcuts (the common ones are in sdk/shortcuts.js).
 const onFront = (fn) => () => { const id = wm.focused(); if (id) fn(id); };
 const minimizeFront = onFront(wm.minimize);
 const hideFront = onFront(hideApp);
@@ -104,7 +105,7 @@ const switchApps = (e) => openSwitcher(switcherHold(e), e.shift);
 const cycleWindows = (e) => cycleAppWindows(e.shift);
 
 const flowTable = (toggleLauncher) => [
-  { id: 'launcher', keys: ['F4'], show: ['❖', 'F4'], run: toggleLauncher, label: 'shell.shortcuts.launcher', group: 'system' },
+  { id: 'launcher', keys: ['F4', 'Meta+F4'], show: ['❖', 'F4'], run: toggleLauncher, label: 'shell.shortcuts.launcher', group: 'system' },
   { id: 'showDesktop', keys: ['Meta+F11'], run: toggleShowDesktop, label: 'shell.shortcuts.showDesktop', group: 'system' },
   { id: 'dockAutohide', keys: ['Meta+Alt+D'], run: toggleDockAutohide, label: 'shell.shortcuts.dockAutohide', group: 'system' },
   { id: 'switchApps', keys: switcherKeys('meta'), run: switchApps, label: 'shell.shortcuts.switchApps', group: 'windows' },
@@ -125,9 +126,11 @@ function DockMenu({ pos, at, items, onClose }) {
 }
 
 function App() {
-  startDeskWidgets();      // the desktop widgets' grid and data (sdk/deskwidgets.jsx), as in Lord Workspaces
+  startDeskWidgets();      // the desktop widgets' grid and data (sdk/deskwidgets.jsx), as in Workspaces
   const [s] = useTrackedSettings();   // the desktop renders again only for the settings it reads (sdk/settings.js)
-  const t = makeTheme(s);
+  // the same tokens until a setting they read changes: a window's title or a timer re-rendering the desktop must not
+  // re-render every window and widget with it (0.8.9.6.2 QA: ~4300 nodes a second while a terminal's title spun)
+  const t = useMemo(() => makeTheme(s), [s]);
   const { windows, mounted, focused } = useWindows();
   const preview = useStore(snapPreview);
   const top = mounted[mounted.length - 1];
@@ -200,10 +203,10 @@ function App() {
         {mounted.map((w) => (
           <Fragment key={w.id}>
             {preview && w === top ? <SnapPreview t={t} /> : null}
-            <Window win={w} app={getApp(w.id)} t={t} focused={w.id === focused} fx={minFx(w.id)} />
+            <Window win={w} app={getApp(w.id)} t={t} focused={w.id === focused} fx={minFx(w.id)} frameKey={windowFrameKey(w)} />
           </Fragment>
         ))}
-        {minimizing.filter((x) => !mounted.includes(x.win)).map(({ win }) => <Window key={win.id} win={win} app={getApp(win.id)} t={t} focused={false} fx={minFx(win.id)} />)}
+        {minimizing.filter((x) => !mounted.includes(x.win)).map(({ win }) => <Window key={win.id} win={win} app={getApp(win.id)} t={t} focused={false} fx={minFx(win.id)} frameKey={windowFrameKey(win)} />)}
         {!ga && <DesktopWidgets layer="above" />}
         <WidgetPicker />
         {/* Everything above the windows goes in its layer (sdk/layers.js, docs/LAYERS.md): the
@@ -211,7 +214,7 @@ function App() {
             by themselves (Menu.jsx). */}
         {!ga && <Layer name="menubar">
           <MenuBars t={t} height={MENU_H} displays={all} every={every} mirror={screen.mirror} focused={focused} focusRect={focusRect}
-            control={control ? control.area.id : null} clock={clockPanel ? clockPanel.area.id : null} unread={unread}
+            focusName={fw ? windowAppName(fw) : ''} control={control ? control.area.id : null} clock={clockPanel ? clockPanel.area.id : null} unread={unread}
             onClock={panelToggle(setClockPanel, setControl)} onControlCenter={panelToggle(setControl, setClockPanel)}
             onLaunchpad={() => setLaunchpad(true)} />
         </Layer>}

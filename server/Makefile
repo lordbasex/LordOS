@@ -73,13 +73,13 @@ QJS_OBJ := $(patsubst %,build/qjs/%.o,quickjs libregexp libunicode cutils dtoa)
 # Monitor: metrics, connections and the country of an IP (src/monitor, see docs/MONITOR.md)
 MON_SRC := src/monitor/mon.c src/monitor/disktemp.c src/monitor/voltage.c src/monitor/gpustat.c src/monitor/nvgpu.c src/monitor/nethist.c src/monitor/netrec.c src/monitor/conn.c src/monitor/procctl.c src/monitor/proc_admin.c src/monitor/exeown.c src/monitor/describe.c src/monitor/mmdb.c src/monitor/map.c src/ui/js_monitor.c
 # Media (src/media, docs/MEDIA.md): only the lord-server side. Only lord-media links FFmpeg.
-MEDIA_SRC := src/media/mstudio.c src/media/mstudiohub.c src/ui/js_studio.c src/media/media.c src/media/svgicon.c src/media/hwdec.c src/media/mview.c src/media/capture.c src/media/annot.c src/media/imgops.c src/media/maudio.c src/media/mpulse.c src/media/proto.c src/media/mstream.c src/media/mcursor.c src/ui/js_media.c
+MEDIA_SRC := src/media/mstudio.c src/media/mstudiohub.c src/ui/js_studio.c src/media/media.c src/media/svgicon.c src/media/hwdec.c src/media/mview.c src/media/mviews.c src/media/mambient.c src/media/mloop.c src/media/nv12.c src/media/capture.c src/media/annot.c src/media/imgops.c src/media/maudio.c src/media/mpulse.c src/media/proto.c src/media/mstream.c src/media/mcursor.c src/ui/js_media.c
 SEC_SRC := src/sec/json.c src/sec/sign.c src/sec/pkgstate.c src/sec/perms.c src/sec/cgroup.c src/sec/sandbox.c src/sec/brokersrv.c src/sec/brokercam.c src/sec/brokerkr.c src/sec/brokermail.c src/sec/restrict.c src/sec/appid.c src/sec/pwguard.c src/sec/codesig.c src/sec/pkgapp.c src/sec/statusitem.c src/sec/brokerclip.c
 # App mode: lord-server --app <id> runs an .lpk app as an isolated Wayland client (src/app)
 APP_SRC := src/app/appclient.c src/app/appspawn.c src/app/companion.c src/app/probe.c src/ui/js_broker.c src/ui/js_brokercam.c src/ui/js_brokermail.c src/app/apphost_bc.c
-SRC := src/hw/wallpaper_admin.c src/hw/wallpaper_find.c src/hw/studio_bg_admin.c src/hw/studio_bg_find.c src/hw/mok_admin.c src/hw/wallpaper_image.c src/main.c src/fpipe.c src/kms.c src/gpu/gpu.c src/gpu/gscissor.c src/input.c src/canvas.c src/par.c src/wdog.c src/admin.c src/install/install.c src/install/freepart.c src/install/freespace.c src/install/manual.c src/install/manualpart.c src/apps.c src/fpak.c src/fpakrun.c src/fpakas.c src/fpspawn.c src/fpspawner.c src/fplend.c src/ui/js_flatpak.c src/iconfind.c src/lpk.c src/fsops.c src/fsasync.c src/remote/mirror.c src/remote/share.c src/remote/sharewire.c src/remote/sharegrant.c src/remote/sgrant_admin.c src/ui/js_share.c src/remote/remote_admin.c src/remote/ipnet.c src/remote/rtcwire.c src/remote/ssh_admin.c src/remote/ssh_root.c src/users/users_admin.c src/users/admin_rescue.c src/users/admingroups.c src/users/homedirs.c src/keyboard.c src/keylag.c src/ime.c src/wl/wl.c src/wl/syncobj.c src/wl/keygrab.c src/wl/kbinhibit.c src/wl/timing.c src/wl/xdgact.c src/wl/urilist.c src/wl/dndgate.c src/wl/secctx.c src/wl/x11wire.c src/wl/xwm.c src/wl/xwscale.c src/wl/xauth.c src/wl/xwayland.c src/wl/drmlease.c src/wl/drmlcore.c src/osk.c \
+SRC := src/hw/wallpaper_admin.c src/hw/wallpaper_find.c src/hw/studio_bg_admin.c src/hw/studio_bg_find.c src/hw/mok_admin.c src/hw/wallpaper_image.c src/main.c src/fpipe.c src/kms.c src/gpu/gpu.c src/gpu/gscissor.c src/input.c src/canvas.c src/par.c src/wdog.c src/nofile.c src/admin.c src/install/install.c src/install/freepart.c src/install/freespace.c src/install/manual.c src/install/manualpart.c src/apps.c src/fpak.c src/fpakrun.c src/fpakas.c src/fpspawn.c src/fpspawner.c src/fplend.c src/ui/js_flatpak.c src/iconfind.c src/lpk.c src/fsops.c src/fsasync.c src/fswatch.c src/bgsave.c src/remote/mirror.c src/remote/share.c src/remote/sharewire.c src/remote/sharegrant.c src/remote/sgrant_admin.c src/ui/js_share.c src/remote/remote_admin.c src/remote/ipnet.c src/remote/rtcwire.c src/remote/ssh_admin.c src/remote/ssh_root.c src/users/users_admin.c src/users/admin_rescue.c src/users/admingroups.c src/users/homedirs.c src/keyboard.c src/keylag.c src/ime.c src/wl/wl.c src/wl/syncobj.c src/wl/keygrab.c src/wl/kbinhibit.c src/wl/timing.c src/wl/xdgact.c src/wl/urilist.c src/wl/dndgate.c src/wl/secctx.c src/wl/x11wire.c src/wl/xwm.c src/wl/xwscale.c src/wl/xauth.c src/wl/xwayland.c src/wl/drmlease.c src/wl/drmlcore.c src/osk.c \
        src/ui/wave.c src/sound/spectrum.c src/ui/node.c src/ui/style.c src/ui/layout.c src/ui/transform.c src/ui/text.c src/ui/image.c \
-       src/ui/paint.c src/ui/js.c src/ui/js_sys.c src/ui/js_term.c src/ui/js_wasm.c src/wasm/wasm.c src/wasm/wasm_run.c src/ui/js_sound.c src/ui/js_net.c src/sound/snd.c src/sound/sndcard.c src/sound/pulse.c src/ui/otf.c src/ui/fonts.c \
+       src/ui/paint.c src/ui/js.c src/ui/logclean.c src/ui/js_sys.c src/ui/js_term.c src/ui/js_wasm.c src/wasm/wasm.c src/wasm/wasm_run.c src/ui/js_sound.c src/ui/js_net.c src/sound/snd.c src/sound/sndcard.c src/sound/pulse.c src/ui/otf.c src/ui/fonts.c \
        src/ui/unicode.c src/ui/bidi.c src/ui/shape.c src/ui/shape_indic.c src/ui/shape_syl.c src/ui/shape_khmer.c src/ui/shape_myanmar.c src/ui/shape_use.c src/ui/thbrk.c src/ui/textlayout.c src/ui/caret.c src/ui/grapheme.c \
        src/term/vt.c src/term/pty.c src/term/term.c src/term/termapp.c src/term/pastefilter.c src/term/termfill.c src/term/tsecret.c src/term/tcapture.c src/term/term_paint.c src/term/hold.c \
        src/net/nl.c src/net/crypto.c src/net/state.c src/net/sys.c src/net/dhcp.c src/net/wifi.c src/net/wg.c src/net/ovpn.c src/net/vpn.c src/net/forti.c src/net/vici.c src/net/ipsec.c src/net/vpnproc.c src/net/actions.c src/net/ifwatch.c src/net/wake.c \
@@ -90,6 +90,8 @@ SRC := src/hw/wallpaper_admin.c src/hw/wallpaper_find.c src/hw/studio_bg_admin.c
 DOC_SRC := src/doc/doc.c src/doc/wire.c src/ui/js_doc.c src/print/ipp.c src/print/phttp.c src/print/mdns.c src/print/cups.c \
            src/print/escl.c src/print/print.c src/ui/js_print.c
 SRC += $(DOC_SRC)
+# (0.8.9.6.2) community themes: the per-user folder and the theme realm (docs/THEMES-GUIDE.md, "Community themes")
+SRC += src/ui/themestore.c src/ui/js_theme.c
 # Per-app firewall (src/fw, docs/FIREWALL.md): rules, decision and names learned from DNS
 FW_SRC := src/fw/rules.c src/fw/dnsmap.c src/fw/fwmap.c src/fw/fwlists.c src/fw/fwsub.c src/ui/js_fw.c src/sec/netconn.c src/media/streamurl.c src/fetch/weather.c src/fetch/wxsvc.c src/fetch/fetchspawn.c src/fetch/flathub.c src/fetch/fhsvc.c src/fetch/geocities.c src/ui/js_weather.c
 SRC += $(FW_SRC)
@@ -154,6 +156,7 @@ ALL += build/lordos-firstrun
 build/lordos-firstrun: $(FIRSTRUN_SRC) src/firstrun/firstrun.h src/users/homedirs.h src/users/admingroups.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ $(FIRSTRUN_SRC)
+	chmod g-w $@
 test: build/firstrun-test build/firstrun-fuzz build/imager-test
 build/firstrun-test: tests/firstrun_test.c src/firstrun/firstrun.c src/firstrun/firstrun.h
 	@mkdir -p build
@@ -164,6 +167,19 @@ build/firstrun-fuzz: tests/firstrun_test.c src/firstrun/firstrun.c src/firstrun/
 	$(CC) $(CPPFLAGS) -O1 -g $(WARN) -std=c11 -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer \
 	    -o $@ tests/firstrun_test.c src/firstrun/firstrun.c
 	./$@ 300000 || { rm -f $@; exit 1; }
+# moving wallpapers' rules (docs/MOVING-WALLPAPERS.md): loop cache budget and recording, pause/stop, covered views,
+# NV12 rings and zero-copy frame descriptions (with a fuzz), the NV12 matrices
+test: build/mloop-test
+build/mloop-test: tests/mloop_test.c src/media/mloop.c src/media/mloop.h src/media/nv12.c src/media/nv12.h src/media/proto.c src/media/proto.h src/ui/rectsub.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) -O1 -g $(WARN) -std=gnu11 -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer \
+	    -o $@ tests/mloop_test.c src/media/mloop.c src/media/nv12.c src/media/proto.c -lm
+	./$@ || { rm -f $@; exit 1; }
+# moving wallpapers measured on the GPU with no screen (tests/motion_bench.c; docs/MOVING-WALLPAPERS.md): not in make test
+build/motion-bench: tests/motion_bench.c src/gpu/gpu.c src/gpu/gscissor.c src/kms.c src/canvas.c src/par.c src/media/nv12.c src/media/proto.c src/media/mloop.c src/gpu/gpu.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=gnu11 -o $@ tests/motion_bench.c src/gpu/gpu.c src/gpu/gscissor.c src/kms.c src/canvas.c src/par.c \
+	    src/media/nv12.c src/media/proto.c src/media/mloop.c $(LDLIBS)
 # how a media node draws its picture (src/media/mview.c), the rest of media stubbed
 test: build/mview-test
 build/mview-test: tests/mview_test.c src/media/mview.c src/canvas.c src/media/media_int.h src/canvas.h
@@ -243,6 +259,7 @@ build/gen/np_bpf.h: build/np.bpf.o build/bpf2c
 build/lord-netperm: $(NP_SRC) $(wildcard src/netperm/*.h) $(wildcard src/fw/*.h) src/sec/json.h $(NP_GEN)
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(NP_CPP) $(CFLAGS) $(WARN) -std=c11 -o $@ $(NP_SRC)
+	chmod g-w $@
 # tests/npverify_test.c: the BTF reader, and (as root) every program through the kernel verifier
 ifeq ($(BPF),1)
 test: build/npverify-test
@@ -280,6 +297,7 @@ ALL += build/lord-fand
 build/lord-fand: src/fan/fand.c $(FAN_SRC) $(wildcard src/fan/*.h) src/sec/json.h src/lordlog.c src/lordlog.h src/users/admingroups.c src/users/admingroups.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ src/fan/fand.c $(FAN_SRC) src/lordlog.c src/users/admingroups.c
+	chmod g-w $@
 # lordos.service restarts with live sessions on systemd 258+: controllers off and limits back (src/sec/cgroup.c, #140)
 # tests/cgslice_test.c (docs/VIRTUALIZATION.md 3.7): lord-sessiond's placement of a machine's scope into the machines'
 # slice, on a throwaway tree of the real cgroupfs; as root (without root it says it skipped)
@@ -304,6 +322,12 @@ test: build/toolkitenv-test
 build/toolkitenv-test: tests/toolkitenv_test.c src/wl/toolkitenv.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -Isrc -o $@ tests/toolkitenv_test.c
+	./$@ || { rm -f $@; exit 1; }
+# XSETTINGS for GTK 3 on X11: the property the X window manager serves (src/wl/xsettings.h, docs/TOOLKIT-AUDIT.md)
+test: build/xsettings-test
+build/xsettings-test: tests/xsettings_test.c src/wl/xsettings.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -Isrc -fsanitize=address,undefined -o $@ tests/xsettings_test.c
 	./$@ || { rm -f $@; exit 1; }
 test: build/ptrlock-test
 build/ptrlock-test: tests/ptrlock_test.c src/wl/ptrlock.h src/testbench/lockkey.h
@@ -339,6 +363,7 @@ ALL += build/lord-autoinstall
 build/lord-autoinstall: $(AUTOINSTALL_SRC) $(INSTALL_DISK_HDR) src/admin.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ $(AUTOINSTALL_SRC) -lcrypt
+	chmod g-w $@
 build/freepart-cli: tests/freepart_cli.c src/install/freepart.c src/install/freespace.c src/install/freepart.h src/install/freespace.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -DFP_TEST -o $@ tests/freepart_cli.c src/install/freepart.c src/install/freespace.c
@@ -370,7 +395,7 @@ all: $(ALL)
 # every prerequisite of `test` is done, tests/run_suites.sh runs them (a few seconds) and fails if any
 # fails; a suite whose tool or data isn't installed says "skipped: needs X". `make test-full` adds the
 # helpers (lord-media, lord-doc), the sandbox (Landlock kernel) and the HarfBuzz comparison.
-test: build/lord-claude-status build/popup-client build/wlperf-client build/syncobj-client build/wltiming-client build/syncobj-kernel-test build/guestwin-client build/lordos-guest build/vt-dump build/vt-ring-test build/vt-keys-test build/shake-test build/term-secret-test build/term-guest-test build/term-capture-test build/shape-test build/bidi-test build/ime-test build/thbrk-test build/sound-test build/wasm-test build/net-test build/wasm-js-test build/pkg-test build/browserprefs-test build/lord-browser-prefs build/fsops-test build/portal-check-test build/fsasync-test build/sign-test build/mmdb-test build/canvas-test build/arcpath-test build/ipp-test build/tp-test build/media-test build/imgops-test
+test: build/lord-claude-status build/popup-client build/focusback-client build/wlperf-client build/syncobj-client build/wltiming-client build/syncobj-kernel-test build/guestwin-client build/lordos-guest build/vt-dump build/vt-ring-test build/vt-keys-test build/shake-test build/term-secret-test build/term-guest-test build/term-capture-test build/shape-test build/bidi-test build/ime-test build/thbrk-test build/sound-test build/wasm-test build/net-test build/wasm-js-test build/pkg-test build/browserprefs-test build/lord-browser-prefs build/fsops-test build/portal-check-test build/fsasync-test build/bgsave-test build/fswatch-test build/sign-test build/mmdb-test build/canvas-test build/arcpath-test build/ipp-test build/tp-test build/media-test build/imgops-test
 	@sh tests/run_suites.sh
 test-full: test build/sandbox-test build/doc-test $(filter build/lord-media build/lord-doc build/lord-ocr build/lord-tts,$(ALL))
 	@sh tests/run_suites.sh full
@@ -394,6 +419,7 @@ all: build/lord-browser-prefs
 build/lord-browser-prefs: src/pkg/browserprefs_tool.c src/pkg/browserprefs.c src/pkg/browserprefs.h src/sec/json.c src/sec/json.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ src/pkg/browserprefs_tool.c src/pkg/browserprefs.c src/sec/json.c -lm
+	chmod g-w $@
 # lordos-lid-wake (src/hw/lidwake_tool.c, GitHub #172): the systemd-sleep hook that keeps an open lid from waking
 # a laptop right after it sleeps (/usr/lib/systemd/system-sleep/, root, libc only). Its parsing and decisions are
 # the pure src/hw/lidwake.h, tested by tests/lidwake_test.c.
@@ -401,6 +427,7 @@ all: build/lordos-lid-wake
 build/lordos-lid-wake: src/hw/lidwake_tool.c src/hw/lidwake.h src/hw/chassis.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ src/hw/lidwake_tool.c
+	chmod g-w $@
 test: build/lidwake-test
 build/lidwake-test: tests/lidwake_test.c src/hw/lidwake.h src/hw/chassis.h
 	@mkdir -p build
@@ -600,14 +627,14 @@ build/gshort-test: tests/gshort_test.c src/ui/gshort.c src/ui/gshort.h src/wl/ke
 # the ScreenCast restore token, the Screenshot portal and the FileChooser's lending to Flatpak apps over a private bus
 # (tests/run_suites.sh, needs dbus-run-session)
 test: build/portal-cast-test
-build/portal-cast-test: tests/portal_cast_test.c src/ui/portal.c src/ui/portal.h src/ui/webask.h src/ui/gshort.c src/ui/gshort.h src/wl/keygrab.c src/vault/dbus.c src/hw/jbuf.c src/sec/json.c src/ui/portalcheck.c src/fsops.c src/cast/castsm.c src/cast/castsm.h src/fplend.h
+build/portal-cast-test: tests/portal_cast_test.c src/ui/portal.c src/ui/portal.h src/ui/webask.h src/ui/gshort.c src/ui/gshort.h src/wl/keygrab.c src/vault/dbus.c src/hw/jbuf.c src/sec/json.c src/ui/portalcheck.c src/fsops.c src/cast/castsm.c src/cast/castsm.h src/fplend.h src/bgsave.c src/bgsave.h
 	@mkdir -p build
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/portal_cast_test.c src/ui/portal.c src/ui/gshort.c src/wl/keygrab.c src/vault/dbus.c src/hw/jbuf.c src/sec/json.c src/ui/portalcheck.c src/fsops.c src/cast/castsm.c -lpthread
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/portal_cast_test.c src/ui/portal.c src/ui/gshort.c src/wl/keygrab.c src/vault/dbus.c src/hw/jbuf.c src/sec/json.c src/ui/portalcheck.c src/fsops.c src/cast/castsm.c src/bgsave.c -lpthread
 
 test: build/portal-gs-test
-build/portal-gs-test: tests/portal_gs_test.c src/ui/portal.c src/ui/portal.h src/ui/webask.h src/ui/gshort.c src/ui/gshort.h src/wl/keygrab.c src/vault/dbus.c src/hw/jbuf.c src/sec/json.c src/ui/portalcheck.c src/fsops.c src/cast/castsm.c src/cast/castsm.h
+build/portal-gs-test: tests/portal_gs_test.c src/ui/portal.c src/ui/portal.h src/ui/webask.h src/ui/gshort.c src/ui/gshort.h src/wl/keygrab.c src/vault/dbus.c src/hw/jbuf.c src/sec/json.c src/ui/portalcheck.c src/fsops.c src/cast/castsm.c src/cast/castsm.h src/bgsave.c src/bgsave.h
 	@mkdir -p build
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/portal_gs_test.c src/ui/portal.c src/ui/gshort.c src/wl/keygrab.c src/vault/dbus.c src/hw/jbuf.c src/sec/json.c src/ui/portalcheck.c src/fsops.c src/cast/castsm.c -lpthread
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/portal_gs_test.c src/ui/portal.c src/ui/gshort.c src/wl/keygrab.c src/vault/dbus.c src/hw/jbuf.c src/sec/json.c src/ui/portalcheck.c src/fsops.c src/cast/castsm.c src/bgsave.c -lpthread
 test: build/wlregion-test
 build/wlregion-test: tests/wlregion_test.c src/wl/wlregion.h
 	@mkdir -p build
@@ -631,11 +658,31 @@ build/xwm-test: tests/xwm_test.c src/wl/x11wire.c src/wl/x11wire.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/xwm_test.c src/wl/x11wire.c
 	./$@ || { rm -f $@; exit 1; }
+# tests/nofile_test.c: lord-server's open files' limit raised, and the usual one back in an app's child after its clean-up (#251)
+test: build/nofile-test
+build/nofile-test: tests/nofile_test.c src/nofile.c src/nofile.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) -O1 -g $(WARN) -std=c11 -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer \
+	    -o $@ tests/nofile_test.c src/nofile.c
+	./$@ || { rm -f $@; exit 1; }
+# tests/kms_recover_test.c: a page flip that never completes is dropped and the next frame is a full modeset (BUG-B)
+test: build/kms-recover-test
+build/kms-recover-test: tests/kms_recover_test.c src/kms.c src/kms.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) -O1 -g $(WARN) -std=c11 -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer \
+	    -DKMS_TEST -o $@ tests/kms_recover_test.c src/kms.c -lpthread
+	./$@ || { rm -f $@; exit 1; }
 # tests/wdog_test.c: the compositor's watchdog (src/wdog.c): stalls seen, priority dropped, endless JS stopped
 test: build/wdog-test
 build/wdog-test: tests/wdog_test.c src/wdog.c src/wdog.h src/par.c src/par.h $(QJS_OBJ)
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/wdog_test.c src/wdog.c src/par.c $(QJS_OBJ) -lm -lpthread
+	./$@ || { rm -f $@; exit 1; }
+# a community theme's text on its way to the session log (src/ui/logclean.c; security scan 0.8.9.6.2, F8)
+test: build/logclean-test
+build/logclean-test: tests/logclean_test.c src/ui/logclean.c src/ui/logclean.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=gnu11 -Isrc -o $@ tests/logclean_test.c src/ui/logclean.c
 	./$@ || { rm -f $@; exit 1; }
 # tests/timer_order_test.c: the JS timers (src/ui/js_prelude.h) against the prelude they replaced
 test: build/timer-order-test
@@ -703,7 +750,7 @@ build/journal-test: tests/journal_test.c src/logs/journal.c src/logs/journal.h s
 test: build/fw-rules-test build/dnsmap-test build/broker-restrict-test
 # the firewall's non-network restrictions in the real broker code (docs/FIREWALL.md); open() is
 # wrapped so a fake /dev/video9 can be opened
-BROKER_RESTRICT_SRC := src/sec/brokersrv.c src/sec/brokerclip.c src/sec/brokercam.c src/sec/restrict.c src/sec/perms.c src/sec/json.c \
+BROKER_RESTRICT_SRC := src/sec/brokersrv.c src/sec/brokerhands.c src/sec/brokerclip.c src/sec/brokercam.c src/sec/restrict.c src/sec/perms.c src/sec/json.c \
                        src/fw/rules.c src/fw/fwmap.c src/media/proto.c
 build/broker-restrict-test: tests/broker_restrict_test.c $(BROKER_RESTRICT_SRC) $(wildcard src/sec/*.h src/fw/*.h src/media/*.h)
 	@mkdir -p build
@@ -895,8 +942,8 @@ test: build/engine-test
 test: build/term-damage-test
 build/term-damage-test: tests/term_damage_test.c $(ENGINE_SRC) src/term/term.c src/term/term_paint.c src/term/hold.c src/term/pty.c src/term/pastefilter.c src/term/tcapture.c src/term/tsecret.c src/sec/cgroup.c build/obj/term/vt.o build/obj/ui/stb.o $(HDR)
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/term_damage_test.c $(ENGINE_SRC) src/term/term.c src/term/term_paint.c src/term/hold.c src/term/pty.c src/term/pastefilter.c src/term/tcapture.c src/term/tsecret.c src/sec/cgroup.c build/obj/term/vt.o build/obj/ui/stb.o -lm -lpthread
-build/engine-test: tests/engine_test.c $(ENGINE_SRC) src/outputs.c src/bench/lbinput.c build/obj/ui/stb.o $(HDR) tests/drag_golden_cpu.txt tests/drag_golden_gpu.txt
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/engine_test.c $(ENGINE_SRC) src/outputs.c src/bench/lbinput.c build/obj/ui/stb.o -lm -lpthread
+build/engine-test: tests/engine_test.c $(ENGINE_SRC) src/outputs.c src/bench/lbinput.c src/media/mviews.c build/obj/ui/stb.o $(HDR) tests/drag_golden_cpu.txt tests/drag_golden_gpu.txt
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/engine_test.c $(ENGINE_SRC) src/outputs.c src/bench/lbinput.c src/media/mviews.c build/obj/ui/stb.o -lm -lpthread
 	./$@ || { rm -f $@; exit 1; }
 # the frame pipeline's decisions (src/fpipe.c, docs/GPU.md "The frame pipeline"): LORD_PIPELINE, the auto
 # mode, what a display does next, when input waits, and a display on a vblank grid with and without it
@@ -908,8 +955,8 @@ build/fpipe-test: tests/fpipe_test.c src/fpipe.c src/fpipe.h
 # test_drag_exact's golden hashes for this architecture: only on the reference code (001633b plus
 # step 9, the corners' restore on the drag layer and main's blur-margin repaint), never to make a changed frame pass
 # (tests/engine_test.c, "The dragged window, pixel for pixel")
-drag-golden: tests/engine_test.c $(ENGINE_SRC) src/outputs.c src/bench/lbinput.c build/obj/ui/stb.o $(HDR)
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o build/engine-golden tests/engine_test.c $(ENGINE_SRC) src/outputs.c src/bench/lbinput.c build/obj/ui/stb.o -lm -lpthread
+drag-golden: tests/engine_test.c $(ENGINE_SRC) src/outputs.c src/bench/lbinput.c src/media/mviews.c build/obj/ui/stb.o $(HDR)
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o build/engine-golden tests/engine_test.c $(ENGINE_SRC) src/outputs.c src/bench/lbinput.c src/media/mviews.c build/obj/ui/stb.o -lm -lpthread
 	./build/engine-golden drag-golden
 build/canvas-test: tests/canvas_test.c src/canvas.c src/canvas.h
 	@mkdir -p build
@@ -935,8 +982,15 @@ build/lordlog-test: tests/lordlog_test.c src/lordlog.c src/lordlog.h
 build/fsops-test: tests/fsops_test.c src/fsops.c src/fsops.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -DFSOPS_TEST -o $@ tests/fsops_test.c src/fsops.c -lpthread
 # lord.fs's Async calls (Files on Cloud and network folders): a slow file system never holds the caller (0.8.8.7)
+# settings.json and the clipboard's stores saved off the interface's thread (GitHub #250)
+build/bgsave-test: tests/bgsave_test.c src/bgsave.c src/bgsave.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -DBGSAVE_TEST -o $@ tests/bgsave_test.c src/bgsave.c -lpthread
 build/fsasync-test: tests/fsasync_test.c src/fsasync.c src/fsasync.h src/fsops.c src/fsops.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -DFSASYNC_TEST -o $@ tests/fsasync_test.c src/fsasync.c src/fsops.c -lpthread
+# lord.fs.watch / unwatch (desktop icons, Files): coalesced, name-free folder changes, the limit and the refusals
+build/fswatch-test: tests/fswatch_test.c src/fswatch.c src/fswatch.h src/fsops.c src/fsops.h
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -DFSWATCH_TEST -o $@ tests/fswatch_test.c src/fswatch.c src/fsops.c -lpthread
 # touchpad driver (src/tp): gestures of the simulated touchpad (../tests/touchpad-sim) → what's recognized
 build/tp-test: tests/tp_test.c src/tp/tp.c src/tp/tp.h ../tests/touchpad-sim/gestures.c ../tests/touchpad-sim/gestures.h
 	@mkdir -p build
@@ -1046,6 +1100,10 @@ build/shellx-client: tests/shellx_client.c $(CLIENT_GEN) $(SHELLX_GEN)
 	$(CC) $(CFLAGS) -D_GNU_SOURCE -Ibuild/gen $(WARN) -std=c11 -o $@ tests/shellx_client.c $(filter build/gen/client/xdg-shell-protocol.c,$(CLIENT_GEN)) $(filter %.c,$(SHELLX_GEN)) -lwayland-client
 build/popup-client: tests/popup_client.c $(CLIENT_GEN)
 	$(CC) $(CFLAGS) -D_GNU_SOURCE -Ibuild/gen $(WARN) -std=c11 -o $@ tests/popup_client.c $(filter %.c,$(CLIENT_GEN)) -lwayland-client
+# The keyboard back at once after a window closes, a menu opened then kept, a late read of an older copy dropped
+# (tests/focusback_client.c, docs/TOOLKIT-AUDIT.md; tests/run_suites.sh runs it against a headless lord-server)
+build/focusback-client: tests/focusback_client.c $(CLIENT_GEN)
+	$(CC) $(CFLAGS) -D_GNU_SOURCE -Ibuild/gen $(WARN) -std=c11 -o $@ tests/focusback_client.c $(filter %.c,$(CLIENT_GEN)) -lwayland-client
 # ❖ + drag anywhere in a Linux window (GitHub #219): a Wayland app and an X11 app (Xwayland) against build/lord-server-test's
 # test hooks (tests/moddrag_headless.sh, run by tests/run_suites.sh); the X client only where libxcb's headers are
 build/moddrag-client: tests/moddrag_client.c $(CLIENT_GEN)
@@ -1165,6 +1223,7 @@ build/lord-media: $(LM_SRC) $(wildcard src/media/helper/*.h) src/media/proto.h s
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(MEDIA_CPPFLAGS) $(shell pkg-config --cflags $(MEDIA_PKGS)) $(CFLAGS) $(WARN) -std=c11 -o $@ $(LM_SRC) \
 	    $(shell pkg-config --libs $(MEDIA_PKGS)) -lpthread -lm
+	chmod g-w $@
 # lord-stream (0.8.8.10; cameras and IPTV, docs/MEDIA.md "Network streams"): lord-media's player built with LM_NET, the
 # only helper with internet sockets (sandbox network=1, firewall scope lordos-net-streams). Network players and M3U
 # lists only; lord-media itself keeps no network at all.
@@ -1173,6 +1232,7 @@ build/lord-stream: $(LS_SRC) $(wildcard src/media/helper/*.h) src/media/proto.h 
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(MEDIA_CPPFLAGS) -DLM_NET $(shell pkg-config --cflags $(MEDIA_PKGS)) $(CFLAGS) $(WARN) -std=c11 -o $@ $(LS_SRC) \
 	    $(shell pkg-config --libs $(MEDIA_PKGS)) -lpthread -lm
+	chmod g-w $@
 # lord-stream end to end against a test server (a tool, never installed): build/lordstream-e2e build/lord-stream play URL
 build/lordstream-e2e: tests/lordstream_e2e.c src/media/proto.c src/media/proto.h
 	@mkdir -p build
@@ -1190,6 +1250,7 @@ build/lord-media-hwfall: $(LM_SRC) $(wildcard src/media/helper/*.h) src/media/pr
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(MEDIA_CPPFLAGS) -DLM_HWFALL_TEST=$(HWFALL) $(shell pkg-config --cflags $(MEDIA_PKGS)) $(CFLAGS) $(WARN) -std=c11 -o $@ $(LM_SRC) \
 	    $(shell pkg-config --libs $(MEDIA_PKGS)) -lpthread -lm
+	chmod g-w $@
 # the remote desktop's check of a hardware encoder's first H.264 keyframe (src/media/helper/lm_encheck.h, #94);
 # in test-full when FFmpeg's -dev packages are there; ENCHECK_VAAPI=/dev/dri/renderD128 also checks that card
 ifeq ($(MEDIA),1)
@@ -1210,6 +1271,7 @@ build/lord-media-encfail: $(LM_SRC) $(wildcard src/media/helper/*.h) src/media/p
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(MEDIA_CPPFLAGS) -DLM_ENCHECK_FAIL_TEST $(shell pkg-config --cflags $(MEDIA_PKGS)) $(CFLAGS) $(WARN) -std=c11 -o $@ $(LM_SRC) \
 	    $(shell pkg-config --libs $(MEDIA_PKGS)) -lpthread -lm
+	chmod g-w $@
 # the image editor's pixel operations (crop, resize, turns, redaction; src/media/imgops.c)
 build/imgops-test: tests/imgops_test.c src/media/imgops.c src/media/imgops.h
 	@mkdir -p build
@@ -1323,6 +1385,7 @@ build/gen/%.o: build/gen/%.c
 build/lord-server: $(OBJ) build/obj/ui/stb.o $(QJS_OBJ) $(WL_OBJ)
 	$(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS)
 	@printf '%s\n' $^ > build/lord-server.objs
+	chmod g-w $@
 
 # The conformance tool's server (tools/wl-conformance.mjs, tools/wl-proof.mjs; docs/WAYLAND.md "Conformance"): the same
 # objects as lord-server, but main.c, wl/wl.c and wl/drmlease.c built again with -DLORD_TEST_HOOKS, plus testhooks.c
@@ -1379,6 +1442,7 @@ build/blackfb-test: tests/blackfb_test.c src/remote/blackfb.c src/remote/blackfb
 	./$@ || { rm -f $@; exit 1; }
 build/lord-sessiond: $(SESSIOND_OBJ)
 	$(CC) $(LDFLAGS) -o $@ $^ $(shell pkg-config --libs openssl) $(SESSIOND_LIBS) -lcrypt -lpthread -lm
+	chmod g-w $@
 
 # Version, channel and build of LordOS, shown in About and Settings → General (lord.version and
 # lord.system.info()). Version and channel come from ../package.json ("version" and "lordos": {"channel"}),
@@ -1447,12 +1511,15 @@ build/obj/doc/h_stb.o: src/doc/h_stb.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) -w -c -o $@ $<
 build/lord-doc: $(LD_SRC) build/obj/doc/h_stb.o $(wildcard src/doc/*.h) src/sec/sandbox.h src/sec/cgroup.h src/sec/json.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 $(shell pkg-config --cflags $(LD_PKGS)) -o $@ $(LD_SRC) build/obj/doc/h_stb.o $(shell pkg-config --libs $(LD_PKGS)) -lm
+	chmod g-w $@
 build/lord-claude-status: src/term/claudebridge.c src/sec/json.c src/sec/json.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ src/term/claudebridge.c src/sec/json.c
+	chmod g-w $@
 LO_SRC := src/doc/helper.c src/doc/h_ocr.c src/doc/wire.c src/sec/json.c src/sec/sandbox.c src/sec/cgroup.c
 build/lord-ocr: $(LO_SRC) $(wildcard src/doc/*.h) src/sec/sandbox.h src/sec/cgroup.h src/sec/json.h
 	$(CC) $(CPPFLAGS) -DLORD_HELPER_OCR $(CFLAGS) $(WARN) -std=c11 $(shell pkg-config --cflags tesseract) -o $@ $(LO_SRC) $(shell pkg-config --libs tesseract) -lm
+	chmod g-w $@
 # rules for extracting without leaving the folder (tests/arcpath_test.c)
 build/arcpath-test: tests/arcpath_test.c src/doc/arcpath.c src/doc/arcpath.h
 	@mkdir -p build
@@ -1496,6 +1563,7 @@ build/obj/netd/netd.o: src/net/netd.c src/admin.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -c -o $@ $<
 build/lord-netd: $(NETD_OBJ)
 	$(CC) $(LDFLAGS) -o $@ $^ -lm -lpthread
+	chmod g-w $@
 
 # SMART parsers (ATA and NVMe) of the Disks app: hand-built data, healthy/warning/failing
 test: build/smart-test
@@ -1528,6 +1596,19 @@ DISKCLI_SRC := tests/disk_cli.c src/disk/disk.c src/disk/diskuse.c src/disk/smar
 build/disk-cli: $(DISKCLI_SRC) src/disk/disk.h src/imager/imager_admin.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ $(DISKCLI_SRC)
+# the privileged helper's reply lines (src/adminline.h, GitHub #280): a disk with seven partitions is one whole line,
+# a longer text is cut but stays one line, a reader drops a line too long for it whole and keeps the next one
+test: build/adminline-test
+build/adminline-test: tests/adminline_test.c src/adminline.h src/admin.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/adminline_test.c
+	./$@ || { rm -f $@; exit 1; }
+# the interface language for launched Linux apps (src/uilangenv.h, GitHub #262): LANGUAGE and LC_MESSAGES' candidates
+test: build/uilangenv-test
+build/uilangenv-test: tests/uilangenv_test.c src/uilangenv.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/uilangenv_test.c
+	./$@ || { rm -f $@; exit 1; }
 # a system with no administrator (src/users/admin_rescue.c): who may become one
 test: build/admin-rescue-test
 build/admin-rescue-test: tests/admin_rescue_test.c src/users/admin_rescue.c src/users/admin_rescue.h
@@ -1556,10 +1637,21 @@ build/hwdec-test: tests/hwdec_test.c src/media/hwdec.c src/media/hwdec.h src/med
 
 build/wallpaper-find-test: tests/wallpaper_find_test.c src/hw/wallpaper_find.c src/sec/json.c src/hw/wallpaper_find.h
 	@mkdir -p build
-	$(CC) $(CFLAGS) -o $@ tests/wallpaper_find_test.c src/hw/wallpaper_find.c src/sec/json.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -o $@ tests/wallpaper_find_test.c src/hw/wallpaper_find.c src/sec/json.c
 	./$@
 
 test: build/wallpaper-find-test
+
+# the catalog's closed actions (src/hw/wallpaper_admin.c): wallpaper-get keeps a video as <sha256>.mp4 and a still picture
+# as <sha256>.jpg (from the catalog's codec), wallpaper-remove deletes either, wallpaper-login "still cat:<id>"; a fake
+# download, a catalog and a store under build/; and the shipped assets/wallpapers/motion.json
+build/wallpaper-admin-test: tests/wallpaper_admin_test.c src/hw/wallpaper_admin.c src/hw/wallpaper_find.c src/hw/wallpaper_find.h src/hw/wallpaper_image.c src/sec/json.c src/pkg/crypto.c build/obj/ui/stb.o ../assets/wallpapers/motion.json
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -D'WALLPAPER_CATALOG="build/wallpaper-admin-files/catalog.json"' \
+	    -D'WALLPAPER_STORE="build/wallpaper-admin-files/store"' -D'WALLPAPER_OWNER_OK(st)=((st).st_uid == getuid())' \
+	    -o $@ tests/wallpaper_admin_test.c src/hw/wallpaper_admin.c src/hw/wallpaper_find.c src/hw/wallpaper_image.c src/sec/json.c src/pkg/crypto.c build/obj/ui/stb.o -lm
+	./$@ || { rm -f $@; exit 1; }
+test: build/wallpaper-admin-test
 
 # a picture chosen as wallpaper (src/hw/wallpaper_image.c): only real images, no links, EXIF applied, nothing oversized
 build/wallpaper-image-test: tests/wallpaper_image_test.c src/hw/wallpaper_image.c src/hw/wallpaper_image.h src/ui/stb.c
@@ -1569,7 +1661,39 @@ build/wallpaper-image-test: tests/wallpaper_image_test.c src/hw/wallpaper_image.
 test: build/wallpaper-image-test
 
 # a Wayland app that behaves like Google Chrome with profiles (a picker, then the browser window, a dialog told its parent
-# late), for Lord Workspaces' launch placement: tests/launchplace_headless.sh (tests/launchplace_client.c)
+# late), for Workspaces' launch placement: tests/launchplace_headless.sh (tests/launchplace_client.c)
 test: build/launchplace-client build/lord-server-test
 build/launchplace-client: tests/launchplace_client.c $(CLIENT_GEN)
 	$(CC) $(CFLAGS) -D_GNU_SOURCE -Ibuild/gen $(WARN) -std=c11 -o $@ tests/launchplace_client.c $(filter %.c,$(CLIENT_GEN)) -lwayland-client
+
+# (0.8.9.6.2) Community themes (docs/THEMES-GUIDE.md "Community themes"): LordOS's QuickJS patches the guard of every
+# lord.* call stands on (a theme's code on the stack, its jobs, its bound and native functions), and the per-user
+# themes folder (the helper's answer read strictly, the staging folder, the install record)
+test: build/realm-taint-test build/themestore-test
+build/realm-taint-test: tests/realm_taint_test.c $(QJS_OBJ)
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/realm_taint_test.c $(QJS_OBJ) -lm -lpthread
+	./$@ || { rm -f $@; exit 1; }
+
+# lord-themec: a community theme's .zip checked and built in the helpers' sandbox (src/themec, ui/js_theme.c;
+# AGENTS.md "lord-themec"). LordOS's own code and libc only: the zip reader, stb_image's zlib decoder, QuickJS and the
+# theme compiler (tools/themec/themec.js) compiled in.
+LORD_THEMEC_SRC := src/themec/lordthemec.c src/themec/zipread.c src/themec/stbzlib.c src/sec/sandbox.c src/sec/cgroup.c src/sec/json.c
+build/gen/themec_js.h: ../tools/themec/themec.js
+	@mkdir -p build/gen
+	{ echo '/* generated from tools/themec/themec.js (Makefile) */'; echo 'static const unsigned char themec_js[] = {'; \
+	  od -An -v -tx1 $< | sed 's/\([0-9a-f][0-9a-f]\)/0x\1,/g'; echo '0x00 };'; } > $@
+build/lord-themec: $(LORD_THEMEC_SRC) src/themec/zipread.h src/sec/sandbox.h build/gen/themec_js.h $(QJS_OBJ)
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=gnu11 -o $@ $(LORD_THEMEC_SRC) $(QJS_OBJ) -lm -lpthread
+	chmod g-w $@
+all: build/lord-themec
+build/themestore-test: tests/themestore_test.c src/ui/themestore.c src/ui/themestore.h src/themec/zipread.c src/themec/stbzlib.c src/sec/json.c src/pkg/crypto.c build/lord-themec
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=undefined $(WARN) -std=gnu11 -o $@ tests/themestore_test.c src/ui/themestore.c src/themec/zipread.c src/themec/stbzlib.c src/sec/json.c src/pkg/crypto.c
+	./$@ build/lord-themec || { rm -f $@; exit 1; }
+# a community theme in a headless session: its realm, the guard of every lord.* call, forged elements, the watchdog
+test-full: community-theme-headless
+community-theme-headless: build/lord-server build/lord-server-test
+	tests/community_theme_headless.sh; r=$$?; [ $$r -eq 0 ] || [ $$r -eq 77 ]
+.PHONY: community-theme-headless

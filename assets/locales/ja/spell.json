@@ -1,0 +1,22 @@
+{
+  "menu.looking": "候補を探しています…",
+  "menu.none": "候補はありません",
+  "menu.add": "「{word}」を辞書に追加",
+  "menu.ignore": "無視",
+  "settings.title": "スペルチェック",
+  "settings.hint": "LordOS のテキスト欄では、つづりの誤りに赤い波線が付きます。右クリックすると候補が表示されます。チェックはこのコンピュータ上で行われ、オンラインには送られません。パスワード、検索、アドレスの欄はチェックしません。",
+  "settings.check": "入力中にスペルをチェック",
+  "settings.languages": "スペルチェック：言語",
+  "settings.defaultHint": "未選択：インターフェイスの言語と英語（辞書がインストールされている場合）。Web アプリも同じものを使います。",
+  "settings.chosenHint": "選んだ言語のどれかが知っている単語は正しいとみなされます（最大 4 つ）。Web アプリはインターフェイスの言語と英語を使います。",
+  "settings.none": "辞書がインストールされていません。下からインストールしてください。",
+  "settings.useDefault": "既定を使う",
+  "settings.more": "その他の言語",
+  "settings.moreHint": "Debian の辞書です。インストールには管理者のパスワードが必要です。",
+  "settings.installing": "インストール中…",
+  "settings.install": "インストール",
+  "settings.words": "あなたの辞書",
+  "settings.wordsHint": "ここまたは Web アプリで「辞書に追加」した単語です。",
+  "settings.remove": "削除",
+  "settings.noWords": "まだ単語はありません。"
+}

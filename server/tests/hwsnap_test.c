@@ -9,6 +9,7 @@
  * A throwaway test key only: the release key never signs anything here. */
 #include "sysreport/hwsnap.h"
 #include "pkg/crypto.h"
+#include "sec/json.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -127,6 +128,51 @@ static void test_check(void) {
     free(big);
 }
 
+/* The optional "toolkits" field (format 1 kept; catalog.mjs --toolkits). This reader accepts a snapshot with or
+ * without it and checks it as strictly as the devices; any other extra field is still refused. */
+#define TK(id, ver, rep, fail, score) "{\"id\":\"" id "\",\"lordos\":\"" ver "\",\"reports\":" #rep ",\"fail\":" #fail ",\"score\":" #score "}"
+#define SNAPTK(devs, tks) "{\"format\":\"lordos-hwsnapshot\",\"version\":1,\"generated\":\"2026-10-29\",\"reports\":2,\"devices\":[" devs "],\"toolkits\":[" tks "]}\n"
+
+/* The root check of LordOS 0.8.9.6.1 and older (hwsnap.c before the field): exactly 5 fields. A snapshot the
+ * catalogue writes by default must still pass it, since lordos-hwdata reaches those releases too. */
+static int old_reader_accepts(const char *text, size_t n) {
+    JDoc d;
+    if (json_parse(text, n, &d, NULL, 0)) return 0;
+    int ok = d.root && d.root->type == J_OBJ && d.root->len == 5 && json_get(d.root, "devices");
+    for (const JVal *v = ok ? json_get(d.root, "devices")->kid : NULL; v && ok; v = v->next) ok = v->type == J_OBJ && v->len == 9;
+    json_free(&d);
+    return ok;
+}
+
+static void test_toolkits(void) {
+    char err[160];
+    const char *with = SNAPTK(DEV("gpu:v3d", "gpu", "0.8.7", 1, 0, 0, 1, 0), TK("gtk4-wayland", "0.8.9.7", 3, 1, 87.5) "," TK("x11-xwayland", "0.8.9.7", 1, 0, 100));
+    CHECK(check_signed(with, err, sizeof err) == HWSNAP_OK, "a snapshot with toolkits");
+    CHECK(check_signed(SNAPTK("", ""), err, sizeof err) == HWSNAP_OK, "an empty toolkit list");
+    CHECK(check_signed(GOOD, err, sizeof err) == HWSNAP_OK, "a snapshot without toolkits (the old format)");
+    CHECK(old_reader_accepts(GOOD, strlen(GOOD)), "the old reader accepts the default snapshot");
+    CHECK(!old_reader_accepts(with, strlen(with)), "the old reader refuses toolkits: why catalog.mjs writes it only with --toolkits");
+    static const char *const invalid[] = {
+        SNAPTK("", TK("gtk5-wayland", "0.8.9.7", 1, 0, 50)),         /* unknown combination */
+        SNAPTK("", TK("gtk4-wayland", "0.8", 1, 0, 50)),             /* bad version */
+        SNAPTK("", TK("gtk4-wayland", "0.8.9.7", 0, 0, 50)),         /* no report */
+        SNAPTK("", TK("gtk4-wayland", "0.8.9.7", 1, 2, 50)),         /* more failures than reports */
+        SNAPTK("", TK("gtk4-wayland", "0.8.9.7", 1, 0, 101)),        /* score over 100 */
+        SNAPTK("", TK("gtk4-wayland", "0.8.9.7", 1, 0, -1)),
+        SNAPTK("", TK("gtk4-wayland", "0.8.9.7", 1.5, 0, 50)),
+        SNAPTK("", "{\"id\":\"gtk4-wayland\",\"lordos\":\"0.8.9.7\",\"reports\":1,\"fail\":0,\"score\":\"50\"}"),
+        SNAPTK("", "{\"id\":\"gtk4-wayland\",\"lordos\":\"0.8.9.7\",\"reports\":1,\"fail\":0}"),
+        SNAPTK("", "{\"id\":\"gtk4-wayland\",\"lordos\":\"0.8.9.7\",\"reports\":1,\"fail\":0,\"score\":5,\"x\":1}"),
+        "{\"format\":\"lordos-hwsnapshot\",\"version\":1,\"generated\":\"2026-10-29\",\"reports\":2,\"devices\":[],\"toolkits\":{}}",
+        "{\"format\":\"lordos-hwsnapshot\",\"version\":1,\"generated\":\"2026-10-29\",\"reports\":2,\"devices\":[],\"toolkits\":[],\"extra\":1}",
+    };
+    for (size_t i = 0; i < sizeof invalid / sizeof invalid[0]; i++) {
+        HwSnapState st = check_signed(invalid[i], err, sizeof err);
+        if (st != HWSNAP_INVALID) printf("  toolkits case %zu: %s\n", i, hwsnap_state_name(st));
+        CHECK(st == HWSNAP_INVALID, "a malformed toolkit field is refused");
+    }
+}
+
 static void put(const char *dir, const char *name, const char *text) {
     char p[512];
     snprintf(p, sizeof p, "%s/%s", dir, name);
@@ -189,6 +235,7 @@ static void test_built(const char *path) {
     HwSnapState s = hwsnap_check(buf, n, sig, strlen(sig), pub, err, sizeof err);
     if (s != HWSNAP_OK) printf("  %s: %s (%s)\n", path, hwsnap_state_name(s), err);
     CHECK(s == HWSNAP_OK, "the built snapshot passes the C checks");
+    CHECK(old_reader_accepts(buf, n), "the built snapshot passes the old (0.8.9.6.1) reader too");
 }
 
 int main(int argc, char **argv) {
@@ -196,6 +243,7 @@ int main(int argc, char **argv) {
     ed25519_public(OTHER, other_pub);
     test_check();
     test_load();
+    test_toolkits();
     if (argc > 1) test_built(argv[1]);
     printf("hwsnap-test: %d ok, %d failed\n", pass, fail);
     return fail ? 1 : 0;

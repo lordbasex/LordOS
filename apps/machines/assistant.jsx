@@ -19,7 +19,7 @@
 import { View, Text, TextInput, FilePicker, Toggle, ScrollView, admin, fs, openUrl, userDirs, settings, locale, useFilesDrop, FilesDropHint, t as tr } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import CATALOG from '../../assets/machines/systems.json';
-import { systemsFor, entryOf, listingNames, newest, pickImage, pinnedImage, cardSize, versionIn, progressOf, resumedOf, unattendedOf, checkSetup, hostnameFor, userFor, lordosLang } from './catalog.js';
+import { systemsFor, entryOf, listingNames, newest, pickImage, pinnedImage, cardSize, versionIn, progressOf, resumedOf, unattendedOf, checkSetup, hostnameNext, userFor, lordosLang } from './catalog.js';
 import { newKey } from './keyflow.js';
 import { validateDraft, createRequest, missingFor, systemOf, versionOf, archOf, isoArch, suggestName, gfxFor, no3dReason, winfspFor, gvtGpu, defaultCard, detectPlan, dropSource } from './model.js';
 import { allProfiles, profileById, builtinProfile, defaultProfileId, onHost, setPatch, shareAbs, DEFAULT_PROFILE } from './profiles.js';
@@ -51,7 +51,7 @@ function Tile({ title, hint, onClick, selected, disabled, mark, height = 76, dro
       {mark}
       <View>
         <Text style={{ fontSize: 13, fontWeight: 700, color: p.text, textAlign: 'start' }}>{title}</Text>
-        {hint ? <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start', whiteSpace: 'nowrap', overflow: 'hidden' }}>{hint}</Text> : null}
+        {hint ? <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{hint}</Text> : null}
       </View>
       {children}
     </View>
@@ -98,6 +98,9 @@ export function Assistant({ host, mode, names, groupNames, onClose, onCreated, o
   const [un, setUn] = useState({ on: true, user: userFor(typeof lord !== 'undefined' && lord.fs?.home ? lord.fs.home() : ''), password: '', hostname: '', timezone: hd.timezone, keymap: hd.keymap });
   const [alt, setAlt] = useState(null);
   const altSeq = useRef(0);
+  // the computer's name filled in by itself: it follows the machine's while it is still that one (going back from
+  // Debian to LordOS, or from Windows), never one the person typed
+  const autoHost = useRef('');
   // Windows: { mode: 'own' | 'eval', phase: 'wait' | 'hashing' | 'ready' | 'error', iso: { path, name, lang, label }, pct, err, lang }
   const [win, setWin] = useState(null);
   const [edition, setEdition] = useState('Windows 11 Pro');
@@ -219,7 +222,7 @@ export function Assistant({ host, mode, names, groupNames, onClose, onCreated, o
     const timer = setInterval(look, 2000);
     return () => clearInterval(timer);
   }, [windows, win?.mode, win?.phase, arch]);
-  useEffect(() => { if (windows) setUn((u) => ({ ...u, hostname: windowsHostname(name) })); }, [windows, name]);
+  useEffect(() => { if (windows) setUn((u) => ({ ...u, hostname: (autoHost.current = windowsHostname(name)) })); }, [windows, name]);
   // the clipboard both ways when the profile says so (the review's switch starts there)
   useEffect(() => { setShareClip(pv.clipboard === 'both'); }, [profile]);
   // a system the person added: its verified image, the profile it says
@@ -279,7 +282,15 @@ export function Assistant({ host, mode, names, groupNames, onClose, onCreated, o
     resolve(uo.image, arch).then((img) => { if (seq === altSeq.current) setAlt({ id: uo.image, arch, phase: 'ready', image: img }); })
       .catch((err) => { if (seq === altSeq.current) setAlt({ id: uo.image, arch, phase: 'error', err: err.message || String(err) }); });
   }, [needAlt, uo?.image, arch]);
-  useEffect(() => { if (name && !un.hostname && !windows) setUn((u) => ({ ...u, hostname: hostnameFor(name) })); }, [name]);
+  useEffect(() => {
+    if (!name || windows) return;
+    setUn((u) => {
+      const hostname = hostnameNext(u.hostname, autoHost.current, name);
+      if (hostname === u.hostname) return u;
+      autoHost.current = hostname;
+      return { ...u, hostname };
+    });
+  }, [name, windows]);
   const setup = windows ? checkWindowsSetup(un) : checkSetup(un);
   const plan = windows ? editionPlan(winE, win?.mode, edition, winKey) : null;
   // what is downloaded and installed: the card's image, or the unattended install's own
@@ -411,6 +422,15 @@ export function Assistant({ host, mode, names, groupNames, onClose, onCreated, o
   };
   const stopDownload = () => { cancelled.current = true; admin.run('vm-image-cancel', '', null, { quiet: true }).catch(() => {}); };
 
+  // a file dropped on the first step goes to the tile that takes it (an ISO, a disk image, another app's machine).
+  // A hook, so it stays above the group and migrate pages' early returns (React's hook order).
+  const drop = useFilesDrop({ accepts: (n) => !!dropSource(n), onDrop: ({ files }) => {
+    const f = files[0];
+    const src = f && step === 0 && !job ? dropSource(f.split('/').pop()) : null;
+    if (!src) return;
+    pickSeq.current++; setDl(null); setDetectPage(false); setPicking(false); setSource(src);
+    if (src === 'migrate') setPath(f); else chose(f, src);
+  } });
   const grp = source === 'group';
   if (grp && step > 0 && dl?.phase === 'ready') return <GroupFlow step={step} setStep={setStep} dl={dl} host={host} names={names} groupNames={groupNames} catalog={CATALOG}
     onCancel={onClose} onGroup={(dir) => onGroup?.(dir)} />;
@@ -428,14 +448,6 @@ export function Assistant({ host, mode, names, groupNames, onClose, onCreated, o
   const title = onDetect ? tr('machines.as.title.detect') : step === 2 && (uo || windows) ? tr('machines.as.title.setup') : tr(`machines.as.title.${STEPS[step]}`);
   const goBack = () => { if (onDetect) setDetectPage(false); else if (step === 1 && needsDetect) { setStep(0); setDetectPage(true); } else setStep(step - 1); };
   const goOn = () => { if (step === 0 && needsDetect && !onDetect) { setDetectPage(true); return; } setDetectPage(false); setStep(step + 1); };
-  // a file dropped on the first step goes to the tile that takes it (an ISO, a disk image, another app's machine)
-  const drop = useFilesDrop({ accepts: (n) => !!dropSource(n), onDrop: ({ files }) => {
-    const f = files[0];
-    const src = f && step === 0 && !job ? dropSource(f.split('/').pop()) : null;
-    if (!src) return;
-    pickSeq.current++; setDl(null); setDetectPage(false); setPicking(false); setSource(src);
-    if (src === 'migrate') setPath(f); else chose(f, src);
-  } });
   const fileHint = (k) => (source === k && path ? path.split('/').pop() : tr(`machines.as.${k}Hint`));
   let body = null;
   if (onDetect) body = <DetectPage detect={detect} dp={dp} sys={sys} ver={ver} path={path} host={host}
@@ -572,7 +584,7 @@ export function Assistant({ host, mode, names, groupNames, onClose, onCreated, o
         <View style={{ flexDirection: 'row', gap: 12 }}>
           <View style={{ flex: 1, gap: 4 }}>
             <Text style={{ fontSize: 12, fontWeight: 600, color: p.dim, textAlign: 'start' }}>{tr('machines.un.user')}</Text>
-            <TextInput value={un.user} onChange={(user) => setUn((u) => ({ ...u, user }))} />
+            <TextInput spellCheck={false} value={un.user} onChange={(user) => setUn((u) => ({ ...u, user }))} />
             {setup.errors.user ? <Text style={{ fontSize: 12, color: '#ff453a', textAlign: 'start' }}>{tr(`machines.un.err.${setup.errors.user}`)}</Text> : null}
           </View>
           <View style={{ flex: 1, gap: 4 }}>
@@ -645,7 +657,8 @@ export function Assistant({ host, mode, names, groupNames, onClose, onCreated, o
           </View>
         </View>
       ) : null}
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: 10, backgroundColor: p.card }}>
+      {/* handsDeny: whether a machine is encrypted is the person's own choice (docs/HANDS.md) */}
+      <View handsDeny style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: 10, backgroundColor: p.card }}>
         <Toggle on={encrypt} onChange={setEncrypt} />
         <View style={{ flex: 1 }}>
           <Text style={{ fontSize: 13, color: p.text, textAlign: 'start' }}>{tr('machines.as.encrypt')}</Text>
@@ -779,13 +792,15 @@ function DetectPage({ detect, dp, sys, ver, path, host, onOther }) {
   </>;
 }
 
-// a group card's mark: the group's two machines and a badge "Group · 2 machines"
+// a group card's mark: the group's two machines and a badge "Group · 2 machines". The badge takes the room left
+// beside the mark and wraps onto a second line in a long language (GitHub #266: "Groupe · 2 machines" ran out of the
+// card in French)
 function GroupTileMark({ n }) {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-      <View style={{ width: 56, height: 40, borderRadius: 8, alignItems: 'center', justifyContent: 'center', background: `linear-gradient(135deg, ${groupColors[0]}, ${groupColors[1]})` }}><GroupMark size={26} /></View>
-      <View style={{ height: 20, paddingHorizontal: 8, borderRadius: 10, justifyContent: 'center', backgroundColor: 'rgba(125,70,152,0.85)' }}>
-        <Text style={{ fontSize: 11, fontWeight: 700, color: '#fff', whiteSpace: 'nowrap' }}>{tr('machines.whonix.badge', { n })}</Text>
+      <View style={{ width: 56, height: 40, flexShrink: 0, borderRadius: 8, alignItems: 'center', justifyContent: 'center', background: `linear-gradient(135deg, ${groupColors[0]}, ${groupColors[1]})` }}><GroupMark size={26} /></View>
+      <View style={{ flexShrink: 1, minWidth: 0, minHeight: 20, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10, justifyContent: 'center', backgroundColor: 'rgba(125,70,152,0.85)' }}>
+        <Text style={{ fontSize: 11, lineHeight: 1.25, fontWeight: 700, color: '#fff', textAlign: 'start', numberOfLines: 2, textOverflow: 'ellipsis' }}>{tr('machines.whonix.badge', { n })}</Text>
       </View>
     </View>
   );
@@ -866,7 +881,7 @@ function WinSetup({ un, setUn, setup, plan, entry, mode, edition, setEdition, wi
         </View>
         <View style={{ gap: 4 }}>
           <Text style={{ fontSize: 12, fontWeight: 600, color: p.dim, textAlign: 'start' }}>{tr('machines.win.key')}</Text>
-          <TextInput value={winKey} onChange={setWinKey} placeholder="XXXXX-XXXXX-XXXXX-XXXXX-XXXXX" />
+          <TextInput spellCheck={false} value={winKey} onChange={setWinKey} placeholder="XXXXX-XXXXX-XXXXX-XXXXX-XXXXX" />
           <Text style={{ fontSize: 12, lineHeight: 1.4, color: plan?.err ? '#ff453a' : p.dim, textAlign: 'start' }}>
             {plan?.err === 'needsKey' ? tr('machines.win.needsKey') : plan?.err === 'key' ? tr('machines.win.badKey') : plan?.generic ? tr('machines.win.keyHint', { edition: plan.name }) : tr('machines.win.keyYours')}</Text>
         </View>

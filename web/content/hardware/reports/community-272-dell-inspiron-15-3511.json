@@ -1,0 +1,468 @@
+{
+  "format": "lordos-hwreport",
+  "version": 1,
+  "createdAt": "2026-11-26",
+  "source": "community",
+  "lordos": "0.8.9-beta",
+  "live": false,
+  "system": {
+    "machine": {
+      "vendor": "Dell Inc.",
+      "product": "Inspiron 15 3511",
+      "version": "",
+      "boardVendor": "Dell Inc.",
+      "boardName": "07V0Y0",
+      "chassis": "laptop",
+      "model": "",
+      "biosVendor": "Dell Inc.",
+      "biosVersion": "1.51.0",
+      "biosDate": "09/23/2026",
+      "firmware": "uefi",
+      "secureBoot": false,
+      "virtualization": ""
+    },
+    "cpu": {
+      "model": "11th Gen Intel(R) Core(TM) i5-1135G7 @ 2.40GHz",
+      "vendor": "GenuineIntel",
+      "arch": "x86_64",
+      "sockets": 1,
+      "cores": 4,
+      "threads": 8,
+      "minMHz": 400,
+      "maxMHz": 4200,
+      "governor": "powersave",
+      "l1dKB": 48,
+      "l1iKB": 32,
+      "l2KB": 1280,
+      "l3KB": 8192
+    },
+    "memory": {
+      "totalKB": 16120824,
+      "swapKB": 8388604,
+      "zram": []
+    },
+    "gpus": [
+      {
+        "bus": "pci",
+        "vendorId": "8086",
+        "deviceId": "9a49",
+        "vendor": "Intel Corporation",
+        "device": "TigerLake-LP GT2 [Iris Xe Graphics]",
+        "driver": "i915",
+        "bootVga": true,
+        "renderNode": true,
+        "connectors": 2,
+        "connected": 1
+      }
+    ],
+    "displays": [
+      {
+        "connector": "eDP-1",
+        "enabled": true,
+        "name": "",
+        "manufacturer": "CMN",
+        "product": "15e5",
+        "year": 2021,
+        "widthCm": 34,
+        "heightCm": 19,
+        "diagonalTenths": 153,
+        "nativeWidth": 1920,
+        "nativeHeight": 1080,
+        "mode": "1920x1080"
+      }
+    ],
+    "storage": [
+      {
+        "model": "UP GAMER FAST PLUS 256GB",
+        "vendor": "",
+        "bytes": 256060514304,
+        "rotational": false,
+        "removable": false,
+        "transport": "nvme",
+        "link": "8.0 GT/s PCIe x4"
+      }
+    ],
+    "pci": [
+      {
+        "class": "060000",
+        "className": "Host bridge",
+        "vendorId": "8086",
+        "deviceId": "9a14",
+        "vendor": "Intel Corporation",
+        "device": "Tiger Lake-UP3/H35 4 cores Host Bridge/DRAM Registers",
+        "driver": ""
+      },
+      {
+        "class": "030000",
+        "className": "VGA compatible controller",
+        "vendorId": "8086",
+        "deviceId": "9a49",
+        "vendor": "Intel Corporation",
+        "device": "TigerLake-LP GT2 [Iris Xe Graphics]",
+        "driver": "i915"
+      },
+      {
+        "class": "118000",
+        "className": "Signal processing controller",
+        "vendorId": "8086",
+        "deviceId": "9a03",
+        "vendor": "Intel Corporation",
+        "device": "TigerLake-LP Dynamic Tuning Processor Participant",
+        "driver": "proc_thermal"
+      },
+      {
+        "class": "118000",
+        "className": "Signal processing controller",
+        "vendorId": "8086",
+        "deviceId": "9a0d",
+        "vendor": "Intel Corporation",
+        "device": "Tigerlake Telemetry Aggregator Driver",
+        "driver": "intel_vsec"
+      },
+      {
+        "class": "0c0330",
+        "className": "USB controller",
+        "vendorId": "8086",
+        "deviceId": "a0ed",
+        "vendor": "Intel Corporation",
+        "device": "Tiger Lake-LP USB 3.2 Gen 2x1 xHCI Host Controller",
+        "driver": "xhci_hcd"
+      },
+      {
+        "class": "050000",
+        "className": "RAM memory",
+        "vendorId": "8086",
+        "deviceId": "a0ef",
+        "vendor": "Intel Corporation",
+        "device": "Tiger Lake-LP Shared SRAM",
+        "driver": ""
+      },
+      {
+        "class": "028000",
+        "className": "Network controller",
+        "vendorId": "8086",
+        "deviceId": "a0f0",
+        "vendor": "Intel Corporation",
+        "device": "Wi-Fi 6 AX201",
+        "driver": "iwlwifi"
+      },
+      {
+        "class": "0c8000",
+        "className": "Serial bus controller",
+        "vendorId": "8086",
+        "deviceId": "a0e8",
+        "vendor": "Intel Corporation",
+        "device": "Tiger Lake-LP Serial IO I2C Controller #0",
+        "driver": "intel-lpss"
+      },
+      {
+        "class": "0c8000",
+        "className": "Serial bus controller",
+        "vendorId": "8086",
+        "deviceId": "a0e9",
+        "vendor": "Intel Corporation",
+        "device": "Tiger Lake-LP Serial IO I2C Controller #1",
+        "driver": "intel-lpss"
+      },
+      {
+        "class": "078000",
+        "className": "Communication controller",
+        "vendorId": "8086",
+        "deviceId": "a0e0",
+        "vendor": "Intel Corporation",
+        "device": "Tiger Lake-LP Management Engine Interface",
+        "driver": "mei_me"
+      },
+      {
+        "class": "010601",
+        "className": "SATA controller",
+        "vendorId": "8086",
+        "deviceId": "a0d3",
+        "vendor": "Intel Corporation",
+        "device": "Tiger Lake-LP SATA Controller",
+        "driver": "ahci"
+      },
+      {
+        "class": "060400",
+        "className": "PCI bridge",
+        "vendorId": "8086",
+        "deviceId": "a0bc",
+        "vendor": "Intel Corporation",
+        "device": "Tiger Lake-LP PCI Express Root Port #5",
+        "driver": "pcieport"
+      },
+      {
+        "class": "060100",
+        "className": "ISA bridge",
+        "vendorId": "8086",
+        "deviceId": "a082",
+        "vendor": "Intel Corporation",
+        "device": "Tiger Lake-LP LPC Controller",
+        "driver": ""
+      },
+      {
+        "class": "040380",
+        "className": "Audio device",
+        "vendorId": "8086",
+        "deviceId": "a0c8",
+        "vendor": "Intel Corporation",
+        "device": "Tiger Lake-LP Smart Sound Technology Audio Controller",
+        "driver": "snd_hda_intel"
+      },
+      {
+        "class": "0c0500",
+        "className": "SMBus",
+        "vendorId": "8086",
+        "deviceId": "a0a3",
+        "vendor": "Intel Corporation",
+        "device": "Tiger Lake-LP SMBus Controller",
+        "driver": "i801_smbus"
+      },
+      {
+        "class": "0c8000",
+        "className": "Serial bus controller",
+        "vendorId": "8086",
+        "deviceId": "a0a4",
+        "vendor": "Intel Corporation",
+        "device": "Tiger Lake-LP SPI Controller",
+        "driver": ""
+      },
+      {
+        "class": "010802",
+        "className": "Non-Volatile memory controller",
+        "vendorId": "1ed0",
+        "deviceId": "2283",
+        "vendor": "Hosin Global Electronics",
+        "device": "Patriot P300 NVMe SSD (DRAM-less)",
+        "driver": "nvme"
+      }
+    ],
+    "usb": [
+      {
+        "vendorId": "8087",
+        "productId": "0aaa",
+        "vendor": "",
+        "product": "",
+        "class": "e0",
+        "speedMbps": 12,
+        "driver": "btusb"
+      },
+      {
+        "vendorId": "27c6",
+        "productId": "639c",
+        "vendor": "",
+        "product": "",
+        "class": "ef",
+        "speedMbps": 12,
+        "driver": ""
+      },
+      {
+        "vendorId": "0c45",
+        "productId": "6730",
+        "vendor": "",
+        "product": "",
+        "class": "ef",
+        "speedMbps": 480,
+        "driver": "uvcvideo"
+      }
+    ],
+    "network": [
+      {
+        "kind": "wifi",
+        "driver": "iwlwifi",
+        "up": false,
+        "speedMbps": null
+      }
+    ],
+    "audio": [
+      "HDA Intel PCH"
+    ],
+    "bluetooth": [
+      {
+        "driver": "btusb"
+      }
+    ],
+    "power": [
+      {
+        "kind": "ac",
+        "vendor": "",
+        "model": "",
+        "technology": "",
+        "status": "",
+        "capacity": null,
+        "health": null,
+        "online": 1
+      },
+      {
+        "kind": "battery",
+        "vendor": "SMP",
+        "model": "DELL XDY9K32",
+        "technology": "Li-poly",
+        "status": "Full",
+        "capacity": 100,
+        "health": 78,
+        "online": null
+      }
+    ],
+    "thermal": [
+      {
+        "sensor": "INT3400 Thermal",
+        "milliC": 20000,
+        "fans": 0
+      },
+      {
+        "sensor": "TSKN",
+        "milliC": 35050,
+        "fans": 0
+      },
+      {
+        "sensor": "TMEM",
+        "milliC": 36050,
+        "fans": 0
+      },
+      {
+        "sensor": "TCPU",
+        "milliC": 50050,
+        "fans": 0
+      },
+      {
+        "sensor": "iwlwifi_1",
+        "milliC": 32000,
+        "fans": 0
+      },
+      {
+        "sensor": "x86_pkg_temp",
+        "milliC": 54000,
+        "fans": 0
+      },
+      {
+        "sensor": "BAT0",
+        "milliC": null,
+        "fans": 0
+      },
+      {
+        "sensor": "nvme",
+        "milliC": 19850,
+        "fans": 0
+      },
+      {
+        "sensor": "AC",
+        "milliC": null,
+        "fans": 0
+      },
+      {
+        "sensor": "dell_smm",
+        "milliC": 54000,
+        "fans": 1
+      },
+      {
+        "sensor": "iwlwifi_1",
+        "milliC": 32000,
+        "fans": 0
+      },
+      {
+        "sensor": "coretemp",
+        "milliC": 54000,
+        "fans": 0
+      }
+    ],
+    "software": {
+      "os": "Debian GNU/Linux 13 (trixie)",
+      "osId": "debian",
+      "osVersion": "13",
+      "kernel": "6.12.117+deb13-amd64",
+      "lordos": "0.8.9-beta",
+      "lsm": "lockdown,capability,landlock,yama,apparmor,tomoyo,bpf,ipe,ima,evm",
+      "landlockAbi": 6,
+      "bpfLsm": true,
+      "cgroup2": true,
+      "live": false,
+      "bootMedium": "internal",
+      "bootLinkMbps": null,
+      "bootToRam": false,
+      "kernelConfig": {
+        "CONFIG_SECURITY_LANDLOCK": "y",
+        "CONFIG_SECCOMP_FILTER": "y",
+        "CONFIG_USER_NS": "y",
+        "CONFIG_BPF_SYSCALL": "y",
+        "CONFIG_BPF_JIT": "y",
+        "CONFIG_CGROUP_BPF": "y",
+        "CONFIG_BPF_LSM": "y",
+        "CONFIG_INET_DIAG_DESTROY": "y",
+        "CONFIG_INET_UDP_DIAG": "m",
+        "CONFIG_MEMCG": "y",
+        "CONFIG_PSI": "y",
+        "CONFIG_ZRAM": "m",
+        "CONFIG_DRM": "m",
+        "CONFIG_UHID": "m"
+      },
+      "services": {
+        "lord-sessiond": true,
+        "lord-netd": true,
+        "lord-netperm": true,
+        "lord-fand": true
+      }
+    },
+    "session": {
+      "composition": "gpu",
+      "gpuInit": "on",
+      "renderer": "Mesa Intel(R) Iris(R) Xe Graphics (TGL GT2)",
+      "dmabuf": true,
+      "scanouts": 0
+    }
+  },
+  "compatibility": [
+    {
+      "id": "gpu",
+      "state": "works",
+      "note": "gpuComposes"
+    },
+    {
+      "id": "display",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "storage",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "network",
+      "state": "limits",
+      "note": "notConnected"
+    },
+    {
+      "id": "wifi",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "bluetooth",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "audio",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "power",
+      "state": "works",
+      "note": "batteryHealth"
+    },
+    {
+      "id": "isolation",
+      "state": "works",
+      "note": null
+    },
+    {
+      "id": "suspend",
+      "state": "unchecked",
+      "note": null
+    }
+  ],
+  "bench": null,
+  "desktop": null
+}

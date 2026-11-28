@@ -592,7 +592,7 @@ eq('labels', M.statusGlyph({ st: 'kept' }).key, 'cloud.status.kept');
   const idx = fs.readFileSync(path.join(root, 'apps/settings/index.jsx'), 'utf8');
   const files = fs.readFileSync(path.join(root, 'apps/files/cloud.jsx'), 'utf8');
   eq('no Cloud sheet in the shell\'s modal layer (Settings, Files)', [/<Layer\b/.test(src), /<Layer\b/.test(files)], [false, false]);
-  eq('the sheets are drawn at the Settings window\'s root', /section === 'cloud' \? <CloudSheets \/> : null/.test(idx), true);
+  eq('the sheets are drawn at the Settings window\'s root', /section === 'cloud' \? <CloudSheets handsDeny=\{denied\} \/> : null/.test(idx), true);
   eq('the sign-in waits inline in the pane, not in a sheet', [/v\.signin \? <SignInCard/.test(src), /kind: 'signin'/.test(src)], [true, false]);
   eq('every sign-in goes through one guarded start', [(src.match(/cloud\.beginSignIn\(/g) || []).length, /if \(signinStarting\) return;/.test(src)], [1, true]);
   eq('the page isn\'t opened again on start (only by its button)', (src.match(/cloud\.openSignInPage\(/g) || []).length, 1);

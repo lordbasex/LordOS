@@ -128,5 +128,6 @@
   "user.user": "Felhasználónév",
   "user.userHint": "Kisbetűk, számok, - és _. Rendszergazda lesz (sudo).",
   "welcome.text": "Ez a varázsló a számítógép lemezére telepíti a LordOS-t. Kiválasztja a nyelvet, a billentyűzetet, a lemezt és a felhasználóját. A telepítés törli a kiválasztott lemezt, kivéve, ha a meglévők mellé telepít, vagy saját maga választja ki a partíciókat.",
-  "welcome.title": "Üdvözli a LordOS"
+  "welcome.title": "Üdvözli a LordOS",
+  "disk.unreadable": "Egy lemez leírását nem sikerült beolvasni, ezért nem szerepel a listában. Keressen újra; ha továbbra is hiányzik, jelezze nekünk."
 }

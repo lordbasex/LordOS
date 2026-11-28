@@ -1,6 +1,6 @@
 # Desktops
 
-Several desktops, each with its own windows, in Lord Flow and Lord Classic. All displays switch together.
+Several desktops, each with its own windows, in Flow and Classic. All displays switch together.
 There is always at least one, and at most nine. Most of this is SDK work: `lord-server` knows only that a
 window is *parked*.
 
@@ -9,7 +9,7 @@ window is *parked*.
 | `sdk/desktopmodel.js` | The rules as plain data, no runtime: what shows, what is in front, who has the keyboard, the Overview's layout. `server/tests/desktop_model_test.mjs` |
 | `sdk/windows.js` | `w.desktop`, the stores `activeDesktop`, `desktopList` and `desktopNames`, `desktopName`, `renameDesktop`, `moveDesktop`, `wm.moveToDesktop`, `wm.raise`, `useWindows`, `useWindowHidden` |
 | `sdk/desktops.js` | Switching, the keys, the saved count and names, the indicator, the animation |
-| `sdk/overview.jsx` | The Overview, the same in both themes (it replaced Lord Classic's task view) |
+| `sdk/overview.jsx` | The Overview, the same in both themes (it replaced Classic's task view) |
 | `sdk/windowshell.jsx` | `display: none` on a hidden desktop, the window's place in the Overview |
 | `sdk/wayland.js`, `server/src/wl/wl.c` | The keyboard and the parked state of Linux windows |
 
@@ -57,7 +57,7 @@ A parked X11 window goes iconic and to the bottom of X's stack through the path 
 
 ## The Overview
 
-Ctrl+Up in Lord Flow (with its Ctrl arrows on, below), Super+Tab or the taskbar button in Lord Classic, the Window menu or the desktop's menu in
+Ctrl+Up in Flow (with its Ctrl arrows on, below), Super+Tab or the taskbar button in Classic, the Window menu or the desktop's menu in
 both, and a four-finger swipe up. The windows of the desktop in a grid, drawn smaller by a transform on their
 real frame (lord-server paints a raster of it, so no app redraws; on the GPU path a Linux window's quad is drawn
 at the scaled box, with its hole opened there, so it stays live and can't overflow or reach the Dock), with
@@ -97,7 +97,7 @@ showing. The last desktop can't be closed.
 
 ## Keys and gestures
 
-| | Lord Flow | Lord Classic |
+| | Flow | Classic |
 |---|---|---|
 | Overview | ⌃↑ (option) | ❖Tab |
 | App windows | ⌃↓ (option) | |
@@ -105,7 +105,7 @@ showing. The last desktop can't be closed.
 | New desktop | Overview | ❖⌃D |
 | Close desktop | Overview | ❖⌃F4 |
 
-⌃ arrows are word movement in apps, in Linux apps and in the Terminal, so in Lord Flow (and Lord Workspaces) they are
+⌃ arrows are word movement in apps, in Linux apps and in the Terminal, so in Flow (and Workspaces) they are
 the Desktops keys only when **Settings → Desktop & Dock → Desktops → Use Ctrl + arrow keys for Desktops**
 (`apps/settings/Desktops.jsx`) turns them on (`settings.desktopArrows === true`). Off, the default since 0.8.9.1
 (#201; settings migration 8 turns off the `true` that every user had saved since 0.8.7), the entries don't apply and
@@ -156,9 +156,9 @@ over `remote.sock`, with a small Wayland client that logs keys, focus and `confi
 - A Help search and tour step survived switching away and back, with no keys reaching the hidden field.
 - Dock click and app switcher jumping desktops, Move to Desktop, session restore after a stop, a live theme switch.
 
-| ![Lord Flow](desktops-overview-flow.png) | ![Lord Classic](desktops-overview-classic.png) |
+| ![Flow](desktops-overview-flow.png) | ![Classic](desktops-overview-classic.png) |
 |---|---|
-| The Overview in Lord Flow | The Overview in Lord Classic |
+| The Overview in Flow | The Overview in Classic |
 
 ![Move to Desktop](desktops-move-menu.png)
 

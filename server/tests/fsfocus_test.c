@@ -28,6 +28,13 @@ int main(void) {
     is(fsf_take(0, 0, 1, 0), 1, "a window under the video never takes them, wherever the pointer is");
     is(fsf_take(0, 1, 0, 1), 1, "no window, the pointer on the video's display: the video");
     is(fsf_take(0, 1, 0, 0), 0, "no window, the pointer on the other display: nobody (the desktop there)");
+    /* (BUG-30 of the ws170 QA) a LordOS window (Notes) chosen on the other display: "no window" with the pointer there.
+     * The pointer resting on the video's display afterwards (the person's, or taken back after an agent's click) no
+     * longer gives the next key to the video; chosen on the video's display, the video keeps them as before */
+    is(fsf_take(0, 1, 0, fsf_none_ptr(0, 1)), 0, "Notes chosen on the other display, the pointer back over the video: Notes keeps the keys");
+    is(fsf_take(0, 1, 0, fsf_none_ptr(1, 0)), 1, "chosen on the video's display (one display, or under it): the video");
+    is(fsf_take(0, 1, 0, fsf_none_ptr(-1, 1)), 1, "nothing chosen since the fullscreen began: the pointer now, as before");
+    is(fsf_take(0, 1, 0, fsf_none_ptr(-1, 0)), 0, "nothing chosen since, the pointer on the other display: nobody");
 
     /* one display: as before 0.8.8.10, the fullscreen window always has the keys */
     is(fsf_take(0, 0, fsf_hidden(editor, left, 1), 0), 1, "one display: any other window gives way");

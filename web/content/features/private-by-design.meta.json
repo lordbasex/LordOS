@@ -510,6 +510,14 @@
         "es": "La Prueba del aislamiento (desde 0.8.5)",
         "pt": "O Teste do isolamento (desde a 0.8.5)"
       }
+    },
+    {
+      "path": "docs/HANDS.md",
+      "what": {
+        "en": "Hands: an AI agent on the desktop (since 0.8.9.6.2)",
+        "es": "Manos: un agente de IA en el escritorio (desde la 0.8.9.6.2)",
+        "pt": "Mãos: um agente de IA no desktop (desde a 0.8.9.6.2)"
+      }
     }
   ]
 }

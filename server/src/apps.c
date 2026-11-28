@@ -33,6 +33,7 @@
  * xact_take_launch, wl.c launch_was_for, apps_window_names below). */
 #include "apps.h"
 #include "lordlog.h"
+#include "nofile.h"
 #include "iconfind.h"
 #include "hw/defaults.h"
 #include "hw/mimeapps.h"
@@ -170,6 +171,22 @@ static void set_mime(char *dst, size_t n, const char *v) {
     dst[len] = 0;
 }
 
+/* one more Name[xx] into the list (apps.h DesktopApp.names): one per line, each once, never cut */
+void apps_add_name(char *list, size_t n, const char *v) {
+    size_t vl = strlen(v), have = strlen(list);
+    if (!vl || vl > 159 || strchr(v, '\n')) return;
+    for (const char *p = list; *p;) {
+        const char *e = strchr(p, '\n');
+        size_t l = e ? (size_t)(e - p) : strlen(p);
+        if (l == vl && !memcmp(p, v, vl)) return;
+        p += l + (e ? 1 : 0);
+    }
+    if (have + vl + 2 > n) return;
+    if (have) list[have++] = '\n';
+    memcpy(list + have, v, vl + 1);
+}
+#define add_name apps_add_name
+
 static int parse_desktop(const char *file, const char *lang, Entry *e) {
     FILE *f = fopen(file, "r");
     if (!f) return -1;
@@ -214,6 +231,7 @@ static int parse_desktop(const char *file, const char *lang, Entry *e) {
         if (!strcmp(k, "Name")) {
             set_tr(e, 0, e->a.name, sizeof e->a.name, v, loc, lang); e->has_name = 1;
             if (!loc) snprintf(e->a.name_c, sizeof e->a.name_c, "%s", v);
+            else if (strcmp(loc, "@")) add_name(e->a.names, sizeof e->a.names, v);   /* not Name[en@shaw] */
         }
         else if (!strcmp(k, "GenericName")) set_tr(e, 1, e->a.generic, sizeof e->a.generic, v, loc, lang);
         else if (!strcmp(k, "Comment")) set_tr(e, 2, e->a.comment, sizeof e->a.comment, v, loc, lang);
@@ -1208,6 +1226,7 @@ static int launch_flatpak(const char *id, const char *opened) {
             syscall(SYS_close_range, 3, FPSW_FD - 1, 0);
             syscall(SYS_close_range, ln[1] >= 0 ? FPLEND_FD + 1 : FPSW_FD + 1, ~0u, 0);
         } else syscall(SYS_close_range, 3, ~0u, 0);
+        nofile_restore();                           /* the usual 1024, now that there is room under it (nofile.h, #251) */
         const char *home = getenv("HOME");
         if (home && chdir(home)) {}
         /* its root-owned scope (not app_scope_reserved: "fp-" is reserved for this path alone) */
@@ -1297,6 +1316,52 @@ int apps_flatpak_list(const char *lang, const DesktopApp **out) {
             if (!a->wmclass[0]) snprintf(a->wmclass, sizeof a->wmclass, "%s", id);   /* a Flatpak window's app_id is its id */
             a->icon[0] = 0;
             iconfind_app(&ir, e->icon_name, a->icon, sizeof a->icon);
+        }
+        closedir(d);
+    }
+    /* An app may export more entries, each named after its id plus a suffix (Flatpak requires the prefix):
+     * org.libreoffice.LibreOffice.writer.desktop next to org.libreoffice.LibreOffice.desktop. Their MimeType goes to
+     * their app's entry, so "Open with" offers that app for those types (the ws170 QA found LibreOffice missing for an
+     * .odt: only Writer's export declares it); nothing else of them is read, and they never become an app of their own
+     * (the launch is the app's, by its id). */
+    for (int k = 0; e && k < 2; k++) {
+        char dir[PATH_MAX + 32];
+        snprintf(dir, sizeof dir, "%.4000s/applications", roots[k]);
+        DIR *d = opendir(dir);
+        if (!d) continue;
+        struct dirent *de;
+        while ((de = readdir(d))) {
+            size_t l = strlen(de->d_name);
+            if (l <= 8 || strcmp(de->d_name + l - 8, ".desktop") || l - 8 > FPAK_ID_MAX) continue;
+            int owner = -1;
+            size_t best = 0;
+            for (int i = 0; i < n; i++) {
+                size_t il = strlen(flatpaks[i].id);
+                if (il > best && il + 1 < l - 8 && !strncmp(de->d_name, flatpaks[i].id, il) && de->d_name[il] == '.') { owner = i; best = il; }
+            }
+            if (owner < 0) continue;
+            char file[PATH_MAX * 2];
+            snprintf(file, sizeof file, "%s/%s", dir, de->d_name);
+            if (parse_desktop(file, lang, e) || !e->is_app || e->hidden || !e->a.mime[0]) continue;
+            DesktopApp *a = &flatpaks[owner];
+            for (char *tok = e->a.mime; *tok;) {
+                size_t tl = strcspn(tok, ";");
+                if (tl && tl < 256) {
+                    char m[258];
+                    snprintf(m, sizeof m, ";%.*s;", (int)tl, tok);
+                    char have[sizeof a->mime + 2];
+                    snprintf(have, sizeof have, ";%s%s", a->mime, a->mime[0] && a->mime[strlen(a->mime) - 1] == ';' ? "" : ";");
+                    size_t al = strlen(a->mime);
+                    if (!strstr(have, m) && al + tl + 2 < sizeof a->mime) {
+                        if (al && a->mime[al - 1] != ';') a->mime[al++] = ';';
+                        memcpy(a->mime + al, tok, tl);
+                        a->mime[al + tl] = ';';
+                        a->mime[al + tl + 1] = 0;
+                    }
+                }
+                tok += tl;
+                if (*tok == ';') tok++;
+            }
         }
         closedir(d);
     }
@@ -1636,6 +1701,7 @@ static int launch(const char *id, const char *file, const char *action, const ch
         if (null >= 0) { dup2(null, 0); dup2(null, 1); dup2(null, 2); }
         if (logfd >= 0) { dup2(logfd, 1); dup2(logfd, 2); }
         syscall(SYS_close_range, 3, ~0u, 0);
+        nofile_restore();                           /* the usual 1024, now that there is room under it (nofile.h, #251) */
         const char *home = getenv("HOME");
         if (!cwd[0] || chdir(cwd)) { if (home && chdir(home)) {} }
         /* its own app-lordos-<id>.scope cgroup: the firewall, the Monitor, the PipeWire guard and

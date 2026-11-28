@@ -2,7 +2,7 @@
 // machine's mark (like a Unity mode's menu in the menu bar). Its menu works like the guest's Start menu: a search, the
 // guest's windows (Running) and apps to open (appslist.jsx, the same lists as the controller's panel), then the machine's
 // name, Show the Machine's Window and Leave Apps Mode. One item per machine, through the SDK's status items, so every
-// theme that draws <StatusItems /> shows it on each of its bars (Lord Flow's menu bar, the Classic taskbar, Workspaces'
+// theme that draws <StatusItems /> shows it on each of its bars (Flow's menu bar, the Classic taskbar, Workspaces'
 // top bar); it goes when apps mode ends (the machine leaves `guests`).
 import { View, Text, ScrollView, Overlay, addListener, useStore, wm, registerStatusItem, statusPanelAt, statusPanelRoom, t as tr } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';

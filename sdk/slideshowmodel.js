@@ -1,6 +1,6 @@
 // slideshowmodel.js — the wallpaper slideshow's decisions, as plain functions with no imports (0.8.9; tests:
 // server/tests/slideshow_model_test.mjs). The SDK draws it (sdk/slideshow.jsx); a theme turns it on by declaring
-// "wallpaper": { "slideshow": true } in its theme.json (sdk/thememeta.js). Lord Workspaces is the only one today.
+// "wallpaper": { "slideshow": true } in its theme.json (sdk/thememeta.js). Workspaces is the only one today.
 //
 // settings.slideshow = { on, category, every, perDisplay }:
 //   on          off by default

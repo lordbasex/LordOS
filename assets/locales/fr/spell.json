@@ -1,0 +1,22 @@
+{
+  "menu.looking": "Recherche de suggestions…",
+  "menu.none": "Aucune suggestion",
+  "menu.add": "Ajouter « {word} » au dictionnaire",
+  "menu.ignore": "Ignorer",
+  "settings.title": "Orthographe",
+  "settings.hint": "Les mots mal orthographiés sont soulignés d’une vague rouge dans les champs de texte de LordOS ; faites un clic droit sur l’un d’eux pour voir des suggestions. La vérification se fait sur cet ordinateur, jamais en ligne. Les champs de mot de passe, de recherche et d’adresse ne sont pas vérifiés.",
+  "settings.check": "Vérifier l’orthographe pendant la saisie",
+  "settings.languages": "Orthographe : langues",
+  "settings.defaultHint": "Aucune choisie : la langue de votre interface et l’anglais, si leurs dictionnaires sont installés. Les applications web utilisent les mêmes.",
+  "settings.chosenHint": "Un mot est correct si l’une des langues choisies le connaît (4 au maximum). Les applications web utilisent la langue de votre interface et l’anglais.",
+  "settings.none": "Aucun dictionnaire n’est installé. Installez-en un ci-dessous.",
+  "settings.useDefault": "Utiliser les valeurs par défaut",
+  "settings.more": "Plus de langues",
+  "settings.moreHint": "Dictionnaires de Debian. En installer un demande le mot de passe d’un administrateur.",
+  "settings.installing": "Installation…",
+  "settings.install": "Installer",
+  "settings.words": "Votre dictionnaire",
+  "settings.wordsHint": "Mots ajoutés avec « Ajouter au dictionnaire », ici ou dans une application web.",
+  "settings.remove": "Retirer",
+  "settings.noWords": "Aucun mot pour l’instant."
+}

@@ -10,6 +10,7 @@ endif
 build/lord-fetch: $(FETCH_SRC) src/fetch/fetchproto.h src/fetch/weather.h src/fetch/flathub.h src/fetch/fhget.h src/fpak.h src/fw/fwlists.h src/mail/http.h src/mail/net.h src/sec/sandbox.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ $(FETCH_SRC) $(shell pkg-config --libs openssl) -lpthread -lm
+	chmod g-w $@
 # subscriptions (fw/fwsub.c) without network, and lord-fetch's refusals (tests/fwsub_test.c)
 FWSUB_SRC := src/fw/fwsub.c src/fw/fwlists.c src/fw/rules.c src/fw/fwmap.c src/doc/wire.c src/sec/json.c src/sec/netconn.c src/sec/cgroup.c
 ifeq ($(MAILNET),1)

@@ -1,4 +1,4 @@
-// videowidget.jsx — the desktop's Video widget (0.8.8.10, Lord Workspaces): a camera, a stream or a TV channel in a card,
+// videowidget.jsx — the desktop's Video widget (0.8.8.10, Workspaces): a camera, a stream or a TV channel in a card,
 // played by lord-stream (sdk/streams.jsx). Small, medium, large and extra large; pause (a live stream closes: no
 // bandwidth, nothing decoding) and mute; Reconnecting while a lost stream comes back. Small and medium ask a camera
 // for its sub stream where the address says how (lowQuality). The address is kept without credentials in the
@@ -129,7 +129,7 @@ export function VideoSetup() {
           {label('shell.widgets.video.nameLabel')}
           <TextInput value={name} onChange={setName} placeholder={t('shell.widgets.video.namePlaceholder')} style={field} />
           {label('shell.widgets.video.urlLabel')}
-          <TextInput value={addr} onChange={setAddr} placeholder="rtsp://user:password@192.168.1.10:554/stream" style={field} onSubmit={() => save(addr, name)} />
+          <TextInput spellCheck={false} value={addr} onChange={setAddr} placeholder="rtsp://user:password@192.168.1.10:554/stream" style={field} onSubmit={() => save(addr, name)} />
           <Text style={{ fontSize: 11, color: th.textDim, textAlign: 'start' }}>{t('shell.widgets.video.urlHint')}</Text>
           {label('shell.widgets.video.listLabel')}
           <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>

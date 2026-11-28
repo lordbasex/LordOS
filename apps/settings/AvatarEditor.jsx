@@ -4,7 +4,7 @@
 // ~/.cache/lordos/avatar.jpg (a 100 MB photo becomes a few dozen KB; the same file each time), which the user-avatar action then copies to
 // /var/lib/lordos/users. The original is never changed. All the picture work is lord-media's (sdk/media.js: image, crop,
 // resize, saveImage), no pixels go through JavaScript.
-import { View, Text, Button, Slider, Layer, FilePicker, MediaView, media, fs, addListener, useTheme, useLocale, useAppWindow, wm, spacing, typeScale } from '@lordos/sdk';
+import { View, Text, Button, Slider, WindowSheet, FilePicker, MediaView, media, fs, addListener, useTheme, useLocale, spacing, typeScale } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { avatarCrop } from './avatarmodel.js';
 
@@ -18,7 +18,6 @@ const IMAGES = /\.(png|jpe?g|webp|heic|heif|avif|gif|bmp|tiff?)$/i;
 export function AvatarEditor({ onSave, onClose }) {
   const th = useTheme();
   const { t: tr } = useLocale();
-  const win = useAppWindow();
   const [picking, setPicking] = useState(true);
   const [src, setSrc] = useState(null);             // { id, w, h }: the upright picture
   const [zoom, setZoom] = useState(0);              // 0..1 of the slider
@@ -91,10 +90,9 @@ export function AvatarEditor({ onSave, onClose }) {
     onSave(out);
   };
 
-  const g = wm.frame(wm.get(win.id) || {});
   return (
-    <Layer name="modal">
-      <View style={{ position: 'absolute', left: g.x || 0, top: g.y || 0, width: g.w || 720, height: g.h || 560, alignItems: 'center',
+    <WindowSheet>
+      <View style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, alignItems: 'center',
         justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.35)' }}>
         {picking ? (
           <View style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0 }}>
@@ -124,6 +122,6 @@ export function AvatarEditor({ onSave, onClose }) {
           </View>
         )}
       </View>
-    </Layer>
+    </WindowSheet>
   );
 }

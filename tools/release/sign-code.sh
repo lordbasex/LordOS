@@ -6,7 +6,7 @@
 #
 #   npm run build && tools/release/sign-code.sh [root] [private-key.pem]
 #
-# Run on the maintainer's machine, after `npm run build` and before the tree travels to the build
+# Run on the maintainer's LordOS machine, after `npm run build` and before the tree travels to the build
 # VMs: the bundles are architecture-independent, so one signature serves the amd64 and arm64 .debs,
 # the ISO and the Raspberry Pi image. The private key never leaves this machine. Default key:
 # ~/.config/lordos-release/release-ed25519.key.pem (mode 0600). A different key (a throwaway one for

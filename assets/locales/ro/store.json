@@ -172,6 +172,7 @@
     "other": "{count} de actualizat"
   },
   "remove": "Elimină",
+  "removeAsk": "Eliminați {name}?",
   "rescue.ask": "Niciun cont de pe acest computer nu este administrator. Dacă știți parola root, puteți face din acest cont un administrator. Intră în vigoare doar după repornirea computerului.",
   "rescue.button": "Fă-mă administrator",
   "rescue.noSudo": "Niciun cont de pe acest computer nu este administrator, iar pachetul sudo nu este instalat. Ca root, rulați apt install sudo, apoi încercați din nou aici.",
@@ -240,7 +241,7 @@
   },
   "suggest.nvidiaDriver.detail": "Acum folosește nouveau, driverul liber inclus în LordOS. Driverul producătorului ({packages}) oferă de obicei performanțe 3D și gestionare a energiei mai bune.",
   "suggest.nvidiaDriver.note.nouveau": "Până îl instalați, rămâne în uz driverul liber nouveau; eliminarea pachetului revine la el.",
-  "suggest.nvidiaDriver.note.older": "Plăcile mai vechi de aproximativ 2014 nu sunt acceptate de această versiune a driverului; păstrați driverul liber pe ele. Desktopul LordOS nu a fost încă testat cu acest driver.",
+  "suggest.nvidiaDriver.note.older": "Plăcile mai vechi de aproximativ 2014 nu sunt suportate de această versiune a driverului; păstrați driverul liber pe ele. Desktopul LordOS cu acest driver este experimental: un raport al comunității îl arată compus pe placă (o GTX 1070 cu driverul 580); unul mai vechi era compus de procesor.",
   "suggest.nvidiaDriver.note.secureBoot": "Driverul este compilat pentru kernelul dvs. pe acest computer (DKMS) și din nou după fiecare actualizare a kernelului. Cu Secure Boot activat, trebuie să înregistrați cheia sa de semnare la următoarea repornire, altfel driverul nu se va încărca.",
   "suggest.nvidiaDriver.title": "Driver grafic proprietar",
   "suggest.nvidiaDriver.unavailable": "Driverul producătorului necesită componentele contrib și non-free ale Debian, iar acestea nu sunt ambele activate în sursele de pachete ale acestui computer. Driverul liber, nouveau, continuă să funcționeze.",

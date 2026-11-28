@@ -31,6 +31,8 @@
 #include "webback.h"
 #include "weburl.h"
 #include "weboffline.h"
+#include "../spellang.h"
+#include "webcall.h"
 #include "lord_version.h"           /* build/gen: LordOS's version, for the user agent */
 
 #include <sys/utsname.h>
@@ -167,6 +169,7 @@ void web_set_user_agent(Web *w, int kind) {
     if (!ua[0]) return;
     w->user_agent = kind;
     webkit_settings_set_user_agent(webkit_web_view_get_settings(w->view), ua);
+    webhints_identity(w);               /* Chrome's Client Hints and navigator.userAgentData follow the identity */
     /* navigator.userAgent stays what the document started with: load the page again (only the app's own: another
      * site in the window, a sign-in half done, is left alone and gets the new one with its next load) */
     if (!w->outside) web_reload(w);
@@ -273,6 +276,8 @@ void web_reload(Web *w) {
 
 void web_show(Web *w, const char *token) {
     if (w->win) webwin_show(w->win, token);
+    /* the window maps only with a frame from the web process: a page that hangs would show nothing, so it must answer */
+    web_hang_urgent(w);
     if (w->offline_uri && w->offline_page) { w->offline_failures = 0; offline_retry(w); }
 }
 
@@ -291,7 +296,7 @@ double web_now_ms(void) {
 }
 
 void web_state_save(Web *w) {
-    char path[PATH_MAX + 16], text[128];
+    char path[PATH_MAX + 16], text[WEBPAGE_STATE_MAX];
     size_t n = webpage_state_write(&w->state, text, sizeof text);
     if (snprintf(path, sizeof path, "%s/state.json", w->profile_dir) >= (int)sizeof path || !n) return;
     if (webreg_write_file(path, text, n)) fprintf(stderr, "lord-web: %s: %s\n", path, strerror(errno));
@@ -351,6 +356,14 @@ static gboolean on_decide(WebKitWebView *v, WebKitPolicyDecision *dec, WebKitPol
     Web *w = d;
     if (type == WEBKIT_POLICY_DECISION_TYPE_RESPONSE) {
         WebKitResponsePolicyDecision *r = WEBKIT_RESPONSE_POLICY_DECISION(dec);
+        /* the site's Accept-CH, for the Client Hints of a profile that is Chrome (webhints.c) */
+        if (webkit_response_policy_decision_is_main_frame_main_resource(r)) {
+            WebKitURIResponse *resp = webkit_response_policy_decision_get_response(r);
+            webhints_response(w, resp);
+            /* the document's Document-Isolation-Policy, in closed words, for the call log's "page:" line (webcall.h) */
+            SoupMessageHeaders *h = resp ? webkit_uri_response_get_http_headers(resp) : NULL;
+            webcall_set_dip(h ? soup_message_headers_get_one(h, "Document-Isolation-Policy") : NULL);
+        }
         if (webkit_response_policy_decision_is_main_frame_main_resource(r) && !webkit_response_policy_decision_is_mime_type_supported(r)) {
             webkit_policy_decision_download(dec);
             return TRUE;
@@ -388,13 +401,14 @@ static WebKitWebView *on_create(WebKitWebView *v, WebKitNavigationAction *a, gpo
 
 /* ---- permissions ---- */
 
-typedef struct { WebKitPermissionRequest *req; int kinds[2], n, i, allowed; } Pending;
+typedef struct { WebKitPermissionRequest *req; int kinds[2], n, i, allowed, asked; } Pending;
 
 static void ask_next(Web *w, Pending *p);
 
 static void asked(Web *w, int kind, const char *answer, void *data) {
     (void)kind;
     Pending *p = data;
+    p->asked = 1;
     if (strcmp(answer, "allow") && strcmp(answer, "once")) p->allowed = 0;
     p->i++;
     ask_next(w, p);
@@ -411,6 +425,7 @@ static void ask_next(Web *w, Pending *p) {
     /* again before each question and the answer: the page may have left the scope while lord-server asked */
     if (p->allowed && !page_is_app(w)) p->allowed = 0;
     if (p->allowed && p->i < p->n) { webbus_ask(w, p->kinds[p->i], asked, p); return; }
+    webcalls_permission(w, p->kinds, p->n, p->allowed, p->asked ? "asked" : "the app's setting");
     if (p->allowed) webkit_permission_request_allow(p->req);
     else webkit_permission_request_deny(p->req);
     g_object_unref(p->req);
@@ -475,8 +490,12 @@ static gboolean on_query(WebKitWebView *v, WebKitPermissionStateQuery *q, gpoint
 /* ---- notifications, the file chooser, the pointer, crashes ---- */
 
 static gboolean on_notification(WebKitWebView *v, WebKitNotification *n, gpointer d) { (void)v; webbus_notify(d, n); return TRUE; }
+/* a service worker's clients.focus() (LordOS's WebKit since +4.2: lordos-sw-notifications.patch). WebKit allows it only
+ * while the worker handles a user gesture, a click on one of its notifications: the window comes forward as on a click
+ * on a page's notification */
+static void on_sw_focus(WebKitWebView *v, gpointer d) { (void)v; web_show(d, NULL); }
 static gboolean on_file_chooser(WebKitWebView *v, WebKitFileChooserRequest *r, gpointer d) { (void)v; webbus_choose_files(d, r); return TRUE; }
-/* ---- editing: the shell's Edit menu and the page's context menu (LordOS's own menu, webbus_menu) ---- */
+/* ---- editing: the shell's Edit menu and the page's context menu (LordOS's own menu, webmenu.c) ---- */
 
 void web_edit(Web *w, int cmd) {
     const char *c = webedit_webkit(cmd);
@@ -492,46 +511,12 @@ void web_edit(Web *w, int cmd) {
     if (cmd == WEBEDIT_COPY || cmd == WEBEDIT_CUT) webwin_after_edit(w->win);
 }
 
-/* an address the menu may offer: a web, mail or phone link, or (for an image) one the page itself can read again */
-static int menu_uri_ok(const char *u, int image) {
-    if (!u || !u[0] || strlen(u) > 8192) return 0;
-    if (!g_ascii_strncasecmp(u, "https://", 8) || !g_ascii_strncasecmp(u, "http://", 7)) return 1;
-    if (image) return !g_ascii_strncasecmp(u, "blob:", 5) || !g_ascii_strncasecmp(u, "data:image/", 11);
-    return !g_ascii_strncasecmp(u, "mailto:", 7) || !g_ascii_strncasecmp(u, "tel:", 4);
-}
-
-void web_menu_chosen(Web *w, int item, const char *link, const char *image) {
-    switch (item) {
-    case WEBMENU_CUT: web_edit(w, WEBEDIT_CUT); break;
-    case WEBMENU_COPY: web_edit(w, WEBEDIT_COPY); break;
-    case WEBMENU_PASTE: web_edit(w, WEBEDIT_PASTE); break;
-    case WEBMENU_SELECT_ALL: web_edit(w, WEBEDIT_SELECT_ALL); break;
-    case WEBMENU_COPY_LINK: if (link && w->win) webwin_offer(w->win, NULL, g_bytes_new(link, strlen(link))); break;
-    case WEBMENU_OPEN_LINK: if (link) webbus_open_uri(w, link); break;
-    case WEBMENU_COPY_IMAGE: if (image) webxfer_copy_image(w, image); break;
-    default: break;
-    }
-}
-
-/* WebKit's own menu is never shown (WPE has none to show): lord-server shows LordOS's, with items for what is under
- * the pointer. A page that handles its own right click (and prevents the default) never gets here. */
-void web_context_menu(Web *w, unsigned at, const char *link, const char *image) {
-    at &= WEBMENU_AT_EDITABLE | WEBMENU_AT_SELECTION;
-    if (menu_uri_ok(link, 0)) at |= WEBMENU_AT_LINK;
-    else link = NULL;
-    if (menu_uri_ok(image, 1) && !w->outside) at |= WEBMENU_AT_IMAGE;
-    else image = NULL;
-    int items[WEBMENU_N];
-    int n = webmenu_items(at, items);
-    webbus_menu(w, items, n, link, image);
-}
-
-/* should WebKit ever ask (2.48's WPE port doesn't; webselect.c reports the right click instead) */
+/* WebKit's own menu is never shown. With WPEPlatform (2.54) WebKit asks for one when the page leaves a right click in a
+ * text field alone (webselect.c lets it, for its spelling suggestions): webmenu.c takes its spelling items for
+ * LordOS's menu, which the page script's report shows */
 static gboolean on_context_menu(WebKitWebView *v, WebKitContextMenu *m, WebKitHitTestResult *h, gpointer d) {
-    (void)v; (void)m;
-    unsigned at = (webkit_hit_test_result_context_is_editable(h) ? WEBMENU_AT_EDITABLE : 0) | (webkit_hit_test_result_context_is_selection(h) ? WEBMENU_AT_SELECTION : 0);
-    web_context_menu(d, at, webkit_hit_test_result_context_is_link(h) ? webkit_hit_test_result_get_link_uri(h) : NULL,
-                     webkit_hit_test_result_context_is_image(h) ? webkit_hit_test_result_get_image_uri(h) : NULL);
+    (void)v; (void)h;
+    web_menu_webkit(d, m);
     return TRUE;
 }
 
@@ -553,6 +538,13 @@ static void on_crash(WebKitWebView *v, WebKitWebProcessTerminationReason why, gp
     Web *w = d;
     static gint64 last;
     gint64 now = g_get_monotonic_time();
+    if (web_hang_take(w)) {
+        /* ended by webhang.c because the page didn't answer: the page again in a new web process, and the person is told */
+        w->offline_retrying = 0;
+        web_reload(w);
+        webbus_notify_text(w, weblang("hang.reloaded"), "");
+        return;
+    }
     fprintf(stderr, "lord-web: the web process ended (%s)\n", why == WEBKIT_WEB_PROCESS_CRASHED ? "crashed" : why == WEBKIT_WEB_PROCESS_EXCEEDED_MEMORY_LIMIT ? "memory limit" : "terminated");
     if (why == WEBKIT_WEB_PROCESS_TERMINATED_BY_API || (last && now - last < CRASH_WINDOW_US)) { web_quit(w, 1); return; }
     last = now;
@@ -574,6 +566,14 @@ static int downloads_dir(Web *w, char *out, size_t n) {
 
 static gboolean on_destination(WebKitDownload *dl, const char *suggested, gpointer d) {
     Web *w = d;
+    /* Save Image As… or Save Video As… (webmenu.c): the file the person chose in LordOS's save dialog, which asked
+     * before replacing one that is there */
+    const char *chosen = g_object_get_data(G_OBJECT(dl), WEBMENU_DEST_KEY);
+    if (chosen) {
+        webkit_download_set_allow_overwrite(dl, TRUE);
+        webkit_download_set_destination(dl, chosen);
+        return TRUE;
+    }
     char dir[PATH_MAX], name[WEBDL_NAME_MAX + 16], uniq[WEBDL_NAME_MAX + 32], path[PATH_MAX + WEBDL_NAME_MAX + 40];
     if (downloads_dir(w, dir, sizeof dir) || webdl_name(suggested, name, sizeof name)) { webkit_download_cancel(dl); return TRUE; }
     int fd = open(dir, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
@@ -632,8 +632,32 @@ static void notification_permissions(Web *w) {
     webkit_security_origin_unref(o);
 }
 
+/* Spelling (docs/WEBAPPS.md, "Spelling"): WebKit's own checker in the page's text fields, with the dictionaries
+ * LordOS's one model picks (spellang.h: the interface language's and English, only installed ones) */
+static void spelling(Web *w) {
+    char inst[64][SPELLANG_TAG_MAX], pick[SPELLANG_MAX][SPELLANG_TAG_MAX];
+    const char *list[64];
+    int n = spellang_installed(SPELLANG_DIR, inst, 64);
+    for (int i = 0; i < n; i++) list[i] = inst[i];
+    const char *l = getenv("LC_ALL");
+    if (!l || !*l) l = getenv("LC_MESSAGES");
+    if (!l || !*l) l = getenv("LANG");
+    int k = spellang_choose(l, list, n, pick, SPELLANG_MAX);
+    if (!k) { web_note("spelling: no dictionary installed for the interface language or English"); return; }
+    const char *langs[SPELLANG_MAX + 1] = { 0 };
+    for (int i = 0; i < k; i++) langs[i] = pick[i];
+    webkit_web_context_set_spell_checking_languages(w->context, langs);
+    webkit_web_context_set_spell_checking_enabled(w->context, TRUE);
+    web_note("spelling: %s%s%s", langs[0], k > 1 ? ", " : "", k > 1 ? langs[1] : "");
+}
+
 int web_engine_start(Web *w) {
     w->context = web_context_new();
+    /* before any web process starts: the cameras' udev entries in WebKit's sandbox, so a page can list them (webcam.h);
+     * whether a page may use one is still asked (on_permission) */
+    web_note("cameras: %d in the web process's sandbox", webcalls_sandbox_cameras(w->context));
+    spelling(w);
+    webhints_context(w);                /* before any web process starts: the Client Hints extension */
     notification_permissions(w);
     w->session = web_session_new(w);
     if (!w->session) return -1;
@@ -649,6 +673,8 @@ int web_engine_start(Web *w) {
     g_signal_connect(w->view, "permission-request", G_CALLBACK(on_permission), w);
     g_signal_connect(w->view, "query-permission-state", G_CALLBACK(on_query), w);
     g_signal_connect(w->view, "show-notification", G_CALLBACK(on_notification), w);
+    if (g_signal_lookup("lordos-focus-from-service-worker", WEBKIT_TYPE_WEB_VIEW))
+        g_signal_connect(w->view, "lordos-focus-from-service-worker", G_CALLBACK(on_sw_focus), w);
     g_signal_connect(w->view, "run-file-chooser", G_CALLBACK(on_file_chooser), w);
     g_signal_connect(w->view, "context-menu", G_CALLBACK(on_context_menu), w);
     g_signal_connect(w->view, "mouse-target-changed", G_CALLBACK(on_target), w);
@@ -656,6 +682,7 @@ int web_engine_start(Web *w) {
     g_signal_connect(w->view, "notify::uri", G_CALLBACK(on_uri), w);
     g_signal_connect(w->view, "close", G_CALLBACK(on_close), w);
     g_signal_connect(w->view, "web-process-terminated", G_CALLBACK(on_crash), w);
+    web_hang_start(w);
     g_signal_connect(w->view, "notify::is-playing-audio", G_CALLBACK(on_audio), w);
     g_signal_connect(w->view, "load-changed", G_CALLBACK(on_load), w);
     g_signal_connect(w->view, "load-failed", G_CALLBACK(on_load_failed), w);
@@ -665,6 +692,8 @@ int web_engine_start(Web *w) {
     webxfer_init(w);
     webselect_init(w);
     webdark_init(w);
+    webhints_view(w);
+    webcalls_init(w);
     g_signal_connect(w->session, "download-started", G_CALLBACK(on_download), w);
     webkit_web_view_load_uri(w->view, w->app.start_url);
     return 0;

@@ -3,10 +3,15 @@
 
 // What the theme's frame adds around a window drawn with its frame (windowChrome(): { w, h }): borders of w / 2 on the
 // sides and the bottom, the title bar on top. A window that draws its own frame (csd) has none.
-export function chromeInset(chrome, csd) {
+// strip: the window has menus, so a theme that gives each window its own menu strip under the title bar (chrome.menu:
+// Classic, Workspaces, Celeste) draws it, and it is part of the frame too: the app's content is the frame
+// less all of it. Left out, a Linux app got the strip's height less than it asked for, and lost it again on each of
+// its own resizes (a fullscreen exit), which window memory then kept.
+export function chromeInset(chrome, csd, strip = false) {
   if (csd || !chrome) return { left: 0, top: 0, w: 0, h: 0 };
   const side = Math.max(0, Math.round((chrome.w || 0) / 2));
-  return { left: side, top: Math.max(0, (chrome.h || 0) - side), w: chrome.w || 0, h: chrome.h || 0 };
+  const menu = strip ? Math.max(0, Math.round(chrome.menu || 0)) : 0;
+  return { left: side, top: Math.max(0, (chrome.h || 0) - side) + menu, w: chrome.w || 0, h: (chrome.h || 0) + menu };
 }
 
 // xdg-toplevel-drag: where the frame goes so the window's geometry point (ox, oy) is under the pointer (px, py).
@@ -28,6 +33,11 @@ export function tagKey(tag) {
 // The key a window's place is remembered under (sdk/windowmemory.js): its app's, and with a tag that app's window of
 // that kind. Only ever beside the app's own Dock id, so one app's tag can't reach another app's places.
 export const placeKeyOf = (appKey, tag) => (appKey && tagKey(tag) ? `${appKey}#${tagKey(tag)}` : appKey);
+// The toolkit audit's own windows (tools/toolkit-audit, app ids and X classes lordos-toolkit-audit*) are never remembered
+// nor placed from memory: they ask for 600x400 and check that they get it. A size saved from one run (and, while the
+// harnesses shared an id, from another toolkit's window; any case: GTK's X class is "Lordos-toolkit-audit-gtk3") came back in every later run: qt5 and qt6 at 600x421, gtk3-x11
+// at 600x406, x11-xwayland back from fullscreen at its remembered size (BUG-12 and BUG-24 of the ws170 QA).
+export const remembersPlace = (key) => typeof key === 'string' && !!key && !/^(linux|desktop):lordos-toolkit-audit(?:$|[-#.])/i.test(key);
 // The description an app gave a window, as its name while it has no title (at most 120 characters).
 export const descriptionTitle = (d) => (typeof d === 'string' ? d.replace(/\s+/g, ' ').trim().slice(0, 120) : '');
 
@@ -57,3 +67,9 @@ export function blurBoxes(rects) {
   return out;
 }
 export const BLUR_RADIUS = 24;          // as the theme's own translucent panels
+
+// A Linux window's fullscreen box from lord-server's "fullscreen" event ({ x, y, w, h }, the display it covers), or null.
+export function fullscreenRectOf(d) {
+  if (!d || ![d.x, d.y, d.w, d.h].every(Number.isFinite) || d.w <= 0 || d.h <= 0) return null;
+  return { x: Math.round(d.x), y: Math.round(d.y), w: Math.round(d.w), h: Math.round(d.h) };
+}

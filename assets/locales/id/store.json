@@ -162,6 +162,7 @@
     "other": "{count} akan diperbarui"
   },
   "remove": "Hapus",
+  "removeAsk": "Hapus {name}?",
   "rescue.ask": "Tidak ada akun di komputer ini yang merupakan administrator. Jika Anda mengetahui kata sandi root, Anda dapat menjadikan akun ini administrator. Perubahan berlaku hanya setelah komputer dimulai ulang.",
   "rescue.button": "Jadikan Saya Administrator",
   "rescue.noSudo": "Tidak ada akun di komputer ini yang merupakan administrator, dan paket sudo tidak terinstal. Sebagai root, jalankan apt install sudo, lalu coba lagi di sini.",
@@ -226,7 +227,7 @@
   },
   "suggest.nvidiaDriver.detail": "Saat ini menggunakan nouveau, driver bebas yang disertakan dengan LordOS. Driver dari vendor ({packages}) biasanya memberikan kinerja 3D dan manajemen daya yang lebih baik.",
   "suggest.nvidiaDriver.note.nouveau": "Sampai Anda menginstalnya, driver bebas nouveau tetap digunakan; menghapus paketnya akan kembali ke driver itu.",
-  "suggest.nvidiaDriver.note.older": "Kartu yang lebih tua dari sekitar tahun 2014 tidak didukung oleh versi driver ini; tetap gunakan driver bebas untuk kartu tersebut. Desktop LordOS belum diuji dengan driver ini.",
+  "suggest.nvidiaDriver.note.older": "Kartu yang lebih lama dari sekitar 2014 tidak didukung versi driver ini; tetap gunakan driver bebas pada kartu tersebut. Desktop LordOS dengan driver ini eksperimental: satu laporan komunitas menunjukkannya dikomposisi di kartu (GTX 1070 dengan driver 580); laporan sebelumnya dikomposisi oleh prosesor.",
   "suggest.nvidiaDriver.note.secureBoot": "Driver dibangun untuk kernel Anda di komputer ini (DKMS) dan dibangun ulang setelah setiap pembaruan kernel. Dengan Secure Boot aktif, Anda harus mendaftarkan kunci penandatanganannya saat dimulai ulang berikutnya, atau driver tidak akan dimuat.",
   "suggest.nvidiaDriver.title": "Driver grafis proprietary",
   "suggest.nvidiaDriver.unavailable": "Driver dari vendor memerlukan komponen contrib dan non-free Debian, dan keduanya tidak diaktifkan di sumber paket komputer ini. Driver bebas, nouveau, tetap berfungsi.",

@@ -202,6 +202,7 @@
   "power.healthNormal": "ব্যাটারির স্বাস্থ্য: {pct}% (স্বাভাবিক)",
   "power.healthService": "ব্যাটারির স্বাস্থ্য: {pct}% (সার্ভিসিং প্রস্তাবিত)",
   "power.healthUnknown": "ব্যাটারির স্বাস্থ্য: অজানা",
+  "power.h": "{h} ঘণ্টা",
   "power.hm": "{h} ঘণ্টা {m} মিনিট",
   "power.immediately": "সঙ্গে সঙ্গে",
   "power.left": "{time} বাকি",

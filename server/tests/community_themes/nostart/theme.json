@@ -1,0 +1,2 @@
+{ "name": "nostart", "description": "A test fixture: a theme that fails at its start.",
+  "community": true, "author": "LordOS tests", "license": "MIT", "version": "1.0.0" }

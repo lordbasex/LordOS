@@ -39,9 +39,12 @@ int cursor_size(void);
 int cursor_set_boost(double level);
 void cursor_set_shake(int on);
 int cursor_shake(void);
-/* A theme's accent arrow (Lord Workspaces): on, the default pointer is a rounded tip filled with rgb (0xRRGGBB);
+/* A theme's accent arrow (Workspaces): on, the default pointer is a rounded tip filled with rgb (0xRRGGBB);
  * off, LordOS's black arrow. The other shapes never change. 1 if it changed (the pointer is drawn again). */
 int cursor_set_accent(int on, uint32_t rgb);
+/* A theme's pointer colours (a style pack, docs/THEMES-GUIDE.md): every shape filled with fill and outlined with outline
+ * (0xRRGGBB each); off, LordOS's black with a white outline. The shapes and the shadow never change. 1 if it changed. */
+int cursor_set_scheme(int on, uint32_t fill, uint32_t outline);
 /* Changes each time the size changes (to redraw the cursor). */
 unsigned cursor_size_serial(void);
 /* The scale (percent, a multiple of 25 in 75–CURSOR_PCT_MAX) a display at pct gets with the size setting. */

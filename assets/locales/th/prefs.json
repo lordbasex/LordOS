@@ -201,6 +201,7 @@
   "power.healthNormal": "สุขภาพแบตเตอรี่: {pct}% (ปกติ)",
   "power.healthService": "สุขภาพแบตเตอรี่: {pct}% (แนะนำให้เข้ารับบริการ)",
   "power.healthUnknown": "สุขภาพแบตเตอรี่: ไม่ทราบ",
+  "power.h": "{h} ชม.",
   "power.hm": "{h} ชม. {m} นาที",
   "power.immediately": "ทันที",
   "power.left": "เหลือ {time}",

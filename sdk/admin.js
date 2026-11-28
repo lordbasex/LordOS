@@ -29,7 +29,11 @@ globalThis.__lordAdmin = (id, kind, text) => {
   }
   const p = pending.get(id);
   if (!p) return;
-  if (kind === 'LOG') {
+  // PROGRESS <n> (wallpaper-get, studio-bg-get): a line of progress like LOG, never the action's answer. Before 0.8.9.6.2
+  // it ended the request as an error whose text was the first percent ("0"): the file still downloaded, but "Download
+  // and use" never got to use it.
+  if (kind === 'LOG' || kind === 'PROGRESS') {
+    if (kind === 'PROGRESS') text = `PROGRESS ${text}`;
     p.onLog?.(text);
     p.log = [...p.log, text].slice(-200);
     if (!p.quiet) refreshBusy();

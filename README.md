@@ -57,8 +57,8 @@ started ([`results/0.8.5-beta/vmware-fusion`](results/0.8.5-beta/vmware-fusion))
 
 ## Get LordOS
 
-The latest release is **[0.8.9.6.1-beta](https://github.com/lordbasex/LordOS/releases/tag/v0.8.9.6.1-beta)**
-(2026-11-25), an update through Store → Updates and `apt`; the images below are still
+The latest release is **[0.8.9.6.2-beta](https://github.com/lordbasex/LordOS/releases/tag/v0.8.9.6.2-beta)**
+(2026-11-28), an update through Store → Updates and `apt`; the images below are still
 [0.8.9-beta](https://github.com/lordbasex/LordOS/releases/tag/v0.8.9-beta)'s (2026-11-18). Releases are signed and published on [GitHub Releases](https://github.com/lordbasex/LordOS/releases)
 and on [lordos.org](https://lordos.org/#download). Before you download, see
 [what LordOS needs](https://lordos.org/requirements/) and

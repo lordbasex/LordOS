@@ -6,7 +6,7 @@ No es un cliente nativo de ningún servicio. **LordOS no cambia los sitios ni su
 
 [[shot:6]]
 
-Es nuevo en **LordOS 0.8.8.8**, publicada el 12 de noviembre de 2026; el último lanzamiento es la 0.8.9.6.1. Vive en un paquete opcional, `lordos-web`: sin él, el resto de LordOS funciona igual, y la Tienda lo instala por vos con tu primera app web.
+Es nuevo en **LordOS 0.8.8.8**, publicada el 12 de noviembre de 2026; el último lanzamiento es la 0.8.9.6.2. Vive en un paquete opcional, `lordos-web`: sin él, el resto de LordOS funciona igual, y la Tienda lo instala por vos con tu primera app web.
 
 [[figure:web-runtime]]
 
@@ -61,7 +61,7 @@ Un **perfil** es una cuenta aparte de la misma app: la personal y la del trabajo
 
 ## Privacidad y seguridad
 
-- **Un proceso por app y perfil.** Cada perfil de cada app corre en su propio proceso `lord-web`, y solo `lord-server` lo arranca, desde una ruta fija, con una app y un perfil que revisó antes. Un cuelgue o un error afecta solo a esa ventana.
+- **Un proceso por app y perfil.** Cada perfil de cada app corre en su propio proceso `lord-web`, y solo `lord-server` lo arranca, desde una ruta fija, con una app y un perfil que revisó antes. Un cuelgue o un error afecta solo a esa ventana. *Desde la 0.8.9.6.2:* LordOS revisa cada 15 segundos que cada app web siga respondiendo, y al instante cuando abrís una que ya corre; una que se cuelga se reinicia sola (te llega una notificación), una página colgada recibe un proceso web nuevo, y Ajustes → Apps web tiene Reiniciar, Forzar salida y **Reiniciar el motor de las apps web**.
 - **La caja de arena de WebKit nunca se apaga.** Los procesos de la página y de red corren dentro de la caja de arena propia de WebKit (bubblewrap y seccomp). `lord-web` se niega a arrancar si alguien intenta apagarla.
 - **Su propia fila en el firewall y sus límites.** Cada app web tiene su propia identidad en el firewall de LordOS y su propia fila en el Monitor, así que la podés permitir o bloquear como a cualquier app. Sus perfiles comparten límites de memoria y CPU a la medida de tu computadora (memoria hasta tres cuartos de la total, entre 1 y 16 GB, y la mitad de los núcleos, al menos dos).
 - **Permisos preguntados una vez por app.** Las notificaciones, la cámara, el micrófono, compartir pantalla y tu ubicación se preguntan la primera vez que la app los necesita, y tu respuesta queda en **Ajustes → Apps web**, donde la podés cambiar (Permitir, Preguntar, Denegar). Solo las páginas propias de la app los reciben: una página de inicio de sesión de otro sitio, o un marco de otro origen, queda denegada y nunca se pregunta por ella.
@@ -77,7 +77,7 @@ A WPE WebKit le faltan varias cosas que un navegador hace por vos, así que `lor
 - **Copiar y pegar en los dos sentidos**, texto en cualquier idioma, **imágenes** (una imagen que copiaste se pega en un chat; una página puede copiar una imagen a tu portapapeles) y **archivos** (copiás en Archivos y pegás en la app web).
 - **Arrastrar archivos** desde Archivos a la página, como en un navegador: también funcionan las páginas de chat que muestran una zona para soltar cuando llega un archivo.
 - **El menú Edición** en la barra de menú: Deshacer, Rehacer, Cortar, Copiar, Pegar y Seleccionar todo. Ajustes… en el menú de la app abre los ajustes de esa app, y Ayuda abre el sitio en tu navegador.
-- **El menú del clic derecho propio de LordOS**: Cortar, Copiar, Pegar, Seleccionar todo, Copiar dirección del enlace, Abrir enlace en el navegador y Copiar imagen, según lo que haya bajo el puntero. Una página con su propio menú (una pizarra, un editor) lo conserva.
+- **El menú del clic derecho propio de LordOS**: Cortar, Copiar, Pegar, Seleccionar todo, Copiar dirección del enlace, Abrir enlace en el navegador y Copiar imagen, según lo que haya bajo el puntero. Una página con su propio menú (una pizarra, un editor) lo conserva. *Desde la 0.8.9.6.2:* el menú sigue al de Chrome. Sobre texto seleccionado: Copiar, Copiar enlace al texto destacado, Buscar “…” en la web (Google, DuckDuckGo, Bing o Startpage, elegido en Ajustes → Apps web; solo se envía el texto seleccionado, en tu navegador) y Habla, que lo lee en voz alta con las voces de LordOS. En un campo de texto: sugerencias de ortografía (la corrección ortográfica ahora está activa, en tu idioma y en inglés), Ignorar ortografía, Agregar al diccionario, Deshacer, Rehacer, Cortar, Copiar, Pegar, Pegar como texto sin formato (Ctrl+Shift+V), Seleccionar todo y Emoji. En imágenes y videos: Abrir, Guardar como…, Copiar y la dirección; Reproducir, Silenciar, Repetir y Mostrar controles. En la página: Atrás, Adelante y Volver a cargar; e Inspeccionar mientras el modo desarrollador está activo. Imprimir y Traducir no se ofrecen: el motor todavía no puede imprimir y LordOS no tiene traductor.
 - Recargá con Ctrl+R o F5, andá para atrás y para adelante con Alt+Izquierda/Derecha o los botones laterales del mouse, y hacé zoom con Ctrl+más, menos y 0. Los enlaces a otros sitios se abren en tu navegador; las descargas van a tu carpeta Descargas con una notificación.
 
 [[shot:8]]
@@ -94,7 +94,7 @@ Las apps web siguen el modo claro u oscuro del escritorio, en vivo: cambiá el M
 
 [[shot:12]]
 
-**La Identidad del navegador de cada perfil** (desde la 0.8.8.9): los sitios deciden qué mostrar según el navegador con el que creen hablar, así que cada perfil puede decirles Chrome en Linux, tal como lo dice Chrome (lo predeterminado), Edge en Linux (para los sitios de oficina, correo y chat de equipo de su fabricante), Firefox en Linux o el nombre propio de WebKit de LordOS (el que usaban todas las apps). Se elige de una lista corta en Ajustes → Apps web o en *Identidad del navegador* del menú de la app (Lord Flow), nunca escribiéndolo, y una ventana abierta vuelve a cargar su página con él. LordOS sigue usando su propio motor diga lo que diga el nombre. Algunos sitios revisan el navegador y lo rechazan si algo no coincide; si un sitio lo rechaza o falla, elegí otra identidad, como LordOS (WebKit). Un sitio que ya vinculó tu computadora, como una app de mensajería, conserva el nombre que vio hasta que la vincules de nuevo.
+**La Identidad del navegador de cada perfil** (desde la 0.8.8.9): los sitios deciden qué mostrar según el navegador con el que creen hablar, así que cada perfil puede decirles Chrome en Linux, tal como lo dice Chrome (lo predeterminado), Edge en Linux (para los sitios de oficina, correo y chat de equipo de su fabricante), Firefox en Linux o el nombre propio de WebKit de LordOS (el que usaban todas las apps). Se elige de una lista corta en Ajustes → Apps web o en *Identidad del navegador* del menú de la app (Flow), nunca escribiéndolo, y una ventana abierta vuelve a cargar su página con él. LordOS sigue usando su propio motor diga lo que diga el nombre. Algunos sitios revisan el navegador y lo rechazan si algo no coincide; si un sitio lo rechaza o falla, elegí otra identidad, como LordOS (WebKit). Un sitio que ya vinculó tu computadora, como una app de mensajería, conserva el nombre que vio hasta que la vincules de nuevo.
 
 ## Herramientas para desarrolladores web
 

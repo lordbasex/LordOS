@@ -4,8 +4,9 @@
 // See docs/EDITOR.md.
 import {
   View, Text, TextInput, Button, ScrollView, ToolbarButton, direction, useTheme, useLocale, useAppWindow, useKeyboard, wm, fs, formatBytes, addListener, hasTextFocus, print, speechItems, registerSelection, ContextMenu, settings, useSettings,
-  useSidebar, SidebarToggle, SidebarOverlay,
+  useSidebar, SidebarToggle, SidebarOverlay, SkinRegion, useSkinned,
 } from '@lordos/sdk';
+import { editorViewModel, skinCommand } from './skinmodel.js';
 import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { Doc, cursorAt, hasSel, selStart, selEnd } from './buffer.js';
 import { LANGUAGES, languageFor, languageById, paletteFor } from './syntax.js';
@@ -164,7 +165,7 @@ function Picker({ t, title, placeholder, items, onPick, onCancel, render = (x) =
       <View onClick={(e) => e.stopPropagation()} style={{ marginTop: 30, width: 480, maxWidth: '92%', padding: 12, gap: 8, borderRadius: 12,
         backgroundColor: t.windowBg, border: `1px solid ${t.separator}`, boxShadow: '0 16px 40px rgba(0,0,0,0.45)' }}>
         {title && <Text style={{ fontSize: 11, fontWeight: 600, color: t.textDim, marginLeft: 4 }}>{title}</Text>}
-        <TextInput key={focused ? 'on' : 'off'} value={q} onChange={(v) => { setQ(v); setSel(0); }} placeholder={placeholder} autoFocus onCancel={onCancel}
+        <TextInput spellCheck={false} key={focused ? 'on' : 'off'} value={q} onChange={(v) => { setQ(v); setSel(0); }} placeholder={placeholder} autoFocus onCancel={onCancel}
           onSubmit={() => shown[sel] && onPick(shown[sel])}
           onKeyDown={(e) => {
             if (e.key === 'ArrowDown') { setSel((s) => Math.min(shown.length - 1, s + 1)); return true; }
@@ -474,6 +475,24 @@ export default function Editor() {
   const col = [...doc.line(k.l).slice(0, k.c).replace(/\t/g, ' '.repeat(tab.tabSize))].length + 1;
   const nsel = doc.cursors.filter(hasSel).reduce((n, x) => n + doc.textIn(selStart(x), selEnd(x)).length, 0);
   const editorOverlay = !!overlay;
+  // (0.8.9.6.2) app skins (docs/THEMES-GUIDE.md, "App skins → Text Editor"): the tabs, a toolbar, the status bar and the
+  // context menu may be a theme's; the text and the dialogs never are
+  const skinned = useSkinned('editor');
+  const CMD_LABEL = { new: 'editor.cmd.new', open: 'editor.cmd.open', openFolder: 'editor.cmd.openFolder', save: 'editor.cmd.save', saveAs: 'editor.cmd.saveAs',
+    close: 'editor.cmd.close', print: 'editor.cmd.print', undo: 'editor.cmd.undo', redo: 'editor.cmd.redo', cut: 'editor.cmd.cut', copy: 'editor.cmd.copy',
+    paste: 'editor.cmd.paste', selectAll: 'editor.cmd.selectAll', find: 'editor.cmd.find', findNext: 'editor.cmd.findNext', gotoLine: 'editor.cmd.gotoLine',
+    gotoFile: 'editor.cmd.gotoFile', language: 'editor.cmd.language', toggleProject: 'editor.cmd.toggleProject' };
+  const vm = skinned ? editorViewModel({
+    tabs: tabs.map((x) => ({ id: x.id, name: x.path ? baseName(x.path) : tr('editor.untitled'), dirty: x.doc.dirty, active: x.id === tab.id })),
+    status: { line: primary.l + 1, col, cursors: doc.cursors.length, selected: nsel, language: lang.id === 'plain' ? tr('editor.plain') : lang.name,
+      indent: tab.useTabs ? tr('editor.status.tabs', { n: tab.tabSize }) : tr('editor.status.spaces', { n: tab.tabSize }), eol: doc.eol === '\n' ? 'LF' : 'CRLF', message: msg },
+    label: (id) => tr(CMD_LABEL[id]),
+  }, {
+    selectTab: (key) => { if (tabs.some((x) => x.id === key)) setActiveId(key); },
+    closeTab: (key) => { const x = tabs.find((y) => y.id === key); if (x) closeTab(x); },
+    command: (id) => { const c = skinCommand(id); if (c) run(c); },
+    menu: (ev) => { if (ev && typeof ev.local === 'function') onContextMenu(ev); },
+  }) : null;
 
   // files dragged from Files: a file opens in a tab, a folder becomes the project
   const dropFiles = (paths) => {
@@ -507,7 +526,9 @@ export default function Editor() {
         </View>
       )}
       <View ref={column} style={{ flex: 1 }}>
+        <SkinRegion app="editor" region="toolbar" model={vm} />
         {/* tabs */}
+        <SkinRegion app="editor" region="tabBar" model={vm}>
         <View style={{ height: 34, flexDirection: 'row', backgroundColor: t.sidebarBg, direction: 'ltr', overflow: 'hidden' }}>
           <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 1, backgroundColor: t.separator }} />
           {sb.narrow && root !== null && (
@@ -527,14 +548,21 @@ export default function Editor() {
             );
           })}
         </View>
+        </SkinRegion>
         <EditorView key={tab.id} doc={doc} lang={lang} t={t} palette={palette} settings={{ tabSize: tab.tabSize, useTabs: tab.useTabs }}
           matches={find.open ? found.list.map((m, i) => ({ ...m, current: i === current })) : null}
           onChange={bump} onCommand={onCommand} apiRef={api} overlay={editorOverlay} onContextMenu={onContextMenu} />
         {find.open && <FindBar t={t} tr={tr} find={find} setFind={setFind} count={found.list.length} current={current} error={found.error}
           onNext={nextMatch} onPrev={prevMatch} onReplace={replaceOne} onReplaceAll={replaceAll} onClose={() => setFind((f) => ({ ...f, open: false }))} />}
-        {ctx && <ContextMenu x={ctx.x} y={ctx.y} items={ctx.items} onClose={() => setCtx(null)}
-          bounds={column.current ? { w: lord.getLayout(column.current.id)[2], h: lord.getLayout(column.current.id)[3] } : undefined} />}
+        {ctx && (
+          <SkinRegion app="editor" region="contextMenu" model={{ x: ctx.x, y: ctx.y, items: ctx.items, close: () => setCtx(null),
+            bounds: column.current ? { w: lord.getLayout(column.current.id)[2], h: lord.getLayout(column.current.id)[3] } : { w: 800, h: 600 } }}>
+            <ContextMenu x={ctx.x} y={ctx.y} items={ctx.items} onClose={() => setCtx(null)}
+              bounds={column.current ? { w: lord.getLayout(column.current.id)[2], h: lord.getLayout(column.current.id)[3] } : undefined} />
+          </SkinRegion>
+        )}
         {/* status bar */}
+        <SkinRegion app="editor" region="statusBar" model={vm}>
         <View style={{ height: 26, flexDirection: 'row', alignItems: 'center', gap: sb.narrow ? 10 : 16, paddingHorizontal: sb.narrow ? 10 : 14, backgroundColor: t.sidebarBg,
           direction: 'ltr' }}>
           <View style={{ position: 'absolute', left: 0, right: 0, top: 0, height: 1, backgroundColor: t.separator }} />
@@ -555,6 +583,7 @@ export default function Editor() {
             <Text style={{ fontSize: 11, color: t.text }}>{doc.eol === '\n' ? 'LF' : 'CRLF'}</Text>
           </View>
         </View>
+        </SkinRegion>
       </View>
 
       {sb.narrow && sb.shown && project && <SidebarOverlay width={240} onClose={sb.close}>{project}</SidebarOverlay>}

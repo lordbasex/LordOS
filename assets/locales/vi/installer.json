@@ -128,5 +128,6 @@
   "user.user": "Tên người dùng",
   "user.userHint": "Chữ thường, số, - và _. Người dùng này sẽ là quản trị viên (sudo).",
   "welcome.text": "Trình hướng dẫn này cài đặt LordOS lên ổ đĩa của máy tính này. Bạn sẽ chọn ngôn ngữ, bàn phím, ổ đĩa và người dùng. Việc cài đặt sẽ xóa ổ đĩa đã chọn, trừ khi bạn cài bên cạnh nội dung hiện có hoặc tự chọn phân vùng.",
-  "welcome.title": "Chào mừng đến với LordOS"
+  "welcome.title": "Chào mừng đến với LordOS",
+  "disk.unreadable": "Không đọc được mô tả của một ổ đĩa nên nó không có trong danh sách. Hãy tìm lại; nếu vẫn thiếu, vui lòng báo cho chúng tôi."
 }

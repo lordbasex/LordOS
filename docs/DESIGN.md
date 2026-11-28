@@ -176,7 +176,7 @@ the shell's confirmation and power sheets) their shape through tokens next to th
 (`sdk/theme.js`, `DEFAULT_TOKENS`). Apps don't read them: they use the controls, so every app takes
 the theme's look without changes, and isolated apps receive the same tokens through the broker.
 
-| Token | Lord Flow | Lord Classic | What it changes |
+| Token | Flow | Classic | What it changes |
 |---|---|---|---|
 | `controlRadius` / `controlRadiusSmall` | 7 / 6 | 4 / 4 | `Button`, `TextInput`, `SearchField`, `Segmented`, `Stepper`, toolbar buttons, sidebar rows, pop-up buttons |
 | `groupRadius` | 10 | 6 | `GroupBox`, Settings' sections and page headers, dialogs (+2) |
@@ -191,7 +191,7 @@ the theme's look without changes, and isolated apps receive the same tokens thro
 Control heights, spacing and the type scale stay the same in both themes, so layouts don't move
 when the user switches.
 
-## Lord Classic
+## Classic
 
 The second full appearance (0.8.3), for people used to a taskbar layout. Same apps, same SDK; only
 the frame, the shell and the tokens above change. Our own design: drawn icons (`themes/classic/glyphs.jsx`),
@@ -210,7 +210,7 @@ Inter, the LordOS wallpapers and LordOS names, no assets or names from any other
 | ![rtl](classic/shell-rtl-dark.png) | ![switch](classic/shell-switch-dark.png) |
 | Arabic: the taskbar and the frame mirror | Settings → Appearance → Desktop style |
 | ![before](classic/shell-before-start-dark.png) | ![after](classic/shell-start-light.png) |
-| Before (0.8.2): the Lord Classic template | After: the start menu in light mode |
+| Before (0.8.2): the Classic template | After: the start menu in light mode |
 | ![files rtl](classic/files-classic-rtl.png) | ![settings rtl](classic/settings-classic-rtl.png) |
 | Files in Arabic | Settings in Arabic: the selection bar on the leading edge |
 
@@ -218,14 +218,14 @@ Inter, the LordOS wallpapers and LordOS names, no assets or names from any other
   44 × 34 px minimize, maximize/restore and close buttons at the end (close turns red on hover);
   corners of 8 px, square when maximized or snapped; the focused window has a stronger border and
   shadow. In right-to-left languages the engine mirrors the row (buttons at the start).
-- **Menus inside the window (0.8.5):** Lord Classic has no menu bar on top, so an app that declares
+- **Menus inside the window (0.8.5):** Classic has no menu bar on top, so an app that declares
   menus (`useAppMenus`: Files, Text Editor, Notes, Terminal, PDF Viewer, Photos, Screenshots, Mail,
   Passwords) shows them in a 26 px strip under its title bar (File, Edit, View, Go…, then Window and
   Help, one menu open at a time; `MenuStrip` in `themes/classic/components/Window.jsx`). Apps without
   menus of their own get no strip. Help holds About <app>; the Window menu is the same in both themes
   (`windowMenuItems`, `sdk/windowmenu.js`: Minimize, Zoom, Fill, Center, Move & Resize, Move to
   <display>, Bring All to Front and the open windows), and the app menu and Force Quit come from
-  `sdk/appcontrol.js` (Lord Flow shows them under the app's name and in the crown menu).
+  `sdk/appcontrol.js` (Flow shows them under the app's name and in the crown menu).
 - **Taskbar:** 48 px (56 px wide on the left or right), a translucent material with the theme's
   blur (none with Transparency off). Buttons are 40 × 40 with a 6 px radius; the running app has a
   short pill below its icon, longer and in the accent color when it is in front. Tooltips after
@@ -235,7 +235,7 @@ Inter, the LordOS wallpapers and LordOS names, no assets or names from any other
   (`panelFoot`) for the user and power or the battery and Settings.
 - **Quick settings tiles:** 48 px high, accent fill when on, a chevron segment that opens the
   matching Settings page. The glyphs (moon, sun, contrast, layers, Bluetooth, signal bars) are the SDK's
-  (`sdk/quickglyphs.jsx`), shared with Lord Flow's Control Center (issue #114). A brightness row appears above the
+  (`sdk/quickglyphs.jsx`), shared with Flow's Control Center (issue #114). A brightness row appears above the
   volume when LordOS can set a backlight.
 - **Shortcuts:** Super alone opens the start menu; Super+arrows snap the window in front; Super+Tab
   is the Overview; Super+A quick settings; Super+N notifications; Alt+F4 closes the window in front.
@@ -245,7 +245,7 @@ Every app in both themes, dark and light, is in [`docs/classic/`](classic/) (`<a
 right-to-left samples (`files`, `settings`, `calculator`, `notes`, `mail`: `<app>-<theme>-rtl.png`)
 and the shell (`shell-*.png`; `shell-before-*.png` is the 0.8.2 template).
 
-| Lord Classic | Lord Flow |
+| Classic | Flow |
 |---|---|
 | ![](classic/settings-classic-light.png) | ![](classic/settings-default-light.png) |
 | ![](classic/mail-classic-dark.png) | ![](classic/mail-default-dark.png) |
@@ -273,7 +273,7 @@ Every scrolling area uses the SDK's `ScrollView`, which draws an **overlay scrol
   The fade changes only the thumb's opacity with `lord.setStyle` (no React render per frame).
 - **Direction and themes:** the bar is on the end edge (`end`), so on the left in right-to-left
   languages. The theme styles it with the optional tokens `scrollThumb`, `scrollThumbHover`,
-  `scrollRadius` and `scrollThumbBorder` (a pill in Lord Flow; the Lord Classic theme's is squarer and
+  `scrollRadius` and `scrollThumbBorder` (a pill in Flow; the Classic theme's is squarer and
   solid with a hairline). `ThemeProvider` passes the setting (`scrollBars`) and `reduceMotion` with
   the tokens, so isolated apps follow them too.
 - **New content starts at the top (0.8.8.3):** a view that shows one page out of several (a Store

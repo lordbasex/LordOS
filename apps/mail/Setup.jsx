@@ -4,10 +4,13 @@
 import { View, Text, useTheme, useStore, Button, TextInput, Segmented, Toggle, ScrollView, t, mailAccounts, mailStatus, mailConfig, autoconfig, OAUTH_PROVIDERS, DAV_PRESETS, davPreset } from '@lordos/sdk';
 import { useEffect, useState } from 'react';
 
-export function Sheet({ children, onClose, width = 460 }) {
+// handsDeny: every sheet of this file (adding an account, its servers and password, trusting a certificate, the
+// accounts panel) is the person's own, never an AI agent's (docs/HANDS.md; security scan 0.8.9.6.2, F3). Isolated,
+// Mail draws in its own process, so lord-server's broker refuses the save itself too (brokermail.c).
+export function Sheet({ children, onClose, width = 460, handsDeny = false }) {
   const th = useTheme();
   return (
-    <View onMouseDown={(e) => { e.stopPropagation?.(); }} style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.32)', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}>
+    <View handsDeny={handsDeny || undefined} onMouseDown={(e) => { e.stopPropagation?.(); }} style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.32)', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}>
       <View onClick={(e) => e.stopPropagation?.()} style={{ width, maxWidth: '94%', maxHeight: '92%', padding: 18, gap: 10, borderRadius: 14, backgroundColor: th.windowBg,
         border: `1px solid ${th.separator}`, boxShadow: '0 20px 50px rgba(0,0,0,0.45)' }}>
         {children}
@@ -33,8 +36,8 @@ function ServerFields({ value, onChange, label }) {
   return (
     <View style={{ gap: 6 }}>
       <Text style={{ fontSize: 12, fontWeight: 600, color: th.text }}>{label}</Text>
-      <Field label={t('mail.setup.server')}><TextInput value={value.host} onChange={(host) => onChange({ ...value, host })} placeholder="imap.example.com" /></Field>
-      <Field label={t('mail.setup.port')}><TextInput value={String(value.port || '')} onChange={(p) => onChange({ ...value, port: Number(p.replace(/\D/g, '')) || 0 })} /></Field>
+      <Field label={t('mail.setup.server')}><TextInput spellCheck={false} value={value.host} onChange={(host) => onChange({ ...value, host })} placeholder="imap.example.com" /></Field>
+      <Field label={t('mail.setup.port')}><TextInput spellCheck={false} value={String(value.port || '')} onChange={(p) => onChange({ ...value, port: Number(p.replace(/\D/g, '')) || 0 })} /></Field>
       <Field label={t('mail.setup.security')}>
         <Segmented options={opts} value={value.security} onChange={(security) => onChange({ ...value, security, port: value.port === 993 || value.port === 143 ? (security === 'ssl' ? 993 : 143) : value.port === 465 || value.port === 587 ? (security === 'ssl' ? 465 : 587) : value.port })} />
       </Field>
@@ -89,16 +92,16 @@ function DavFields({ dav, setDav, preset }) {
           <Text style={{ fontSize: 12, color: th.text }}>{t('mail.setup.davAppPassword', { name: p.name })}</Text>
           {p.appPassword ? <Text style={{ fontSize: 11, color: th.accent }}>{p.appPassword}</Text> : null}
         </View>
-        <Field label={t('mail.setup.davAccountEmail')}><TextInput value={dav.user} onChange={(user) => setDav({ ...dav, user })} placeholder={t('mail.setup.emailPh')} /></Field>
+        <Field label={t('mail.setup.davAccountEmail')}><TextInput spellCheck={false} value={dav.user} onChange={(user) => setDav({ ...dav, user })} placeholder={t('mail.setup.emailPh')} /></Field>
         {toggles}
       </View>
     );
   }
   return (
     <View style={{ gap: 8 }}>
-      <Field label={t('mail.setup.url')}><TextInput value={dav.url} onChange={(url) => setDav({ ...dav, url })} placeholder="https://cloud.example.com/remote.php/dav" /></Field>
-      <Field label={t('mail.setup.cardUrl')}><TextInput value={dav.carddav} onChange={(carddav) => setDav({ ...dav, carddav })} placeholder={t('mail.setup.cardUrlPh')} /></Field>
-      <Field label={t('mail.setup.user')}><TextInput value={dav.user} onChange={(user) => setDav({ ...dav, user })} /></Field>
+      <Field label={t('mail.setup.url')}><TextInput spellCheck={false} value={dav.url} onChange={(url) => setDav({ ...dav, url })} placeholder="https://cloud.example.com/remote.php/dav" /></Field>
+      <Field label={t('mail.setup.cardUrl')}><TextInput spellCheck={false} value={dav.carddav} onChange={(carddav) => setDav({ ...dav, carddav })} placeholder={t('mail.setup.cardUrlPh')} /></Field>
+      <Field label={t('mail.setup.user')}><TextInput spellCheck={false} value={dav.user} onChange={(user) => setDav({ ...dav, user })} /></Field>
       {toggles}
     </View>
   );
@@ -190,7 +193,7 @@ export function AccountSetup({ onClose, kind: kind0 = 'mail', preset: preset0 = 
   const title = kind === 'dav' ? t('mail.setup.titleDav') : t('mail.setup.title');
   const failed = step === 'result' && !!created && (result === 'auth' || result === 'offline' || result === 'cert');
   return (
-    <Sheet>
+    <Sheet handsDeny>
       <Text style={{ fontSize: 17, fontWeight: 700, color: th.text }}>{title}</Text>
       {step === 'who' && (
         <View style={{ gap: 8 }}>
@@ -202,7 +205,7 @@ export function AccountSetup({ onClose, kind: kind0 = 'mail', preset: preset0 = 
           )}
           {!davBlocked && <Field label={t('mail.setup.name')}><TextInput value={name} onChange={setName} placeholder={kind === 'dav' ? (pre.id === 'other' ? t('mail.setup.davNamePh') : `${pre.name} — ${t('mail.setup.calContacts')}`) : t('mail.setup.namePh')} autoFocus /></Field>}
           {kind === 'mail' ? (
-            <Field label={t('mail.setup.email')}><TextInput value={email} onChange={setEmail} placeholder={t('mail.setup.emailPh')} onSubmit={next} /></Field>
+            <Field label={t('mail.setup.email')}><TextInput spellCheck={false} value={email} onChange={setEmail} placeholder={t('mail.setup.emailPh')} onSubmit={next} /></Field>
           ) : <DavFields dav={dav} setDav={setDav} preset={preset} />}
           {!davBlocked && <Field label={kind === 'dav' && pre.id !== 'other' ? t('mail.setup.appSpecificPassword') : t('mail.setup.password')}><TextInput value={pw} onChange={setPw} secure onSubmit={next} /></Field>}
           {!davBlocked && <Text style={{ fontSize: 11, color: th.textDim }}>{t('mail.setup.keyringNote')}</Text>}
@@ -238,7 +241,7 @@ export function AccountSetup({ onClose, kind: kind0 = 'mail', preset: preset0 = 
             </View>
             {manual && (
               <>
-                <Field label={t('mail.setup.user')}><TextInput value={cfg.user} onChange={(user) => setCfg({ ...cfg, user })} /></Field>
+                <Field label={t('mail.setup.user')}><TextInput spellCheck={false} value={cfg.user} onChange={(user) => setCfg({ ...cfg, user })} /></Field>
                 <ServerFields label={t('mail.setup.incoming')} value={cfg.imap} onChange={(imap) => setCfg({ ...cfg, imap })} />
                 <ServerFields label={t('mail.setup.outgoing')} value={cfg.smtp} onChange={(smtp) => setCfg({ ...cfg, smtp })} />
               </>
@@ -279,7 +282,7 @@ export function CertDialog({ cert, onClose }) {
     </View>
   );
   return (
-    <Sheet width={520}>
+    <Sheet width={520} handsDeny>
       <Text style={{ fontSize: 16, fontWeight: 700, color: '#ff453a' }}>{t('mail.cert.title')}</Text>
       <Text style={{ fontSize: 13, color: th.text }}>{t('mail.cert.body', { host: `${cert.host}:${cert.port}` })}</Text>
       <View style={{ padding: 10, borderRadius: 8, backgroundColor: th.control, gap: 3 }}>
@@ -311,7 +314,7 @@ export function PasswordPrompt({ acct, onClose }) {
   };
   if (notSaved) {
     return (
-      <Sheet>
+      <Sheet handsDeny>
         <Text style={{ fontSize: 16, fontWeight: 700, color: th.text }}>{t('mail.password.title')}</Text>
         <Text style={{ fontSize: 13, color: th.textDim }}>{keyringNote(notSaved)}</Text>
         <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 8 }}>
@@ -321,7 +324,7 @@ export function PasswordPrompt({ acct, onClose }) {
     );
   }
   return (
-    <Sheet>
+    <Sheet handsDeny>
       <Text style={{ fontSize: 16, fontWeight: 700, color: th.text }}>{t('mail.password.title')}</Text>
       <Text style={{ fontSize: 13, color: th.textDim }}>{t('mail.password.body', { user: a?.user || acct })}</Text>
       <TextInput value={pw} onChange={setPw} secure autoFocus onSubmit={go} onCancel={onClose} />
@@ -357,7 +360,7 @@ export function AccountsPanel({ onClose, onAdd, onPassword, initial = null, conf
   };
   if (confirm && a) {
     return (
-      <Sheet width={420}>
+      <Sheet width={420} handsDeny>
         <Text style={{ fontSize: 16, fontWeight: 700, color: th.text }}>{t('mail.accounts.removeTitle', { name: a.name || a.email || a.user })}</Text>
         <Text style={{ fontSize: 13, color: th.textDim }}>{t(a.kind === 'dav' ? 'mail.accounts.removeBodyDav' : 'mail.accounts.removeBody')}</Text>
         <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 8, marginTop: 4 }}>
@@ -368,7 +371,7 @@ export function AccountsPanel({ onClose, onAdd, onPassword, initial = null, conf
     );
   }
   return (
-    <Sheet width={620}>
+    <Sheet width={620} handsDeny>
       <Text style={{ fontSize: 17, fontWeight: 700, color: th.text }}>{t('mail.accounts.title')}</Text>
       <View style={{ flexDirection: 'row', gap: 12, height: 300 }}>
         <View style={{ width: 200, gap: 2, backgroundColor: th.sidebarBg, borderRadius: 8, padding: 6 }}>

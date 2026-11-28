@@ -136,7 +136,7 @@ await flush();
 
 // the Window menu's tiling layouts, and each theme's own snap items in its title bar's menu
 const MOVE = sdk.t('shell.window.moveResize');
-// Lord Celeste's menu flattens the Window menu's submenus (classic/components/Menu.jsx): the halves' header shows
+// Celeste's menu flattens the Window menu's submenus (classic/components/Menu.jsx): the halves' header shows
 const own = { classic: sdk.t('shell.classic.snapLeft'), workspaces: sdk.t('shell.ws.snapfly.open'), celeste: sdk.t('shell.window.section.halves') }[theme];
 const c = sdk.wm.open('files', { frame: { x: 300, y: 200, w: 600, h: 400 }, args: { csd: true } });
 await flush();

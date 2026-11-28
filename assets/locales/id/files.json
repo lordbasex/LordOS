@@ -92,7 +92,7 @@
   "menu.emptyTrash": "Kosongkan Sampah",
   "menu.file": "Berkas",
   "menu.forward": "Maju",
-  "menu.getInfo": "Lihat Info",
+  "menu.getInfo": "Properti",
   "menu.go": "Buka",
   "menu.groupBy": "Kelompokkan menurut",
   "menu.newFolder": "Folder Baru",
@@ -334,5 +334,9 @@
   "readOnly.denied": "Folder ini hanya-baca: izinnya tidak memperbolehkan Anda mengubahnya. Untuk mengubahnya, gunakan Terminal atau aplikasi lain.",
   "fromMachineNoRun": "“{name}” berasal dari mesin {machine}. Berkas tidak membuka program atau penginstal dari mesin: gunakan Buka Dengan jika Anda memercayainya.",
   "info.from": "Asal",
-  "info.fromMachine": "Mesin {machine}"
+  "info.fromMachine": "Mesin {machine}",
+  "skin.address": "Alamat",
+  "skin.tasks": "Tugas File dan Folder",
+  "skin.otherPlaces": "Tempat Lain",
+  "skin.details": "Detail"
 }

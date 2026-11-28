@@ -233,7 +233,8 @@ static int has_word(const char *s, const char *w) {
 const char *lordlog_level(const char *msg) {
     static const char *const err[] = { "error", "fail", "fatal", "abort", "crash", "segfault", "panic", "assertion", NULL };
     static const char *const warn[] = { "warn", "could not", "cannot", "can't", "unable", "not started", "refused", "denied",
-                                        "ignored", "timed out", "timeout", "missing", NULL };
+                                        "ignored", "timed out", "timeout", "missing", "stopped responding", "not responding",
+                                        "did not answer", NULL };
     for (int i = 0; err[i]; i++) if (has_word(msg, err[i])) return "ERROR";
     if (strstr(msg, "Error")) return "ERROR";        /* TypeError, ReferenceError, … */
     for (int i = 0; warn[i]; i++) if (has_word(msg, warn[i])) return "WARN";
@@ -423,6 +424,9 @@ static void copier(int in, Out *o) {
 static int start(Out *outs, int nout, int raw, const char *scan_dir, int also_stdout, int copy) {
     int p[2];
     if (pipe2(p, O_CLOEXEC)) return -1;
+    /* room for a burst (WebKit's processes at a crash, a JS stack) while the child writes the file: a writer waits on
+     * the pipe only when the disk itself stalls. The default 64 KB if the kernel says no */
+    if (fcntl(p[1], F_SETPIPE_SZ, 1 << 20) < 0) { /* kept as it is */ }
     tzset();
     fflush(stdout);
     fflush(stderr);
@@ -503,14 +507,23 @@ int lordlog_system_start(const char *name) {
     return 0;
 }
 
-int lordlog_app_start(const char *sub, const char *name) {
+/* stderr taken over when it is <dir>/<sub>/<name>.log itself (the parent opened it): then it is the only writer's way in */
+static int take_stderr(const char *sub, const char *name, const char *dflt, int copy) {
     static Out out;
-    out = (Out){ .fd = -1, .dflt = "app" };
-    if (lordlog_path(sub, name, out.path, sizeof out.path)) return -1;
+    out = (Out){ .fd = -1, .dflt = dflt };
     struct stat a, b;
-    /* only when stderr is that very file (app_spawn opened it): then it is the only writer's way in */
-    if (fstat(2, &a) || lstat(out.path, &b) || !S_ISREG(a.st_mode) || !S_ISREG(b.st_mode) ||
+    /* a stderr that is no file (a terminal, a test's pipe) is left alone before anything else: lordlog_path makes the
+     * log folders, which a throwaway HOME must not get (web_probe_test.py) */
+    if (fstat(2, &a) || !S_ISREG(a.st_mode)) return -1;
+    if (lordlog_path(sub, name, out.path, sizeof out.path)) return -1;
+    if (lstat(out.path, &b) || !S_ISREG(b.st_mode) ||
         a.st_dev != b.st_dev || a.st_ino != b.st_ino) return -1;
     out.fd = 2;
-    return start(&out, 1, -1, NULL, 1, 1);
+    return start(&out, 1, -1, NULL, 1, copy);
+}
+
+int lordlog_app_start(const char *sub, const char *name) { return take_stderr(sub, name, "app", 1); }
+
+int lordlog_stamp_start(const char *sub, const char *name, const char *dflt) {
+    return dflt && lordlog_name_ok(dflt) ? take_stderr(sub, name, dflt, 0) : -1;
 }

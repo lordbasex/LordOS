@@ -34,6 +34,14 @@ export function offers2d(why) { return why === 'qemu-3d-crash'; }
 // vmlog_3d_abort_end). A restart that aborts again right after the start comes back as 'qemu-3d-crash' instead
 export function restartsAgain(state, reason) { return state === 'stopped' && reason === 'reset'; }
 
+// "Close the window when the machine stops" (Configure → Startup, app.json closeOnStop, off by default; GitHub #267): only
+// after a clean stop (the guest shut down, LordOS shut down, Shut Down or Turn Off), never after a failure, so its error
+// stays on screen, and not after the installer's restart (the installed system starts next)
+const CLEAN_STOPS = ['guest-shutdown', 'host-shutdown', 'poweroff'];
+export function closesOnStop(meta, state, reason) {
+  return meta?.closeOnStop === true && state === 'stopped' && CLEAN_STOPS.includes(reason);
+}
+
 // the off card's hint: after the 3D abort with no tools in the guest to say why ('qemu-3d-stop': most likely its own
 // shutdown or restart), what happened and that a restart needs Start; otherwise the usual one
 export function offHint(reason) { return reason === 'qemu-3d-stop' ? 'machines.win.stopped3dHint' : 'machines.win.playHint'; }
@@ -990,7 +998,7 @@ export const machineProtectedOf = (entry, meta, homeProtected = false) =>
 // (xclip or wl-clipboard: lordos-guest's hello said "noclip")
 // shell: the tools start the agent's shell (6.18, tools 8 / w12); links, notify: they pass the guest's links and
 // notifications on, and this machine takes them (6.12); eventlog: a Windows guest's event logs come in (6.19)
-export const AGENT_CAPS = { shutdown: 1, time: 2, exec: 4, files: 8, journal: 16, clipboard: 32, awake: 64, display: 128, windows: 256, transfer: 512, transferSetup: 1024, clipNoTool: 2048, clipLazy: 4096, open: 8192, place: 16384, extra: 32768, extraOff: 65536, shell: 131072, links: 262144, notify: 524288, eventlog: 1048576, toolsDisc: 2097152, send: 4194304 };
+export const AGENT_CAPS = { shutdown: 1, time: 2, exec: 4, files: 8, journal: 16, clipboard: 32, awake: 64, display: 128, windows: 256, transfer: 512, transferSetup: 1024, clipNoTool: 2048, clipLazy: 4096, open: 8192, place: 16384, extra: 32768, extraOff: 65536, shell: 131072, links: 262144, notify: 524288, eventlog: 1048576, toolsDisc: 2097152, send: 4194304, oldLordos: 8388608 };
 // a Windows guest (the system qemu-guest-agent reported): its clipboard and its display's size need the LordOS tools
 // (tools/guest-win), installed from the agent's popover; a Linux guest's size follows QEMU's own display by itself
 export const guestWindows = (agent) => /^windows/i.test(agent?.system || '');
@@ -1054,7 +1062,7 @@ export const discCanCopy = (agent, cfg) => clipTo(cfg?.clipboard || 'off') && !!
 export const clipNeedsTool = (agent, cfg) => agent?.state === 'connected' && clipState(agent, cfg) === 'needsXclip';
 // The LordOS tools this LordOS ships: lordos-guest-win's VERSION (tools/guest-win) and lordos-guest's (tools/guest);
 // vm_model_test checks them against the sources. A connected guest's tools say theirs in their hello (agent.tools)
-export const TOOLS_SHIPPED = { windows: 'w13', linux: '10' };
+export const TOOLS_SHIPPED = { windows: 'w13', linux: '11' };
 const toolsVer = (v) => /^(w?)([0-9]{1,6})$/.exec(String(v || ''));
 // the guest's tools are older than the ones shipped: the agent's popover offers Update, the bar's button gets a dot.
 // "w<n>" is the Windows tools', "<n>" the Linux helper's; anything else (none yet, a newer format) isn't older
@@ -1648,11 +1656,15 @@ export function installError(msg) {
 
 // ---- apps mode (docs/VIRTUALIZATION.md 7.2): each window of the guest as its own LordOS window ----
 
-// Why apps mode can't be turned on now, or null: 'needsAgent' (the machine's agent is off or not connected), 'needsTools'
-// (the guest's helper doesn't list its windows: it needs LordOS or Windows in the machine, with the LordOS tools)
+// Why apps mode can't be turned on now, or null: 'needsAgent' (the machine's agent is off or not connected), 'oldLordos'
+// (the guest runs LordOS older than APPS_GUEST_LORDOS: its tools (11) said "oldlordos"; updating LordOS in the machine
+// is what helps, not the tools), 'needsTools' (the guest's helper doesn't list its windows: it needs LordOS or Windows
+// in the machine, with the LordOS tools)
+export const APPS_GUEST_LORDOS = '0.8.9.5';          // server/src/vm/vmagent.h AG_APPS_LORDOS
 export function appsBlocker(agent, cfg) {
   if (!cfg?.agent || agent?.state !== 'connected') return 'needsAgent';
-  return agent.caps & AGENT_CAPS.windows ? null : 'needsTools';
+  if (agent.caps & AGENT_CAPS.windows) return null;
+  return agent.caps & AGENT_CAPS.oldLordos ? 'oldLordos' : 'needsTools';
 }
 
 // The size the guest is asked for in apps mode: the display's, so its windows are never cut by a smaller screen (even,
@@ -2004,6 +2016,16 @@ export const lordVmWhy = (out) => {
 // A PopMenu's height (apps/machines/ui.jsx: 6 px padding and a 1 px edge on each side, 30 px a row, 11 a separator,
 // about 24 an information row), for placing it before it's drawn
 export const popMenuHeight = (items) => 14 + (items || []).filter(Boolean).reduce((s, it) => s + (it === '-' ? 11 : it.note ? 24 : 30), 0);
+// (QA of 0.8.9.6.2) its width: wide enough for its longest label in the person's language (about 7.4 px a character of
+// the 13 px menu font, the check column and the padding), from min to max
+export const popMenuWidth = (items, min = 232, max = 380) => Math.max(min, Math.min(max,
+  Math.ceil(60 + 7.4 * Math.max(0, ...(items || []).filter((it) => it && it !== '-' && !it.note).map((it) => String(it.label || '').length)))));
+// the box a menu stays in: the work area of the display under the point (no Dock, no menu bar), else the display
+export function menuBounds(display, area) {
+  const d = display || { x: 0, y: 0, w: 0, h: 0 };
+  const a = area && area.w > 0 && area.h > 0 ? area : null;
+  return a ? { x: Math.max(d.x, a.x), y: Math.max(d.y, a.y), w: Math.min(d.x + d.w, a.x + a.w) - Math.max(d.x, a.x), h: Math.min(d.y + d.h, a.y + a.h) - Math.max(d.y, a.y) } : d;
+}
 
 // Where a menu w × h opened at at ({ x, y }: its top-left on the desktop; above: the y its bottom goes to when it opens
 // upwards, the button's top or the pointer) goes on the display b ({ x, y, w, h }, the one under at): below when it

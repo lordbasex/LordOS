@@ -167,6 +167,7 @@
     "other": "{count} att uppdatera"
   },
   "remove": "Ta bort",
+  "removeAsk": "Ta bort {name}?",
   "rescue.ask": "Inget konto på den här datorn är administratör. Om du känner till root-lösenordet kan du göra det här kontot till administratör. Det börjar gälla först efter att datorn har startats om.",
   "rescue.button": "Gör mig till administratör",
   "rescue.noSudo": "Inget konto på den här datorn är administratör, och paketet sudo är inte installerat. Kör apt install sudo som root och försök sedan igen här.",
@@ -233,7 +234,7 @@
   },
   "suggest.nvidiaDriver.detail": "Just nu används nouveau, den fria drivrutinen som ingår i LordOS. Tillverkarens drivrutin ({packages}) ger oftast bättre 3D-prestanda och energihantering.",
   "suggest.nvidiaDriver.note.nouveau": "Tills du installerar den används den fria drivrutinen nouveau; om du tar bort paketet återgår du till den.",
-  "suggest.nvidiaDriver.note.older": "Kort äldre än ungefär 2014 stöds inte av den här drivrutinsversionen; behåll den fria drivrutinen på dem. LordOS skrivbord har inte testats med den här drivrutinen än.",
+  "suggest.nvidiaDriver.note.older": "Kort äldre än ungefär 2014 stöds inte av den här drivrutinsversionen; behåll den fria drivrutinen på dem. LordOS-skrivbordet med den här drivrutinen är experimentellt: en rapport från gemenskapen visar det sammansatt på kortet (ett GTX 1070 med drivrutin 580); en tidigare sammansattes av processorn.",
   "suggest.nvidiaDriver.note.secureBoot": "Drivrutinen byggs för din kärna på den här datorn (DKMS) och igen efter varje kärnuppdatering. Med Secure Boot påslaget måste du registrera dess signeringsnyckel vid nästa omstart, annars läses drivrutinen inte in.",
   "suggest.nvidiaDriver.title": "Proprietär grafikdrivrutin",
   "suggest.nvidiaDriver.unavailable": "Tillverkarens drivrutin behöver Debians komponenter contrib och non-free, och båda är inte aktiverade i den här datorns paketkällor. Den fria drivrutinen, nouveau, fortsätter att fungera.",

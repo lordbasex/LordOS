@@ -1,8 +1,11 @@
-/* wallpaper_admin.c — moving wallpapers on disk (docs/WALLPAPERS.md). Closed actions of the admin helper:
+/* wallpaper_admin.c — catalog wallpapers on disk (docs/WALLPAPERS.md). Closed actions of the admin helper:
  *
- *   wallpaper-get "<id> <variant>"     downloads one file of the catalog to /var/lib/lordos/wallpapers/<sha256>.mp4
+ *   wallpaper-get "<id> <variant>"     downloads one file of the catalog to /var/lib/lordos/wallpapers/<sha256>.mp4 (a
+ *                                      video: codec hevc or h264) or <sha256>.jpg (a still picture: codec jpeg); the
+ *                                      extension comes from the catalog's codec, read here, never from the caller
  *   wallpaper-remove "<id> <variant>"  deletes it
- *   wallpaper-login "still <id>"       the login screen shows that still wallpaper, with no video
+ *   wallpaper-login "still <id>"       the login screen shows that still wallpaper, with no video; <id> is a built-in
+ *                                      wallpaper's id or "cat:<id>", a catalog picture the greeter finds in the store
  *   wallpaper-login "<id> <variant>"   the login screen plays it; "default" goes back to the built-in one
  *   wallpaper-image "<path>"           the session user's own copy of a picture they chose, made by a child running as
  *                                      them; answers its name, 16 hex digits. "remove <name>" deletes that copy
@@ -36,21 +39,30 @@
 #include <time.h>
 #include <unistd.h>
 
-#define CATALOG "/usr/share/backgrounds/lordos/motion.json"
-#define STORE   "/var/lib/lordos/wallpapers"
+#ifndef WALLPAPER_CATALOG
+#define WALLPAPER_CATALOG "/usr/share/backgrounds/lordos/motion.json"
+#endif
+#ifndef WALLPAPER_STORE
+#define WALLPAPER_STORE "/var/lib/lordos/wallpapers"
+#endif
+#ifndef WALLPAPER_OWNER_OK                              /* the tests run as a user: their catalog is theirs */
+#define WALLPAPER_OWNER_OK(st) ((st).st_uid == 0)
+#endif
+#define CATALOG WALLPAPER_CATALOG
+#define STORE   WALLPAPER_STORE
 #define MINE    "/.local/share/lordos/wallpapers"     /* under the user's home: their copies */
 #define IMAGE_SECONDS 30                              /* a picture takes far less; a stuck disk doesn't wait forever */
 
-static int entry(const char *arg, size_t len, char *url, size_t un, char *sha, size_t sn, unsigned long long *size) {
+static int entry(const char *arg, size_t len, char *url, size_t un, char *sha, size_t sn, unsigned long long *size, const char **ext) {
     if (!len || len > 120 || strlen(arg) != len) return -1;
     int fd = open(CATALOG, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
     if (fd < 0) return -1;
     struct stat st;
     char *buf = NULL;
     int rc = -1;
-    if (!fstat(fd, &st) && S_ISREG(st.st_mode) && st.st_uid == 0 && st.st_size > 0 && st.st_size < 1 << 20 && (buf = malloc((size_t)st.st_size + 1))) {
+    if (!fstat(fd, &st) && S_ISREG(st.st_mode) && WALLPAPER_OWNER_OK(st) && st.st_size > 0 && st.st_size < 1 << 20 && (buf = malloc((size_t)st.st_size + 1))) {
         ssize_t r = read(fd, buf, (size_t)st.st_size);
-        if (r == st.st_size) rc = hw_wallpaper_find(buf, (size_t)r, arg, url, un, sha, sn, size);
+        if (r == st.st_size) rc = hw_wallpaper_find(buf, (size_t)r, arg, url, un, sha, sn, size, ext);
     }
     free(buf);
     close(fd);
@@ -67,19 +79,54 @@ static void progress(uint64_t done, uint64_t total, void *ud) {
     admin_say("PROGRESS", "%s", line);                  /* i18n-ok: parsed by sdk/motion.js */
 }
 
+/* Is the file at `path` exactly the catalog's: a regular file (not followed through a link) of `size` bytes whose
+ * SHA-256 is `sha` (64 lowercase hex digits)? A file named after a catalog hash but holding something else (the ws170 QA
+ * found 13 bytes of text named after a video's hash) is not, and is downloaded again over it. */
+static int store_file_ok(const char *path, const char *sha, unsigned long long size) {
+    int fd = open(path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+    if (fd < 0) return 0;
+    struct stat st;
+    int ok = !fstat(fd, &st) && S_ISREG(st.st_mode) && (unsigned long long)st.st_size == size;
+    if (ok) {
+        Sha256 h;
+        sha256_init(&h);
+        unsigned char buf[65536];
+        unsigned long long got = 0;
+        for (;;) {
+            ssize_t n = read(fd, buf, sizeof buf);
+            if (n < 0 && errno == EINTR) continue;
+            if (n < 0) { ok = 0; break; }
+            if (n == 0) break;
+            sha256_update(&h, buf, (size_t)n);
+            got += (unsigned long long)n;
+        }
+        uint8_t out[32];
+        char hex[65];
+        sha256_final(&h, out);
+        hex_encode(out, 32, hex);
+        ok = ok && got == size && !strcmp(hex, sha);
+    }
+    close(fd);
+    return ok;
+}
+
 void hw_act_wallpaper_get(const AdminReq *r, const char *arg, size_t len) {
     (void)r;
     char url[900], sha[65];
     unsigned long long size = 0;
-    if (entry(arg, len, url, sizeof url, sha, sizeof sha, &size)) { admin_err("admin.invalidArgument", NULL); return; }
+    const char *ext = NULL;
+    if (entry(arg, len, url, sizeof url, sha, sizeof sha, &size, &ext)) { admin_err("admin.invalidArgument", NULL); return; }
     mkdir(STORE, 0755);
     chmod(STORE, 0755);
     FetchItem it;
     memset(&it, 0, sizeof it);
     snprintf(it.url, sizeof it.url, "%s", url);
-    snprintf(it.dest, sizeof it.dest, "%s/%s.mp4", STORE, sha);
+    snprintf(it.dest, sizeof it.dest, "%s/%s.%s", STORE, sha, ext);
     struct stat st;
-    if (!stat(it.dest, &st) && (unsigned long long)st.st_size == size) { admin_say("OK", "%s", sha); return; }   /* i18n-ok */
+    if (!lstat(it.dest, &st)) {
+        if (store_file_ok(it.dest, sha, size)) { admin_say("OK", "%s", sha); return; }   /* i18n-ok */
+        unlink(it.dest);                                /* not the catalog's file: fetched again */
+    }
     it.max = size;
     it.expect = size;
     int last = -1;
@@ -99,8 +146,9 @@ void hw_act_wallpaper_remove(const AdminReq *r, const char *arg, size_t len) {
     (void)r;
     char url[900], sha[65], p[200];
     unsigned long long size = 0;
-    if (entry(arg, len, url, sizeof url, sha, sizeof sha, &size)) { admin_err("admin.invalidArgument", NULL); return; }
-    snprintf(p, sizeof p, "%s/%s.mp4", STORE, sha);
+    const char *ext = NULL;
+    if (entry(arg, len, url, sizeof url, sha, sizeof sha, &size, &ext)) { admin_err("admin.invalidArgument", NULL); return; }
+    snprintf(p, sizeof p, "%s/%s.%s", STORE, sha, ext);
     if (unlink(p) && errno != ENOENT) { admin_err("wallpaper.removeFailed", NULL); return; }
     admin_say("OK", "%s", "removed");                   /* i18n-ok: parsed by sdk/motion.js */
 }
@@ -109,7 +157,11 @@ void hw_act_wallpaper_remove(const AdminReq *r, const char *arg, size_t len) {
 static int put_still(const char *what, size_t n) {
     const char *tmp = STORE "/.login.part";
     mkdir(STORE, 0755);
-    int fd = open(tmp, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC | O_NOFOLLOW, 0644);
+    /* a new file, never an existing one opened for writing: the temporary name may still be a hard link to a video of
+     * the store (a login video chosen twice: see hw_act_wallpaper_login), and O_TRUNC wrote this mark into that video
+     * (the ws170 QA found 13 bytes, "crystal-crown", under a catalog video's hash) */
+    unlink(tmp);
+    int fd = open(tmp, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW, 0644);
     if (fd < 0) return -1;
     int bad = write(fd, what, n) != (ssize_t)n;
     if (close(fd)) bad = 1;
@@ -333,7 +385,8 @@ void hw_act_wallpaper_login(const AdminReq *r, const char *arg, size_t len) {
     (void)r;
     const char *dst = STORE "/login.mp4", *tmp = STORE "/.login.part", *still = STORE "/login-still";
     if (len > 6 && len < 60 && !strncmp(arg, "still ", 6)) {            /* a still wallpaper by its id, never a path */
-        for (size_t i = 6; i < len; i++) if (!((arg[i] >= 'a' && arg[i] <= 'z') || (arg[i] >= '0' && arg[i] <= '9') || arg[i] == '-')) { admin_err("admin.invalidArgument", NULL); return; }
+        size_t at = len > 10 && !strncmp(arg + 6, "cat:", 4) ? 10 : 6;   /* "cat:<id>": a catalog picture */
+        for (size_t i = at; i < len; i++) if (!((arg[i] >= 'a' && arg[i] <= 'z') || (arg[i] >= '0' && arg[i] <= '9') || arg[i] == '-')) { admin_err("admin.invalidArgument", NULL); return; }
         if (put_still(arg + 6, len - 6)) { admin_err("wallpaper.removeFailed", NULL); return; }
         unlink(dst);
         login_images_clear(NULL);
@@ -349,12 +402,17 @@ void hw_act_wallpaper_login(const AdminReq *r, const char *arg, size_t len) {
     }
     char url[900], sha[65], p[200];
     unsigned long long size = 0;
-    if (entry(arg, len, url, sizeof url, sha, sizeof sha, &size)) { admin_err("admin.invalidArgument", NULL); return; }
+    const char *ext = NULL;
+    /* only a video plays there: a still picture of the catalog goes through "still cat:<id>" */
+    if (entry(arg, len, url, sizeof url, sha, sizeof sha, &size, &ext) || strcmp(ext, "mp4")) { admin_err("admin.invalidArgument", NULL); return; }
     snprintf(p, sizeof p, "%s/%s.mp4", STORE, sha);
     struct stat st;
     if (lstat(p, &st) || !S_ISREG(st.st_mode) || (unsigned long long)st.st_size != size) { admin_err("wallpaper.notDownloaded", NULL); return; }
     unlink(tmp);
     if (link(p, tmp) || rename(tmp, dst)) { unlink(tmp); admin_err("wallpaper.removeFailed", NULL); return; }
+    /* when login.mp4 already was this video (the same inode), rename() does nothing and leaves the temporary name as a
+     * second link to it: never left behind */
+    unlink(tmp);
     unlink(still);
     login_images_clear(NULL);
     admin_say("OK", "%s", sha);                         /* i18n-ok: parsed by sdk/motion.js */

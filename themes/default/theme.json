@@ -1,4 +1,8 @@
 {
-  "name": "Lord Flow",
-  "description": "Menu bar, magnifying dock, app launcher and Control Center."
+  "name": "Flow",
+  "description": "Menu bar, magnifying dock, app launcher and Control Center.",
+  "author": "Federico Pereira",
+  "email": "fpereira@iperfex.com",
+  "organization": "IPERFEX",
+  "license": "MIT"
 }

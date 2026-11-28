@@ -203,6 +203,7 @@
   "power.healthNormal": "Стан акумулятора: {pct}% (нормальний)",
   "power.healthService": "Стан акумулятора: {pct}% (рекомендовано обслуговування)",
   "power.healthUnknown": "Стан акумулятора: невідомий",
+  "power.h": "{h} год",
   "power.hm": "{h} год {m} хв",
   "power.immediately": "Негайно",
   "power.left": "Залишилося {time}",

@@ -26,6 +26,8 @@ static int sys_conn[8];
 static const char *conn_app[8] = { "mail", "calendar", "reminders", "contacts", "mail", "notes" };
 const char *brokersrv_conn_app(int conn) { return conn >= 0 && conn < 8 ? conn_app[conn] : NULL; }
 int brokersrv_conn_system(int conn) { return conn >= 0 && conn < 8 && sys_conn[conn]; }
+static int agent_owns;
+int brokersrv_hands_owns(void) { return agent_owns; }
 int brokersrv_conn_event(int conn, const char *kind, const char *data, size_t len) { (void)conn; (void)kind; (void)data; (void)len; return 0; }
 static int last_status, last_fd = -1;
 static char last_reply[4096];
@@ -181,6 +183,46 @@ int main(void) {
     check(call(0, "save", acc, strlen(acc), NULL, 0) == BST_OK && !strcmp(saved, acc), "Mail writes the accounts file (validated by mailc)");
     const char *bad = "{\"accounts\":[{\"password\":\"x\"}]}";
     check(call(0, "save", bad, strlen(bad), NULL, 0) == BST_ERROR && strstr(last_reply, "mail.badAccounts"), "a password in the accounts file → mail.badAccounts");
+    /* Hands (security scan 0.8.9.6.2, F3): an AI agent's input never trusts a certificate, adds, removes or re-points an
+     * account; display fields still save */
+    {
+        const char *cur = "{\"notify\":true,\"accounts\":[{\"id\":\"w\",\"kind\":\"mail\",\"user\":\"me@w.example\",\"imap\":{\"host\":\"imap.w.example\",\"port\":993},"
+                          "\"trust\":{\"imap\":\"aa\"},\"signature\":\"-- me\",\"collapsed\":[]}]}";
+        int f2 = open(cfg, O_WRONLY | O_CREAT | O_TRUNC, 0600);
+        check(f2 >= 0 && write(f2, cur, strlen(cur)) == (ssize_t)strlen(cur), "an accounts file with one account");
+        if (f2 >= 0) close(f2);
+        const char *trust = "{\"notify\":true,\"accounts\":[{\"id\":\"w\",\"kind\":\"mail\",\"user\":\"me@w.example\",\"imap\":{\"host\":\"imap.w.example\",\"port\":993},"
+                            "\"trust\":{\"imap\":\"bb\"},\"signature\":\"-- me\",\"collapsed\":[]}]}";
+        const char *server = "{\"notify\":true,\"accounts\":[{\"id\":\"w\",\"kind\":\"mail\",\"user\":\"me@w.example\",\"imap\":{\"host\":\"evil.example\",\"port\":993},"
+                             "\"trust\":{\"imap\":\"aa\"},\"signature\":\"-- me\",\"collapsed\":[]}]}";
+        const char *added = "{\"notify\":true,\"accounts\":[{\"id\":\"w\",\"kind\":\"mail\",\"user\":\"me@w.example\",\"imap\":{\"host\":\"imap.w.example\",\"port\":993},"
+                            "\"trust\":{\"imap\":\"aa\"},\"signature\":\"-- me\",\"collapsed\":[]},{\"id\":\"x\",\"kind\":\"mail\"}]}";
+        const char *removed = "{\"notify\":true,\"accounts\":[]}";
+        const char *senders = "{\"notify\":true,\"trustedSenders\":[\"a@b.example\"],\"accounts\":[{\"id\":\"w\",\"kind\":\"mail\",\"user\":\"me@w.example\","
+                              "\"imap\":{\"host\":\"imap.w.example\",\"port\":993},\"trust\":{\"imap\":\"aa\"},\"signature\":\"-- me\",\"collapsed\":[]}]}";
+        const char *display = "{\"accounts\":[{\"collapsed\":[\"INBOX/x\"],\"signature\":\"-- new\",\"id\":\"w\",\"kind\":\"mail\",\"user\":\"me@w.example\","
+                              "\"imap\":{\"port\":993,\"host\":\"imap.w.example\"},\"trust\":{\"imap\":\"aa\"},\"folded\":true}],\"notify\":false}";
+        const char *twice = "{\"notify\":true,\"accounts\":[{\"id\":\"w\",\"kind\":\"mail\",\"user\":\"me@w.example\",\"imap\":{\"host\":\"imap.w.example\",\"port\":993},"
+                            "\"trust\":{\"imap\":\"aa\"},\"signature\":\"-- me\",\"collapsed\":[]},{\"id\":\"w\",\"kind\":\"mail\"}]}";
+        check(brokermail_cfg_guarded(cur, strlen(cur), trust, strlen(trust)), "guarded: a trusted certificate changed");
+        check(brokermail_cfg_guarded(cur, strlen(cur), server, strlen(server)), "guarded: a server changed");
+        check(brokermail_cfg_guarded(cur, strlen(cur), added, strlen(added)), "guarded: an account added");
+        check(brokermail_cfg_guarded(cur, strlen(cur), removed, strlen(removed)), "guarded: an account removed");
+        check(brokermail_cfg_guarded(cur, strlen(cur), senders, strlen(senders)), "guarded: a trusted sender added");
+        check(brokermail_cfg_guarded(cur, strlen(cur), twice, strlen(twice)), "guarded: an account id twice");
+        check(brokermail_cfg_guarded(NULL, 0, added, strlen(added)), "guarded: the first account");
+        check(brokermail_cfg_guarded(cur, strlen(cur), "{", 1) && brokermail_cfg_guarded("[", 1, cur, strlen(cur)), "guarded: anything unparseable");
+        check(!brokermail_cfg_guarded(cur, strlen(cur), display, strlen(display)), "not guarded: signature, folders, notify (keys in any order)");
+        check(!brokermail_cfg_guarded(cur, strlen(cur), cur, strlen(cur)), "not guarded: the same file again");
+        agent_owns = 1;
+        saved[0] = 0;
+        check(call(0, "save", trust, strlen(trust), NULL, 0) == BST_ERROR && strstr(last_reply, "hands.refused") && !saved[0],
+              "an agent's input: Trust on Mail's certificate dialog refused (hands.refused), nothing saved");
+        check(call(0, "save", added, strlen(added), NULL, 0) == BST_ERROR && !saved[0], "an agent's input: Add Account refused");
+        check(call(0, "save", display, strlen(display), NULL, 0) == BST_OK && !strcmp(saved, display), "an agent's input: a signature or folder change saves");
+        agent_owns = 0;
+        check(call(0, "save", trust, strlen(trust), NULL, 0) == BST_OK && !strcmp(saved, trust), "the person's own Trust saves");
+    }
     check(call(2, "images", "https://a.example/x.png\0", 24, NULL, 0) == BST_DENIED, "Reminders cannot open image hosts");
     images_n = 0;
     check(call(0, "images", "https://a.example/x.png\0https://b.example/y.png\0", 48, NULL, 0) == BST_OK && images_n == 2, "Mail: remote images of one message");

@@ -69,6 +69,9 @@ typedef struct {
     time_t check_at;                /* the next listing that checks a mounted account still answers */
     int keeper_wait;                /* mounted or resumed, not checked since: the keeper waits for check_acc (#85) */
     char *checked[Q_MAX];           /* queued files the conflict rule already looked at (7.2) */
+#define CANCEL_MAX 8
+    int cancel_qid[CANCEL_MAX];     /* uploads stopped by Pause (QA 0.8.9.6.2): their queue id… */
+    long long cancel_at[CANCEL_MAX];/* …and when (mono ms), so each one is stopped once */
 #define SYNCED_MAX 64
     struct { char rel[CLOUD_REL_MAX + 1]; char fp[256]; } synced[SYNCED_MAX];   /* our last uploads, as the cloud has them (N5) */
     int nsynced;
@@ -109,6 +112,9 @@ Acc  *cl_find(const char *id);              /* with cl_mu held */
 Acc  *cl_find_name(const char *name);
 void  cl_changed(void);                     /* push the state soon */
 int   cl_paused(const Acc *a);              /* Pause, Pause All or on battery */
+/* Pause's way to stop an upload in progress (cloud.c, cloud_cancel_due): a regular, non-empty file's first byte read and
+ * written back unchanged (no link followed). 1 when written. */
+int   cloud_rewrite_first_byte(const char *path);
 void  cl_save_keep(void);                   /* with cl_mu held */
 int   cl_rc_simple(int m, const char *body, int timeout);   /* an rc call whose answer doesn't matter: its status */
 void  cl_reply(int req, char *json);

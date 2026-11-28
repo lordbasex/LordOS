@@ -95,7 +95,7 @@
   "menu.emptyTrash": "Safisha Tupio",
   "menu.file": "Faili",
   "menu.forward": "Mbele",
-  "menu.getInfo": "Pata Maelezo",
+  "menu.getInfo": "Sifa",
   "menu.go": "Nenda",
   "menu.groupBy": "Panga makundi kwa",
   "menu.newFolder": "Folda Mpya",
@@ -342,5 +342,9 @@
   "readOnly.denied": "Folda hii ni ya kusoma tu: ruhusa zake hazikuruhusu kuibadilisha. Ili kuibadilisha, tumia Terminal au programu nyingine.",
   "fromMachineNoRun": "“{name}” imetoka kwa mashine {machine}. Faili haifungui programu au visakinishi kutoka kwa mashine: tumia Fungua kwa ukiiamini.",
   "info.from": "Chanzo",
-  "info.fromMachine": "Mashine {machine}"
+  "info.fromMachine": "Mashine {machine}",
+  "skin.address": "Anwani",
+  "skin.tasks": "Kazi za Faili na Folda",
+  "skin.otherPlaces": "Maeneo Mengine",
+  "skin.details": "Maelezo"
 }

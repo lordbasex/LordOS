@@ -128,5 +128,6 @@
   "user.user": "Nume de utilizator",
   "user.userHint": "Litere mici, cifre, - și _. Va fi administrator (sudo).",
   "welcome.text": "Acest asistent instalează LordOS pe discul acestui computer. Veți alege limba, tastatura, discul și utilizatorul. Instalarea șterge discul ales, cu excepția cazului în care instalați alături de ce există sau alegeți singur partițiile.",
-  "welcome.title": "Bun venit în LordOS"
+  "welcome.title": "Bun venit în LordOS",
+  "disk.unreadable": "Descrierea unui disc nu a putut fi citită, așa că nu apare în listă. Căutați din nou; dacă tot lipsește, raportați problema."
 }

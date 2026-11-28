@@ -1,7 +1,7 @@
 // gpu_report_test.mjs — Settings → Graphics cards' compatibility report (sdk/gpureport.js): the JS scrub (no home path,
 // host or user name, serial, MAC, UUID or e-mail leaks), the GitHub form's address (template, fields, length cap, cut on
 // whole lines) and the card and driver summaries. Run: node tests/gpu_report_test.mjs
-import { scrubReport, gpuIssueUrl, cardSummary, driverSummary, isNvidia, reportCard, GPU_TEMPLATE, NVIDIA_ROLES } from '../../sdk/gpureport.js';
+import { scrubReport, gpuIssueUrl, cardSummary, driverSummary, isNvidia, reportCard, GPU_TEMPLATE, NVIDIA_ROLES, nvidiaRoleState } from '../../sdk/gpureport.js';
 import { ISSUE_URL_MAX } from '../../sdk/cloudcheck.js';
 
 let ok = 0, bad = 0;
@@ -67,7 +67,14 @@ eq('no driver', driverSummary({ driver: '' }, info), '');
 eq('isNvidia', [isNvidia({ vendor: 0x10de }), isNvidia({ vendorId: '10de' }), isNvidia({ vendor: 0x1002 }), isNvidia(null)], [true, true, false, false]);
 eq('reportCard', reportCard(info, '0000:00:02.0')?.driver, 'i915');
 eq('reportCard missing', reportCard(info, '0000:09:00.0'), null);
-eq('roles are only planned ones', NVIDIA_ROLES.map((r) => r[0]), ['compute', 'desktop']);
+eq('the roles an NVIDIA card lists', NVIDIA_ROLES.map((r) => r[0]), ['compute', 'desktop']);
+// compute stays planned; the desktop is experimental, and on the card drawing this session it is the session's composition
+eq('compute is planned', nvidiaRoleState('compute', { desktop: 1 }, { session: { composition: 'gpu' } }), 'planned');
+eq('desktop on the drawing card, composed on the GPU (#276)', nvidiaRoleState('desktop', { desktop: 1 }, { session: { composition: 'gpu' } }), 'gpu');
+eq('desktop on the drawing card, composed by the CPU (#171)', nvidiaRoleState('desktop', { desktop: 1 }, { session: { composition: 'cpu' } }), 'cpu');
+eq('desktop of a card that doesn\'t draw it (#274\'s GTX 1650)', nvidiaRoleState('desktop', { desktop: 0 }, { session: { composition: 'gpu' } }), 'experimental');
+eq('desktop with no report facts', nvidiaRoleState('desktop', null, null), 'experimental');
+eq('desktop with no session in the report', nvidiaRoleState('desktop', { desktop: 1 }, { session: null }), 'experimental');
 
 console.log(`gpu-report-test: ${ok} ok, ${bad} failed`);
 process.exit(bad ? 1 : 0);

@@ -3,12 +3,13 @@
 // La emulación (xterm-256color, color directo, mouse, imágenes en línea, marcas del shell)
 // y el dibujo están en C (server/src/term); esta app arma pestañas, paneles divididos,
 // perfiles, buscador, barra de herramientas, atajos y la ventana desplegable.
-import { View, Text, useAppWindow, useKeyboard, useStore, useTheme, wm, pointerWorkArea, term, clipboard, addShortcuts, registerDockMenu, speechMenu, registerSelection, ContextMenu, t as tr } from '@lordos/sdk';
+import { View, Text, useAppWindow, useKeyboard, useStore, useTheme, wm, pointerWorkArea, term, clipboard, addShortcuts, registerDockMenu, speechMenu, registerSelection, ContextMenu, t as tr, SkinRegion, useSkinned } from '@lordos/sdk';
+import { terminalViewModel, skinCommand } from './skinmodel.js';
 import { useEffect, useRef, useState } from 'react';
 import {
   wins, meta, ensureWin, getWin, patchWin, activeTab, activeSid, addTab, closePane, closeTab, split, cycleTab,
   selectTab, focusPane, zoom, toggleZoom, toggleTimestamps, leaves, windowTitle, busyIn, toggleHotkeyWindow, toast,
-  undoClose, paneToTab, equalize, moveTab, saveArrangement, restoreArrangement, toggleAlert, meta as metaStore, noteTermFocus,
+  undoClose, paneToTab, equalize, moveTab, saveArrangement, restoreArrangement, toggleAlert, meta as metaStore, noteTermFocus, tabTitle,
 } from './state.js';
 import { PaneTree, paneNodes } from './Panes.jsx';
 import {
@@ -431,6 +432,9 @@ function TerminalWindow() {
     sendTo(cur, (x) => term.key(x, key, e.char || '', base, e.mods & 7));
   });
 
+  // (0.8.9.6.2) app skins (docs/THEMES-GUIDE.md, "App skins → Terminal"): the tabs, the status and the context menu may
+  // be a theme's; the panes never are. Hooks before the early return below.
+  const skinned = useSkinned('terminal');
   if (!w || !tab) return <View style={{ flex: 1, backgroundColor: '#000' }} />;
   const scheme = schemeOf(profile);
   const paneBg = scheme.bg;
@@ -475,9 +479,26 @@ function TerminalWindow() {
     ] });
   };
 
+  const vm = skinned ? (() => {
+    const mt = meta.get();
+    const info = sid != null ? term.info(sid) : null;
+    const home = lord.fs.home();
+    return terminalViewModel({
+      tabs: w.tabs.map((x) => ({ id: x.id, title: tabTitle(x), color: x.color || getProfile(mt[x.focus]?.profile).tabColor, active: x.id === w.active,
+        busy: leaves(x.root).some((q) => mt[q]?.busy), bell: leaves(x.root).some((q) => mt[q]?.bell) })),
+      status: info ? { cwd: (mt[sid]?.cwd || info.cwd || '').replace(home, '~'), process: info.process, busy: info.busy, shell: info.shell, cols: info.cols, rows: info.rows } : null,
+      broadcast: w.broadcast, label: actionLabel,
+    }, {
+      selectTab: (key) => { if (w.tabs.some((x) => x.id === key)) selectTab(wid, key); },
+      closeTab: (key) => { if (w.tabs.some((x) => x.id === key)) closeTab(wid, key); },
+      tabMenu: (key, ev) => { const tb = w.tabs.find((x) => x.id === key); if (tb && ev) onTabMenu(ev, tb); },
+      command: (id) => { const c = skinCommand(id); if (c) run(wid, c); },
+    });
+  })() : null;
+
   return (
     <View ref={root} style={{ flex: 1 }}>
-      <TabBar t={t} wid={wid} w={w} onTabMenu={onTabMenu} />
+      <SkinRegion app="terminal" region="tabBar" model={vm}><TabBar t={t} wid={wid} w={w} onTabMenu={onTabMenu} /></SkinRegion>
       <View style={{ flex: 1, flexDirection: 'row' }}>
         <View style={{ flex: 1, flexDirection: 'row' }}>
           <PaneTree wid={wid} tab={tab} windowFocused={focused} divider={t.separator} bg={paneBg} onContextMenu={onContextMenu} />
@@ -492,11 +513,15 @@ function TerminalWindow() {
           <Text style={{ fontSize: 12, fontWeight: 700, color: '#000' }}>{tr('terminal.copyModeBar')}</Text>
         </View>
       )}
-      {profile.statusBar && sid != null && <StatusBar t={t} sid={sid} wid={wid} />}
+      {profile.statusBar && sid != null && <SkinRegion app="terminal" region="statusBar" model={vm}><StatusBar t={t} sid={sid} wid={wid} /></SkinRegion>}
       <Overlays t={t} wid={wid} w={w} sid={sid} tab={tab} />
       {tab && <DropHud t={t} sids={leaves(tab.root)} />}
       {w.fwdPanel && <ForwardsPanel t={t} wid={wid} w={w} panel={w.fwdPanel} />}
-      {ctx && <ContextMenu x={ctx.x} y={ctx.y} items={ctx.items} onClose={() => setCtx(null)} bounds={{ w: lord.getLayout(root.current.id)[2], h: lord.getLayout(root.current.id)[3] }} />}
+      {ctx && (
+        <SkinRegion app="terminal" region="contextMenu" model={{ x: ctx.x, y: ctx.y, items: ctx.items, close: () => setCtx(null), bounds: { w: lord.getLayout(root.current.id)[2], h: lord.getLayout(root.current.id)[3] } }}>
+          <ContextMenu x={ctx.x} y={ctx.y} items={ctx.items} onClose={() => setCtx(null)} bounds={{ w: lord.getLayout(root.current.id)[2], h: lord.getLayout(root.current.id)[3] }} />
+        </SkinRegion>
+      )}
     </View>
   );
 }

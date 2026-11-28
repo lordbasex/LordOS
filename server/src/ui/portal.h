@@ -67,7 +67,15 @@ int  portal_shot_capture(int tag, const CastSource *src, const int *area, const 
 int  portal_shot_pixel(const CastSource *src, int x, int y, double rgb[3]);
 /* the picture of request tag is in place at path (ok), or couldn't be made */
 void portal_shot_saved(int tag, int ok, const char *path);
+/* org.freedesktop.portal.Notification (Flatpak apps): their notifications' ids in lord.notifyd are PNOTE_BASE and up;
+ * the shell's "closed" and "action" for those come here (js_hw.c). key: "default" or a button's index "0".."2" */
+#define PNOTE_BASE 0x40000000u
+void portal_note_closed(uint32_t nid);
+void portal_note_action(uint32_t nid, const char *key);
 /* From JS (lord.portal.set): mode, accent (0..1), GNOME accent name and GTK button order. */
 void portal_set(int dark, const double rgb[3], const char *accent_name, const char *button_layout);
+/* What portal_set gave GTK (the GTK 3 theme, the title bar buttons, the interface font, the icon theme), for the
+ * X window manager's XSETTINGS (wl/xwm.c): GTK 3 on X11 reads only those. Static strings of portal.c. */
+void portal_gtk_values(const char **theme, const char **button_layout, const char **font, const char **icons);
 
 #endif

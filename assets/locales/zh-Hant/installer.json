@@ -128,5 +128,6 @@
   "user.user": "使用者名稱",
   "user.userHint": "小寫字母、數字、- 和 _。此使用者將成為管理者（sudo）。",
   "welcome.text": "此輔助程式會將 LordOS 安裝到這台電腦的磁碟上。你將選擇語言、鍵盤、磁碟和你的使用者。安裝會清除所選磁碟，除非你選擇安裝在現有內容旁邊，或自行選擇分割區。",
-  "welcome.title": "歡迎使用 LordOS"
+  "welcome.title": "歡迎使用 LordOS",
+  "disk.unreadable": "無法讀取某個磁碟的描述，因此它未列出。請重新搜尋；如果仍然缺少，請向我們回報。"
 }

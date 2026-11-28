@@ -4,6 +4,7 @@
 #include "../wl/wl.h"
 #include "../media/media.h"
 #include "wave.h"
+#include "rectsub.h"
 #include "grab.h"
 #include "../gpu/gpu.h"
 
@@ -64,6 +65,9 @@ enum { SKIP_PATH_MAX = 64 };
 static const Node *skip_path[SKIP_PATH_MAX];
 static int skip_depth, skip_path_ok;
 static int paint_cull;                  /* paint_node may skip clipped subtrees outside the clip (CPU path) */
+/* GPU path, the opaque cover (paint_root_body): the subtrees skip_until leaves out are not painted, but their app
+ * windows and GPU pictures are noted in the frame's list, in paint order, as painting them would (skip_note_walk) */
+static int skip_note;
 
 static int layer_paint(Canvas *c, Node *n, float opacity);
 static int tf_paint(Canvas *c, Node *n, float opacity);
@@ -71,6 +75,7 @@ static int tf_self, tf_unit;    /* the transformed node being rasterized; the on
 int paint_tf_nocache;           /* tests: transformed subtrees rasterized again, the cache untouched */
 static int tf_nest;             /* > 0: painting into a transformed node's raster, not the canvas */
 static int blur_from_cache(Canvas *c, const Node *n);
+static int frost_source(const Node *n);
 static void blur_to_cache(Canvas *c, const Node *n, float x, float y, float w, float h, int radius);
 static void below_note_blur(float x, float y, float w, float h, int radius);
 static void below_note_affine(const float fwd[6], int sw, int sh);
@@ -112,14 +117,41 @@ static int skip_ancestor(const Node *n) {
 static int cap_last, cap_done;
 
 static void paint_node_body(Canvas *c, Node *n, float opacity);
+static void skip_note_walk(Canvas *c, Node *n, float opacity);
 static void paint_node(Canvas *c, Node *n, float opacity) {
     if (cap_done) return;
     paint_node_body(c, n, opacity);
     if (cap_last && n->id == cap_last) cap_done = 1;
 }
 
+/* A wavy line across (x, y, w, h), device pixels: a sine of period 4 logical px whose peaks touch the box's top and
+ * bottom, 1 logical px thick, antialiased by its distance to each pixel's centre; drawn as one alpha mask, so the box
+ * is all it touches (a misspelled word's underline, docs/SPELLING.md). */
+static void paint_wavy(Canvas *c, float x, float y, float w, float h, float k, uint32_t argb) {
+    int x0 = (int)floorf(x), y0 = (int)floorf(y), pw = (int)ceilf(x + w) - x0, ph = (int)ceilf(y + h) - y0;
+    if (pw <= 0 || ph <= 0 || pw > 8192 || ph > 64) return;
+    uint8_t stack[4096], *a = (size_t)pw * (size_t)ph <= sizeof stack ? stack : malloc((size_t)pw * (size_t)ph);
+    if (!a) return;
+    float th = k * 1.0f, amp = (h - th) / 2, mid = y + h / 2, per = 4 * k;
+    if (amp < 0) amp = 0;
+    for (int j = 0; j < ph; j++) {
+        float py = y0 + j + 0.5f;
+        for (int i = 0; i < pw; i++) {
+            float px = x0 + i + 0.5f;
+            if (px < x || px > x + w) { a[j * pw + i] = 0; continue; }
+            float cy = mid - amp * sinf((px - x) * 6.2831853f / per);
+            float d = fabsf(py - cy) - th / 2;
+            float v = d <= 0 ? 1 : d >= 1 ? 0 : 1 - d;
+            a[j * pw + i] = (uint8_t)(v * 255 + 0.5f);
+        }
+    }
+    canvas_alpha_mask(c, x0, y0, a, pw, ph, pw, argb);
+    if (a != stack) free(a);
+}
+
 static void paint_node_body(Canvas *c, Node *n, float opacity) {
     if (n->type == NODE_RAW || n->s.display_none) return;
+    if (paint_hands_capture && paint_capture_mode && n->id == paint_hands_cursor) return;    /* the agent's own cursor */
     if (layer_paint(c, n, opacity)) return;
     if (n->own_tf && n->id != tf_self && tf_paint(c, n, opacity)) return;
     const Style *s = &n->s;
@@ -145,6 +177,12 @@ static void paint_node_body(Canvas *c, Node *n, float opacity) {
     int corners_differ = !plain && (r4[1] != r4[0] || r4[2] != r4[0] || r4[3] != r4[0]);
     /* a protected window, or a picture of a protected source (a protected machine's, lord.vm.protect) wherever it is shown:
      * the neutral fill and the lock in every capture */
+    /* an AI agent's screenshot: what it must not see is solid black, its whole box (no rounded corners that would make a
+     * blacked-out switch look like a dark one) */
+    if (paint_capture_mode && n->hands_black) {
+        canvas_rrect(c, floorf(x), floorf(y), ceilf(x + w) - floorf(x), ceilf(y + h) - floorf(y), 0, 0xff000000u);
+        return;
+    }
     if (paint_capture_mode && (n->protect || (n->type == NODE_MEDIA && media_id_protected(n->term)))) {
         float rr[4] = { rad, rad, rad, rad };
         paint_protected_fill(c, x, y, w, h, corners_differ ? r4 : rr);
@@ -157,7 +195,10 @@ static void paint_node_body(Canvas *c, Node *n, float opacity) {
      * pixel over the same pixel (the copy of what is below already has it), one level darker than a
      * full repaint at the corners of rounded windows below the dragged one (step 9, approved
      * 2026-10-28: the only pixel change of the drag-frame work, towards what a full repaint gives). */
-    if (!own && !skip_ancestor(n)) return;
+    if (!own && !skip_ancestor(n)) {
+        if (skip_note) skip_note_walk(c, n, opacity);
+        return;
+    }
 
     if (own && (s->shadow_color >> 24) && (s->shadow_blur > 0 || s->shadow_x || s->shadow_y))
         PROF(0, canvas_shadow(c, x, y, w, h, rad, s->shadow_x * k, s->shadow_y * k, s->shadow_blur * k,
@@ -172,8 +213,12 @@ static void paint_node_body(Canvas *c, Node *n, float opacity) {
 
     if (own && s->backdrop_blur >= 1) {
         if (below_collect && !tf_nest) below_note_blur(x, y, w, h, (int)(s->backdrop_blur * k + 0.5f));
+        /* only a moving wallpaper drawn by the GPU below it: the GPU blurs it there with each frame (wl_paint_frost), the
+         * canvas keeps the transparent hole the picture left, and the node's own paint goes over it */
+        int src = corners_differ ? 0 : frost_source(n);
+        if (src && wl_paint_frost(src, n->id, n->ax, n->ay, n->w, n->h, s->radius, s->backdrop_blur)) paint_frost_gpu++;
         /* what is below unchanged since it was blurred: the blurred pixels kept ("Blurred backdrop cache") */
-        if (!blur_from_cache(c, n)) {
+        else if (!blur_from_cache(c, n)) {
             PROF(1, canvas_backdrop_blur(c, x, y, w, h, rad, (int)(s->backdrop_blur * k + 0.5f)));
             blur_to_cache(c, n, x, y, w, h, (int)(s->backdrop_blur * k + 0.5f));
         }
@@ -182,6 +227,7 @@ static void paint_node_body(Canvas *c, Node *n, float opacity) {
         if (corners_differ) PROF(2, canvas_rrect4(c, x, y, w, h, r4, with_opacity(s->bg, op)));
         else PROF(2, canvas_rrect(c, x, y, w, h, rad, with_opacity(s->bg, op)));
     }
+    if (own && s->ext && (s->ext->wavy >> 24)) PROF(2, paint_wavy(c, x, y, w, h, k, with_opacity(s->ext->wavy, op)));
     if (own && s->has_gradient) {
         if (corners_differ) PROF(2, canvas_rrect4_gradient(c, x, y, w, h, r4, s->grad_from, s->grad_to, s->grad_angle, op));
         else PROF(2, canvas_rrect_gradient(c, x, y, w, h, rad, s->grad_from, s->grad_to, s->grad_angle, op));
@@ -789,6 +835,26 @@ static void layer_register(Canvas *c, Node *n, float op) {
                          (n->w - pd[EDGE_L] - pd[EDGE_R] - bl - br) * k, (n->h - pd[EDGE_T] - pd[EDGE_B] - bt - bb) * k, op);
     }
     if (n->type != NODE_TEXT) for (Node *k = n->first; k; k = k->next) layer_register(c, k, op);
+}
+
+/* A subtree the opaque cover leaves out on the GPU path (skip_note): its app windows and GPU pictures noted as
+ * paint_node_body notes them (the same early returns, children in paint order), nothing painted. Their holes, opened
+ * inside the damage, are painted over by the cover. paint_root_body takes the cover only when nothing before it in
+ * paint order is transformed (cover_notable): tf_paint places those windows through wl_tf_begin. */
+static void skip_note_walk(Canvas *c, Node *n, float opacity) {
+    if (n->type == NODE_RAW || n->s.display_none) return;
+    float op = opacity * n->s.opacity;
+    if (op < 0.004f) return;
+    const float *pd = node_padding(n);
+    float bl = node_border(n, EDGE_L), bt = node_border(n, EDGE_T), br = node_border(n, EDGE_R), bb = node_border(n, EDGE_B);
+    float lix = n->ax + pd[EDGE_L] + bl, liy = n->ay + pd[EDGE_T] + bt;
+    float liw = n->w - pd[EDGE_L] - pd[EDGE_R] - bl - br, lih = n->h - pd[EDGE_T] - pd[EDGE_B] - bt - bb;
+    if (n->type == NODE_SURFACE) wl_paint(c, n->term, n->id, lix, liy, liw, lih, op);
+    if (n->type == NODE_MEDIA) media_paint_note(c, n->term, n->id, VX(lix), VY(liy), liw * paint_view.k, lih * paint_view.k, op);
+    if (n->type == NODE_TEXT) return;
+    Node *kids[MAX_KIDS];
+    int k = node_children_ordered(n, kids, MAX_KIDS);
+    for (int i = 0; i < k; i++) skip_note_walk(c, kids[i], op);
 }
 
 /* The layer's box: the window's and its subtree's (logical px) in *b, its pixels on the view's
@@ -1420,6 +1486,7 @@ static int node_paints(const Node *n) {
     const Style *s = &n->s;
     if (n->type != NODE_VIEW) return 1;             /* text, image, terminal, app window, video */
     if ((s->bg >> 24) || s->has_gradient || (s->shadow_color >> 24) || s->backdrop_blur >= 1 || n->own_tf) return 1;
+    if (s->ext && (s->ext->wavy >> 24)) return 1;
     for (int e = EDGE_L; e <= EDGE_B; e++) if (node_border(n, e) > 0) return 1;
     /* rounded and clipping: its corners are saved and restored around its children (paint_node), which
      * changes what is below them even when it paints nothing itself */
@@ -1796,8 +1863,9 @@ static Box blur_near(const Node *n) {
  * (45 % of a 1280x800 screen per frame on VM 116, in one box even with several rectangles on,
  * instead of a few small rectangles; docs/MONITOR.md). Same test as cover_walk below (opaque
  * background, opacity 1 down the tree, no transform, away from rounded corners, clipped by its
- * ancestors), in paint order: only a cover met after the node counts. CPU path without a dragged
- * window only, as the opaque-cover skip (engine-test test_hidden_blur_damage). */
+ * ancestors), in paint order: only a cover met after the node counts. Without a dragged window only,
+ * as the opaque-cover skip; on the GPU path too since 0.8.9.6.2 (engine-test test_hidden_blur_damage,
+ * test_gpu_cover). */
 typedef struct { int target, seen, covered; Box d; } HideWalk;
 
 static void hide_walk(Node *n, Box clip, HideWalk *h) {
@@ -1823,7 +1891,7 @@ static void hide_walk(Node *n, Box clip, HideWalk *h) {
 }
 
 static int blur_hidden(Node *n) {
-    if (gpu_active() || layer.want || !ui.root || n->has_tf) return 0;
+    if (layer.want || !ui.root || n->has_tf) return 0;
     Box b = n->prev_box;
     if (b.x1 <= b.x0 || b.y1 <= b.y0) return 0;
     HideWalk h = { n->id, 0, 0, { floorf(b.x0), floorf(b.y0), ceilf(b.x1), ceilf(b.y1) } };
@@ -2134,10 +2202,160 @@ int paint_node_covered(const Node *target) {
     return seen && found;
 }
 
+/* Whether node target's box is wholly hidden behind the union of opaque nodes painted after it (paint_node_hidden): the
+ * walk of cover_after, but each cover takes its part away from what is left of the box (rectsub.h), so two windows side
+ * by side, or a window and the menu bar, hide it together. A moving wallpaper's view asks it (media/mambient.c). */
+static void hidden_after(Node *n, const Node *target, Box clip, int *seen, RsLeft *left) {
+    if (rs_empty(left) || left->over) return;
+    if (n == target) { *seen = 1; return; }
+    const Style *s = &n->s;
+    if (n->type == NODE_RAW || s->display_none || s->opacity < 0.999f || n->own_tf || n->has_tf) {
+        if (!*seen && n->type != NODE_RAW && !s->display_none) {
+            Node *kids[MAX_KIDS];
+            int k = node_children_ordered(n, kids, MAX_KIDS);
+            Box none = { 0, 0, 0, 0 };
+            for (int i = 0; i < k && !*seen; i++) hidden_after(kids[i], target, none, seen, left);
+        }
+        return;
+    }
+    Box box = box_and((Box){ n->ax, n->ay, n->ax + n->w, n->ay + n->h }, clip);
+    if (*seen && (s->bg >> 24) == 0xff && !s->has_gradient && s->backdrop_blur < 1) {
+        float k = s->radius * 0.3f;
+        rs_sub(left, (RsBox){ box.x0 + k, box.y0 + k, box.x1 - k, box.y1 - k });
+        if (rs_empty(left)) return;
+    }
+    if (n->type == NODE_TEXT) return;
+    Box inner = s->overflow_hidden ? box : clip;
+    float rr = node_edges_plain(n) ? s->radius : max4(s->ext->r.rad);
+    if (s->overflow_hidden && rr > 0) inner = (Box){ inner.x0 + rr, inner.y0 + rr, inner.x1 - rr, inner.y1 - rr };
+    Node *kids[MAX_KIDS];
+    int k = node_children_ordered(n, kids, MAX_KIDS);
+    for (int i = 0; i < k && !rs_empty(left); i++) hidden_after(kids[i], target, inner, seen, left);
+}
+
+int paint_node_hidden(const Node *target) {
+    Node *root = ui.root;
+    if (!root || !target || target == root) return 0;
+    Box d = { floorf(target->ax), floorf(target->ay), ceilf(target->ax + target->w), ceilf(target->ay + target->h) };
+    if (d.x1 <= d.x0 || d.y1 <= d.y0) return 1;                 /* no box at all: nothing of it shows */
+    for (const Node *p = target; p; p = p->parent) if (p->s.display_none || p->s.opacity <= 0.004f) return 1;
+    static RsLeft left;
+    rs_start(&left, (RsBox){ d.x0, d.y0, d.x1, d.y1 });
+    int seen = 0;
+    hidden_after(root, target, (Box){ -1e9f, -1e9f, 1e9f, 1e9f }, &seen, &left);
+    return seen && rs_empty(&left);
+}
+
+/* The nodes with a backdrop blur painted over target (after it in paint order) that meet its box: each one's box and the
+ * margin its blur reads (blur_near), cut to target's box, at most max. A moving wallpaper drawn by the GPU below the UI
+ * keeps the CPU's pixels there, so the Dock and the menu bar still blur it (media/mview.c). Their count (≤ max). */
+/* ---- frosted glass on the GPU (docs/MOVING-WALLPAPERS.md, "The frosted surfaces over the video") ----
+ * A frosted node whose backdrop is nothing but a moving wallpaper the GPU draws below the UI (wl_paint_media) is blurred
+ * by the GPU from the picture's texture with each frame (wl_paint_frost, gpu_draw_frosted): a new frame then costs the
+ * CPU nothing there, no rows read back and no repaint (ws170 QA BUG-14). Decided in paint order: the picture's view
+ * must cover the node's box, and nothing painted after it and before the node may reach that box (another window, its
+ * shadow, a desktop icon, an ancestor's background, an app window): those are only in the CPU's canvas, so the CPU
+ * blurs then, as always. Never in a capture, a transform, a per-corner radius or an ancestor's rounded clip, and only
+ * while paint_gpu_frost is on (main.c: a GPU display, no remote viewer or recording reading the canvas). */
+int paint_gpu_frost;
+long paint_frost_gpu;
+/* does m paint anything of its own (not its children)? */
+static int paints_self(const Node *m) {
+    const Style *s = &m->s;
+    if (m->type != NODE_VIEW || (s->bg >> 24) || s->has_gradient || s->backdrop_blur >= 1) return 1;
+    if ((s->shadow_color >> 24) && (s->shadow_blur > 0 || s->shadow_x || s->shadow_y)) return 1;
+    if (s->ext && (s->ext->wavy >> 24)) return 1;
+    for (int e = 0; e < 4; e++) if (node_border(m, e) > 0) return 1;
+    return 0;
+}
+/* the box m paints in, with its shadow's reach */
+static Box paint_reach(const Node *m) {
+    float e = 1;
+    if ((m->s.shadow_color >> 24) && (m->s.shadow_blur > 0 || m->s.shadow_x || m->s.shadow_y))
+        e += m->s.shadow_blur * 2 + fmaxf(fabsf(m->s.shadow_x), fabsf(m->s.shadow_y));
+    return (Box){ m->ax - e, m->ay - e, m->ax + m->w + e, m->ay + m->h + e };
+}
+typedef struct { const Node *n; Box b; int src, bad, done, steps; } FrostWalk;
+static void frost_walk(Node *m, FrostWalk *w) {
+    if (w->done || m->type == NODE_RAW || m->s.display_none || m->s.opacity <= 0.004f) return;
+    if (++w->steps > 20000) { w->bad = 1; w->done = 1; return; }
+    if (m == w->n) { w->done = 1; return; }
+    int anc = 0;
+    for (const Node *p = w->n->parent; p && !anc; p = p->parent) anc = p == m;
+    if (m->own_tf) {                                    /* a turned or scaled node: its raster isn't this canvas */
+        if (anc || box_meets(paint_reach(m), w->b)) { w->bad = 1; w->done = 1; return; }
+        return;
+    }
+    if (anc && m->s.overflow_hidden && m->s.radius > 0) { w->bad = 1; w->done = 1; return; }    /* its rounded clip */
+    if (box_meets(paint_reach(m), w->b)) {
+        int src = m->type == NODE_MEDIA ? media_frost_source(m->id, w->b.x0, w->b.y0, w->b.x1, w->b.y1) : 0;
+        if (src) { w->src = src; w->bad = 0; return; }    /* the picture: what was painted before it is under it */
+        if (paints_self(m)) w->bad = 1;                    /* over the picture (or under it, until it comes) */
+    }
+    Node *kids[MAX_KIDS];
+    int nk = node_children_ordered(m, kids, MAX_KIDS);
+    for (int i = 0; i < nk && !w->done; i++) frost_walk(kids[i], w);
+}
+static int frost_source(const Node *n) {
+    if (!paint_gpu_frost || paint_capture_mode || tf_nest || !n || n->s.backdrop_blur < 1 || !gpu_active() || !ui.root) return 0;
+    if (!node_edges_plain(n) || n->own_tf) return 0;
+    FrostWalk w = { .n = n, .b = { n->ax, n->ay, n->ax + n->w, n->ay + n->h } };
+    if (w.b.x1 <= w.b.x0 || w.b.y1 <= w.b.y0) return 0;
+    frost_walk(ui.root, &w);
+    return w.done && !w.bad ? w.src : 0;
+}
+
+/* A blurred node whose own background is opaque (no gradient, no transparency in it or above it) covers its blur
+ * entirely: what moves under it never shows, so a new video frame need not repaint it (ws170 QA BUG-14). */
+static int blur_covered(const Node *n) {
+    if ((n->s.bg >> 24) != 255 || n->s.has_gradient) return 0;
+    for (const Node *p = n; p; p = p->parent) if (p->s.opacity < 0.999f) return 0;
+    return 1;
+}
+static void blurs_after(Node *n, const Node *target, Box d, int *seen, Box *out, int max, int *k) {
+    if (n->type == NODE_RAW || n->s.display_none || *k >= max) return;
+    if (n == target) { *seen = 1; return; }
+    if (*seen && n->s.backdrop_blur >= 1 && n->s.opacity > 0.004f && !blur_covered(n) && !frost_source(n)) {
+        Box b = n->prev_box;
+        if (b.x1 <= b.x0 || b.y1 <= b.y0) b = (Box){ n->ax, n->ay, n->ax + n->w, n->ay + n->h };
+        if (b.x1 > b.x0 && b.y1 > b.y0 && box_meets(b, d)) {
+            Box near = blur_near(n);
+            Box c = box_and(box_or(near, b), d);
+            if (c.x1 > c.x0 && c.y1 > c.y0) out[(*k)++] = (Box){ floorf(c.x0), floorf(c.y0), ceilf(c.x1), ceilf(c.y1) };
+        }
+    }
+    Node *kids[MAX_KIDS];
+    int nk = node_children_ordered(n, kids, MAX_KIDS);
+    for (int i = 0; i < nk && *k < max; i++) blurs_after(kids[i], target, d, seen, out, max, k);
+}
+
+int paint_blurs_over(const Node *target, Box *out, int max) {
+    Node *root = ui.root;
+    if (!root || !target || max <= 0) return 0;
+    Box d = { floorf(target->ax), floorf(target->ay), ceilf(target->ax + target->w), ceilf(target->ay + target->h) };
+    if (d.x1 <= d.x0 || d.y1 <= d.y0) return 0;
+    int seen = 0, k = 0;
+    blurs_after(root, target, d, &seen, out, max, &k);
+    return k;
+}
+
 static int opaque_cover_node(Node *root) {
     int found = 0;
     if (ui.damage.x1 > ui.damage.x0) cover_walk(root, ui.damage, (Box){ -1e9f, -1e9f, 1e9f, 1e9f }, &found);
     return found == root->id ? 0 : found;
+}
+
+/* GPU path: whether every node met before the cover in paint order can be left to skip_note_walk: none of them
+ * transformed (1), or one is (0). *reached: the cover was met. */
+static int cover_notable(const Node *n, int cover, int *reached) {
+    if (n->id == cover) { *reached = 1; return 1; }
+    if (n->type == NODE_RAW || n->s.display_none) return 1;
+    if (n->own_tf) return 0;
+    if (n->type == NODE_TEXT) return 1;
+    Node *kids[MAX_KIDS];
+    int k = node_children_ordered((Node *)n, kids, MAX_KIDS);
+    for (int i = 0; i < k && !*reached; i++) if (!cover_notable(kids[i], cover, reached)) return 0;
+    return 1;
 }
 
 /* paint_below_verify: the canvas before a frame that switched to the copy (below_switch) */
@@ -2355,7 +2573,17 @@ static int paint_root_body(Canvas *c, Node *root, int clear, uint32_t rgb, GpuDr
     /* solo cambió un cuadro de video que tapa esa región: se pinta desde ese nodo (no en el camino
      * GPU, que arma acá la lista de ventanas de las apps) */
     skip_until = gpu_active() ? 0 : media_cover_node(ui.damage.x0, ui.damage.y0, ui.damage.x1, ui.damage.y1);
-    if (!skip_until && !gpu_active() && !layer.want) skip_until = opaque_cover_node(root);
+    /* the opaque cover: also on the GPU path (ws174, Monitor over 18 windows at 4K: each of its changes painted every
+     * window under it again), where what it leaves out is only noted (skip_note); not in a capture */
+    skip_note = 0;
+    if (!skip_until && !layer.want && (!gpu_active() || !paint_capture_mode)) {
+        skip_until = opaque_cover_node(root);
+        if (skip_until && gpu_active()) {
+            int reached = 0;
+            if (cover_notable(root, skip_until, &reached) && reached) skip_note = 1;
+            else skip_until = 0;
+        }
+    }
     skip_reached = 0;
     paint_cull = !gpu_active() && paint_multi_damage;
     /* una ventana que se mueve: lo de abajo se copia y se pinta desde ella (capa del arrastre) */
@@ -2396,6 +2624,7 @@ static int paint_root_body(Canvas *c, Node *root, int clear, uint32_t rgb, GpuDr
     if (pre && taken) free(pre);                /* W is the GPU's: the old way is compared there by LORD_GPU_VERIFY */
     else if (pre) below_verify(c, root, pre);
     skip_until = 0;
+    skip_note = 0;
     paint_cull = 0;
     tf_gc();
     wl_paint_popups(c);                     /* menús de las apps Wayland, encima de todo */
@@ -2506,23 +2735,35 @@ static int in_tree(const Node *n, const Node *root) {
     return 0;
 }
 
-static int subtree_protected(const Node *n, int depth) {
-    if (n->protect || (n->type == NODE_MEDIA && media_id_protected(n->term))) return 1;
+/* a protected node in n's subtree; with marks, a node an agent's screenshot blacks out too (a cached raster of it must be
+ * painted again: tf_paint) */
+static int subtree_hidden(const Node *n, int depth, int marks) {
+    if (n->protect || (marks && n->hands_black) || (n->type == NODE_MEDIA && media_id_protected(n->term))) return 1;
     if (depth > 4096) return 1;                     /* deeper than any real tree: treated as protected, never captured */
-    for (const Node *k = n->first; k; k = k->next) if (subtree_protected(k, depth + 1)) return 1;
+    for (const Node *k = n->first; k; k = k->next) if (subtree_hidden(k, depth + 1, marks)) return 1;
     return 0;
 }
+static int subtree_protected(const Node *n, int depth) { return subtree_hidden(n, depth, 1); }
+
+int paint_hands_capture, paint_hands_cursor;
 
 int paint_node_protected(const Node *n) {
     if (!n) return 0;
     for (const Node *a = n->parent; a; a = a->parent) if (a->protect) return 1;
-    return subtree_protected(n, 0);
+    return subtree_hidden(n, 0, 0);
 }
 
 int paint_capture_until(Canvas *c, Node *root, int last, const int *also, int n) {
     if (!root || last <= 0) return 0;
     Node *w = node_get(last);
-    if (w && in_tree(w, root) && paint_node_protected(w)) return -1;    /* a protected window alone: refused */
+    /* a protected window alone: refused (an agent's capture: only when the window itself or what holds it is protected;
+     * what is protected inside it is painted as the protected fill) */
+    int refuse = 0;
+    if (w && in_tree(w, root)) {
+        if (!paint_hands_capture) refuse = paint_node_protected(w);
+        else for (const Node *a = w; a && !refuse; a = a->parent) refuse = a->protect;
+    }
+    if (refuse) return -1;
     paint_capture_mode = 1;
     cap_last = last;
     cap_done = 0;

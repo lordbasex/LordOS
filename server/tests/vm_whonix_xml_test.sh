@@ -11,6 +11,8 @@ cd "$(dirname "$0")/.." || exit 1
 [ -x build/lord-vm-testpaths ] || { echo "skipped: needs build/lord-vm-testpaths"; exit 77; }
 for t in qemu-system-x86_64 qemu-img passt unshare python3; do command -v $t >/dev/null 2>&1 || { echo "skipped: needs $t"; exit 77; }; done
 [ -r /dev/kvm ] && [ -w /dev/kvm ] || { echo "skipped: needs KVM"; exit 77; }
+# Whonix's images are amd64 only, and lord-vm refuses a catalog system for another architecture (a Raspberry Pi 5)
+[ "$(uname -m)" = x86_64 ] || { echo "skipped: needs an x86-64 host (Whonix is amd64 only)"; exit 77; }
 REL=18.2.4.3
 D=$(mktemp -d "${TMPDIR:-/var/tmp}/lwxml.XXXXXX") || exit 1
 chmod 700 "$D"

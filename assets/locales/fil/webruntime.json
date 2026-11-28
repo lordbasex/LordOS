@@ -12,5 +12,9 @@
   "inspect.title": "Naka-on ang mga tool ng developer",
   "inspect.body": "Nabuksan ang mga ito sa iyong browser at mananatiling naka-on hanggang isara mo ang window na ito.",
   "inspect.open": "Buksan sa browser",
-  "inspect.failed": "Hindi masimulan ang mga tool ng developer"
+  "inspect.failed": "Hindi masimulan ang mga tool ng developer",
+  "save.image": "I-save ang larawan",
+  "save.video": "I-save ang video",
+  "save.audio": "I-save ang audio",
+  "hang.reloaded": "Hindi tumutugon ang page kaya muli itong ni-load"
 }

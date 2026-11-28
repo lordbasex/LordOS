@@ -110,6 +110,9 @@ const char *brokersrv_app_of_pid(int pid);
 /* The compositor delivered a paste (Ctrl+V, Shift+Insert, the clipboard panel) to isolated app `app`'s window: it
  * may read the clipboard once, right away (brokerclip.h, bclip_paste_gesture). */
 void brokersrv_paste_gesture(const char *app);
+/* Hands: 1 when an isolated app's request op is refused (the keyring, the FIDO key, a secret to the clipboard on an AI
+ * agent's input; the clipboard's secret while an agent is connected). Pure, for tests (tests/hands_test.c). */
+int  brokersrv_hands_refuses(int op, int agent_owns, int active, int sensitive);
 /* The theme publishes its state (type "theme" or "locale", JSON) and it's forwarded live to every
  * isolated app; it's also kept for the ones that start later (BOP_STATE). */
 int  brokersrv_publish(const char *kind, const char *json, size_t len);

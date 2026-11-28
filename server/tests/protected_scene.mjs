@@ -1,4 +1,4 @@
-// protected_scene.mjs — builds the test bundle of tests/protected_headless.sh (not run by itself): Lord Flow exactly as
+// protected_scene.mjs — builds the test bundle of tests/protected_headless.sh (not run by itself): Flow exactly as
 // tools/build-theme.mjs builds it, plus a small driver in the same SDK module instances that, in a real headless
 // session, opens Calculator protected (wm.open's `protected`, as Machines opens a machine with the anonymity profile) and
 // Notes unprotected side by side, tries to turn the locked protection off, and logs to shell.log:

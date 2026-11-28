@@ -712,6 +712,7 @@
   "agent.toolsAutoFailed": "Otomatik güncelleme çalışmadı ({have} → {want}).",
   "agent.toolsUpdateBtn": "Güncelle",
   "agent.st.needsTools": "Araçlar gerekli",
+  "agent.st.oldLordos": "İçindeki LordOS’u güncelleyin",
   "agent.st.needsXclip": "xclip gerekli",
   "agent.toolsInstalled": "LordOS araçları makinede yüklü ve çalışıyor; her oturum açılışında yeniden başlar.",
   "agent.timesync": "Saati Ayarla",
@@ -880,6 +881,8 @@
   "un.how.preseed": "Yanıtlar yükleyicinin kendi başlangıç dosyalarına girer, parolanız yalnızca karma olarak, ve sistem yüklendiğinde kaldırılır.",
   "un.how.autoinstall": "Yanıtlar yükleyicinin okuduğu küçük bir diske girer, parolanız yalnızca karma olarak, ve sistem yüklendiğinde disk kaldırılır.",
   "un.how.kickstart": "Yanıtlar yükleyicinin okuduğu küçük bir diske girer, parolanız yalnızca karma olarak, ve sistem yüklendiğinde disk kaldırılır.",
+  "un.how.kali": "Yanıtlar yükleyicinin kendi başlangıç dosyalarına girer, parolanız yalnızca karma olarak, ve sistem yüklendiğinde kaldırılır.",
+  "un.how.lordos": "Yanıtlar yükleyicinin okuduğu küçük bir diske girer, parolanız yalnızca karma olarak, ve sistem yüklendiğinde disk kaldırılır.",
   "un.image": "{file} üzerinden yükler; bu dosya da yapımcısının imzalı listesine göre denetlenir",
   "un.review": "Soru sormadan: {host} üzerinde {user} hesabı",
   "un.reviewOff": "Yükleyicinin sorularını siz yanıtlarsınız",
@@ -1100,6 +1103,7 @@
   "apps.menu": "Uygulamalar",
   "apps.needsAgent": "Uygulama modu, makinenin bağlı aracısını gerektirir",
   "win.appsNeedsTools": "Uygulama modu, makinede LordOS araçlarıyla birlikte LordOS veya Windows gerektirir",
+  "win.appsOldLordos": "Uygulama modu, makinenin içinde LordOS {version} veya daha yenisini gerektirir. Makinedeki LordOS’u güncelleyin; LordOS araçları tek başına yetmez.",
   "apps.noApps": "Makine henüz uygulamalarını listelemedi",
   "apps.gone": "Bu pencere makinede kapandı",
   "apps.dropTitle": "Bu dosyaları makinedeki bu pencereye vermek için bırakın",
@@ -2027,5 +2031,7 @@
   "req.row.answers": "Kurulum yanıtları",
   "req.use.answers": "Machines kendisi hazırlar: kurulacak bir şey yok",
   "req.st.download": "Oluştururken",
-  "req.st.builtin": "Yerleşik"
+  "req.st.builtin": "Yerleşik",
+  "cfg.closeOnStop": "Makine durunca pencereyi kapat",
+  "cfg.closeOnStopNote": "Kapatma veya Kapat'tan sonra. Bir sorun yüzünden durursa, ne olduğunu göstermek için pencere açık kalır."
 }

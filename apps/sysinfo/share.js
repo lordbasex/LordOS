@@ -11,6 +11,8 @@
 // the schema lists, in the forms it allows, so a field added to the collector is never shared until it is
 // added to the schema.
 
+import { toolkitRows } from './toolkits.js';
+
 export const FORMAT = 'lordos-hwreport';
 export const REPO_URL = 'https://github.com/lordbasex/LordOS';
 export const ISSUE_TEMPLATE = 'hardware-report.yml';
@@ -91,7 +93,9 @@ export const sameVersion = (a, b) => !!baseVersion(a) && baseVersion(a) === base
 // report: lord.sysinfo.report(); bench / desktop: the last LordBench peak and desktop results (or null);
 // compat: model.js compatibility(report). A bench result is kept only when it was measured with this LordOS
 // version, so the catalogue never files an old version's numbers under the new one.
-export function buildShareReport({ report, bench = null, desktop = null, compat = [], schema, date, source = 'community' }) {
+// toolkits: toolkits.js toolkitSection() of the last toolkit audit, only when the person ticked "Include framework
+// compatibility"; otherwise the key is left out, so a report without it is exactly what older checkers know.
+export function buildShareReport({ report, bench = null, desktop = null, compat = [], toolkits = null, schema, date, source = 'community' }) {
   const rep = report || {};
   const sw = rep.software || {};
   const lordos = String(sw.lordos || '');
@@ -108,6 +112,8 @@ export function buildShareReport({ report, bench = null, desktop = null, compat 
     desktop: d,
   };
   out.compatibility = pick(out.compatibility, schema.properties.compatibility, schema) || [];
+  const tk = toolkits ? pick(toolkits, { $ref: '#/$defs/toolkits' }, schema) : undefined;
+  if (tk) out.toolkits = tk;
   return out;
 }
 
@@ -196,6 +202,7 @@ export function summaryRows(rep) {
     ['boot', bootText(rep)],
     ['bench', rep && rep.bench ? rep.bench.mode : ''],
     ['compat', ((rep && rep.compatibility) || []).filter((c) => c.state !== 'absent').map((c) => `${c.id}=${c.state}`).join(' ')],
+    ['toolkits', toolkitRows(rep && rep.toolkits).map((r) => `${r.id}=${r.fatal ? r.fatal : r.score == null ? '-' : `${Math.floor(r.score)}%`}`).join(' ')],
   ];
   return rows.map(([k, v]) => [k, oneLine(v, 120)]).filter(([, v]) => v);
 }

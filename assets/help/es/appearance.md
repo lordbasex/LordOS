@@ -12,7 +12,7 @@ keywords: apariencia, modo oscuro, claro, color, acento, tema, fondo, transparen
   lentos.
 - **Fondo de pantalla:** [Ajustes → Fondo de pantalla](settings:wallpaper).
 - **Estilo de escritorio:** [Ajustes → Apariencia](settings:appearance) cambia todo el escritorio
-  en vivo, sin cerrar las apps: **Lord Flow** (barra de menú arriba y Dock) o **Lord Classic** (barra
+  en vivo, sin cerrar las apps: **Flow** (barra de menú arriba y Dock) o **Classic** (barra
   de tareas centrada con menú de inicio, ajustes rápidos y notificaciones). Las ventanas abiertas
   vuelven en el estilo nuevo. Cualquier otro tema instalado también aparece acá.
 

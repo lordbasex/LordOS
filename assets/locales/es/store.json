@@ -167,6 +167,7 @@
     "other": "Se actualizan {count}"
   },
   "remove": "Quitar",
+  "removeAsk": "¿Quitar {name}?",
   "rescue.ask": "Ninguna cuenta de este equipo es administradora. Si sabés la contraseña de root, podés hacer administradora a esta cuenta. Solo tiene efecto después de reiniciar el equipo.",
   "rescue.button": "Hacerme administrador",
   "rescue.noSudo": "Ninguna cuenta de este equipo es administradora y el paquete sudo no está instalado. Como root, ejecutá apt install sudo y volvé a probar acá.",
@@ -233,7 +234,7 @@
   },
   "suggest.nvidiaDriver.detail": "Ahora usa nouveau, el driver libre que viene con LordOS. El driver del fabricante ({packages}) suele dar mejor rendimiento 3D y mejor manejo de energía.",
   "suggest.nvidiaDriver.note.nouveau": "Hasta que lo instales se sigue usando el driver libre nouveau; si quitás el paquete, se vuelve a él.",
-  "suggest.nvidiaDriver.note.older": "Las placas anteriores a 2014, aproximadamente, no son compatibles con esta versión del driver; en ellas conviene seguir con el driver libre. El escritorio de LordOS todavía no se probó con este driver.",
+  "suggest.nvidiaDriver.note.older": "Las placas anteriores a 2014, aproximadamente, no son compatibles con esta versión del driver; en ellas conviene seguir con el driver libre. El escritorio de LordOS con este driver es experimental: un informe de la comunidad lo muestra compuesto en la placa (una GTX 1070 con el driver 580); uno anterior lo componía el procesador.",
   "suggest.nvidiaDriver.note.secureBoot": "El driver se compila para tu kernel en este equipo (DKMS) y de nuevo después de cada actualización del kernel. Con el Arranque seguro activado, tenés que registrar su clave de firma en el próximo reinicio, o el driver no carga.",
   "suggest.nvidiaDriver.title": "Driver gráfico propietario",
   "suggest.nvidiaDriver.unavailable": "El driver del fabricante necesita los componentes contrib y non-free de Debian, y no están los dos habilitados en los orígenes de paquetes de este equipo. El driver libre, nouveau, sigue funcionando.",

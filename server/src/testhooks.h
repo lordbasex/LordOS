@@ -26,6 +26,8 @@
  *                       media_composed hands the remote desktop, the screen-sharing API and the recording; portal, the
  *                       Screenshot portal's still of the screen (cast_still); window N, a window (node N) shared alone.
  *                       The protected windows' test (tests/protected_headless.sh, docs/PRIVACY.md)
+ *   where               "ok X Y": where the person's pointer image is drawn (Hands: an agent's input never moves it,
+ *                       tests/hands_e2e.py)
  *   painted             "ok N": the pixels of the UI repainted (its damage, summed over every frame) since the last
  *                       time it was asked. A fullscreen window's subsurface repaints its own box, not the window's
  *                       place (tests/fsub_headless.sh, GitHub #232)
@@ -47,6 +49,7 @@ typedef struct {
     void (*key)(int code, int down);                             /* a key (testhooks.c checks the code's range) */
     int  (*frame)(const char *which, long node);                 /* 0 when the picture was written */
     long long (*painted)(void);                                  /* UI pixels repainted since the last call */
+    void (*where)(int *x, int *y);                               /* where the person's pointer image is */
 } TestHooks;
 
 int  testhooks_start(const TestHooks *h);   /* after dropping privileges; 0 when the socket listens */

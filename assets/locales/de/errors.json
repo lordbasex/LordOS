@@ -234,6 +234,7 @@
   "fs.moveRemoveFailed": "Kopiert, aber das Original konnte nicht entfernt werden: {errno}",
   "fs.noTrash": "Für diesen Ort gibt es keinen Papierkorb",
   "fs.notFile": "Das ist keine Datei",
+  "fs.notFolder": "Das ist kein Ordner",
   "fs.notInTrash": "Es liegt nicht im Papierkorb",
   "fs.notRegular": "Das ist keine reguläre Datei (ist es ein Link?)",
   "fs.openFailed": "Die Datei konnte nicht geöffnet werden: {errno}",
@@ -243,11 +244,13 @@
   "fs.systemFolder": "Dateien zeigt die internen Ordner des Systems nicht an (/proc, /sys, /dev und /run)",
   "fs.tooLarge": "Die Datei ist zu groß (max. {max})",
   "fs.tooManyCopies": "Zu viele laufende Kopiervorgänge; versuche es erneut, wenn einer fertig ist",
+  "fs.tooManyWatches": "Es werden zu viele Ordner überwacht (max. {max})",
   "fs.trashBadOrigin": "Der ursprüngliche Ort ist ungültig",
   "fs.trashEntryFailed": "Der Papierkorbeintrag konnte nicht erstellt werden",
   "fs.trashOriginGone": "Der ursprüngliche Ordner existiert nicht mehr",
   "fs.trashOtherDisk": "Es liegt auf einem anderen Datenträger als sein Papierkorb",
   "fs.trashRestoreExists": "Am ursprünglichen Ort gibt es bereits eine Datei mit diesem Namen",
+  "fs.watchRemote": "Änderungen in Cloud- und Netzwerkordnern können nicht verfolgt werden; der Ordner wird stattdessen neu aufgelistet",
   "fw.bpfConfig": "BPF konnte nicht konfiguriert werden: {errno}",
   "fw.bpfMaps": "Die BPF-Maps konnten nicht erstellt werden: {errno}",
   "fw.bpfMissing": "Das Programm {program} fehlt",
@@ -963,5 +966,9 @@
   "sentinela.notBlocked": "Dieses Programm steht nicht auf der Sperrliste.",
   "sentinela.noAppNetwork": "Dieser Prozess hat keine eigene App, deren Netzwerk gesperrt werden kann.",
   "sys.failed": "Etwas ist schiefgelaufen.",
-  "sys.unsupported": "Diese Version von LordOS kann das nicht."
+  "sys.unsupported": "Diese Version von LordOS kann das nicht.",
+  "theme.notAllowed": "{call} ist für Community-Themes nicht verfügbar",
+  "theme.noHost": "Der LordOS-Teil des Schreibtischstils fehlt",
+  "hands.refused": "Nur du kannst das tun: nie die Eingabe eines KI-Agenten",
+  "install.diskTooManyParts": "Dieser Datenträger hat zu viele Partitionen, als dass das Installationsprogramm sie auflisten könnte"
 }

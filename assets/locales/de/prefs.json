@@ -202,6 +202,7 @@
   "power.healthNormal": "Batteriezustand: {pct} % (normal)",
   "power.healthService": "Batteriezustand: {pct} % (Wartung empfohlen)",
   "power.healthUnknown": "Batteriezustand: unbekannt",
+  "power.h": "{h} Std.",
   "power.hm": "{h} Std. {m} Min.",
   "power.immediately": "Sofort",
   "power.left": "{time} verbleibend",

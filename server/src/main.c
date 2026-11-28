@@ -26,15 +26,17 @@
 #include "bench/lbinput.h"
 #ifdef LORD_TEST_HOOKS
 #include "testhooks.h"           /* build/lord-server-test only */
-#include "media/media_int.h"     /* the capture paths' pictures (test_frame) */
 #include "cast/castproto.h"
 #endif
+#include "media/media_int.h"     /* the capture paths' pictures (test_frame, Hands' screenshots) */
 #include "net/net.h"
 #include "disk/disk.h"
 #include "backup/backup.h"
 #include "cloud/cloud.h"
 #include "ui/js_cloud.h"
 #include "fsasync.h"
+#include "bgsave.h"
+#include "fswatch.h"
 #include "sound/snd.h"
 #include "ui/wave.h"
 #include "sec/json.h"
@@ -52,6 +54,7 @@
 #include <sys/resource.h>
 #include "term/term.h"
 #include "ui/js.h"
+#include "ui/js_theme.h"
 #include "ui/js_input.h"
 #include "ui/ui.h"
 #include "wl/wl.h"
@@ -76,6 +79,7 @@
 #include "media/media.h"
 #include "media/svgicon.h"
 #include "web/webmgr.h"
+#include "ui/webalive.h"
 #include "app/app.h"
 #include "app/apphost_bc.h"
 #include "sec/broker.h"
@@ -106,6 +110,12 @@
 #include "sec/netconn.h"
 #include "bench/lbframes.h"
 #include "fpipe.h"
+#include "nofile.h"
+#include "hands/hands.h"
+#include "hands/handsimg.h"
+#include "hands/handsmark.h"
+#include "hands/handscur.h"
+#include "ui/js_hands.h"
 
 #include <ctype.h>
 #include <libgen.h>
@@ -325,6 +335,10 @@ static SoftPace pace_sw;                /* the next frame's slot when frames are
 static FPipe fpipe;                     /* LORD_PIPELINE (fpipe.h), read once at startup */
 static void prep_undo_all(Server *s) { for (int i = 0; i < OUT_MAX; i++) prep_undo(&s->out[i]); }
 
+/* the watchdog's full modesets for a display whose page flip never completed, since one last completed (main loop) */
+#define FLIP_RECOVER_MAX 3
+static int flip_recover[OUT_MAX];
+
 static int any_flip_pending(const Server *s) {
     for (int i = 0; i < OUT_MAX; i++) if (s->out[i].on && s->out[i].kms.flip_pending) return 1;
     return 0;
@@ -343,8 +357,26 @@ static int out_rects(const Server *s, ORect *r, int *idx) {
 }
 /* where the pointer's image is drawn: at the pointer, or where a pointer lock's owner shows it (pointerlock.h: a
  * machine's guest pointer, inside its picture; the pointer itself stays put) */
+/* Hands (docs/HANDS.md "The agent's cursor"): an agent's input goes through the pointer's own path, but the person's
+ * pointer stays where they left it. The first agent move keeps the person's position; their pointer's image is drawn
+ * there while the agent holds the pointer, and their next pointer input of their own (a move, a button, a wheel, a
+ * remote viewer's) takes it back from there (hands_reclaim). */
+static int hands_borrowed, hands_px, hands_py;
 static void cursor_at(const Server *s, int *x, int *y) {
-    if (!ptrlock_cursor(x, y)) { *x = s->cx; *y = s->cy; }
+    if (!ptrlock_cursor(x, y)) {
+        *x = hands_borrowed ? hands_px : s->cx;
+        *y = hands_borrowed ? hands_py : s->cy;
+    }
+}
+static void hands_reclaim(Server *s) {
+    if (!hands_borrowed) return;
+    hands_borrowed = 0;
+    s->cx = hands_px;
+    s->cy = hands_py;
+    s->lx = s->cx;
+    s->ly = s->cy;
+    s->moved = 1;
+    s->cursor_dirty = 1;
 }
 /* the display under the pointer's image (-1 headless or none) */
 static int out_at_pointer(const Server *s) {
@@ -689,6 +721,8 @@ static void remote_settle(Server *s) {
 
 static void remote_pointer(int fx, int fy) {
     Server *s = remote_server;
+    hands_person_input();                   /* a viewer at the remote desktop is a person too (hands.h) */
+    hands_reclaim(s);
     double lx, ly;                          /* frame pixels of the feed → logical */
     out_to_logical(&feed_out(s)->v, fx, fy, &lx, &ly);
     int x = (int)lround(lx), y = (int)lround(ly);
@@ -711,6 +745,9 @@ static void remote_pointer(int fx, int fy) {
 
 static void remote_button(int button, int down) {
     Server *s = remote_server;
+    hands_person_input();                   /* a viewer at the remote desktop is a person too (hands.h) */
+    hands_reclaim(s);
+    if (down) hands_person_press();
     if (ptrlock_button(button, down)) return;
     if (s->nbuttons < MAX_BUTTONS) s->buttons[s->nbuttons++] = (ButtonEvent){ down, button };
     remote_settle(s);
@@ -718,6 +755,8 @@ static void remote_button(int button, int down) {
 
 static void remote_wheel(int steps) {
     Server *s = remote_server;
+    hands_person_input();                   /* a viewer at the remote desktop is a person too (hands.h) */
+    hands_reclaim(s);
     if (ptrlock_wheel(steps, 0)) return;
     s->wheel += steps;
     remote_settle(s);
@@ -738,6 +777,8 @@ static void keyboards_check(Server *s) {
 
 static void remote_key(int code, int value) {
     Server *s = remote_server;
+    hands_person_input();                   /* a viewer at the remote desktop is a person too (hands.h) */
+    if (value == 1) hands_person_press();
     if (pkagent_blocks_injected(value)) return;           /* an authentication prompt takes only this computer's keys */
     if (value == 1 && code >= KEY_Q && code <= KEY_M && !remote_typed) { remote_typed = 1; keyboards_check(s); }
     if (code == KEY_LEFTCTRL || code == KEY_RIGHTCTRL) s->ctrl = value != 0;
@@ -924,6 +965,229 @@ static void share_text_pump(void) {
 static int share_person(void) { return !remote_server->headless && !display_is_off(); }
 static void share_activity(void) { display_activity(now_ms()); }
 static int share_restricted(const char *id) { return restrict_blocks(id, FW_R_NO_SCREEN); }
+
+/* ---- Hands: an AI agent's input and screenshots (hands/hands.h, docs/HANDS.md; approved by the maintainer 2026-11-26) ----
+ * The agent's pointer, wheel and keys go through the same path as the remote desktop's (remote_settle, dispatch_pointer,
+ * hit test, js_key, the Wayland apps), never /dev/uinput or evdev. hands.c decided the call may happen; these say where
+ * a point or a key would land and refuse the places an agent never reaches. */
+
+/* the system band (sdk/layers.js: system 100, agent 105, input 110, capture 120): HANDS_SYSTEM_Z, handsmark.h */
+static int hands_node_place(const Node *n) {
+    if (pkagent_blocks_injected(1)) return HANDS_WHY_PROMPT;   /* an authentication prompt takes only real keys and clicks */
+    for (const Node *a = n; a; a = a->parent) {
+        if (a->protect) return HANDS_WHY_PROTECTED;
+        if (a->hands_deny) return HANDS_WHY_DENIED_NODE;
+        if (a->parent == ui.root && a->s.z_index >= HANDS_SYSTEM_Z) return HANDS_WHY_SYSTEM;
+    }
+    return 0;
+}
+static int hands_place(double x, double y, int *node) {
+    Node *t = ui.root ? hit_test(ui.root, (float)x, (float)y) : NULL;
+    *node = t ? t->id : 0;
+    if (!t) return pkagent_blocks_injected(1) ? HANDS_WHY_PROMPT : 0;
+    return hands_node_place(t);
+}
+static int hands_node_place_id(int id) {
+    const Node *n = id > 0 ? node_get(id) : NULL;
+    return n ? hands_node_place(n) : HANDS_WHY_OUTSIDE;
+}
+static int hands_same_target(int hit, int ref) {
+    if (hit <= 0 || ref <= 0) return 0;
+    const Node *h = node_get(hit), *r = node_get(ref);
+    if (!h || !r) return 0;
+    for (const Node *a = h; a; a = a->parent) if (a == r) return 1;     /* the click lands inside the ref */
+    for (const Node *a = r; a; a = a->parent) {                          /* or on what holds it, below its window */
+        if (a == h) return 1;
+        if (a->parent == ui.root) break;
+    }
+    return 0;
+}
+/* a system prompt or Screenshots' selection shows (they take the keyboard): an agent's key would go there */
+static int hands_prompt_up(void) {
+    for (const Node *n = ui.root ? ui.root->first : NULL; n; n = n->next) {
+        int z = (int)n->s.z_index;
+        if ((z == 100 || z == 120) && n->first) return 1;
+    }
+    return 0;
+}
+static int hands_keys_place(void) {
+    if (pkagent_blocks_injected(1)) return HANDS_WHY_PROMPT;
+    if (hands_prompt_up()) return HANDS_WHY_SYSTEM;
+    if (wl_has_key_focus()) {
+        if (wl_focus_protected()) return HANDS_WHY_PROTECTED;
+        if (wl_textinput_secret()) return HANDS_WHY_PASSWORD;
+    }
+    return 0;
+}
+static void hands_size(int *w, int *h) { *w = remote_server->W; *h = remote_server->H; }
+static int hands_pointer_locked(void) { return ptrlock_active() || wl_pointer_locked(); }
+static void hands_move(double x, double y) {
+    Server *s = remote_server;
+    if (!hands_borrowed) { hands_borrowed = 1; hands_px = s->cx; hands_py = s->cy; }    /* the person's, kept */
+    int ix = (int)lround(x), iy = (int)lround(y);
+    if (ix != s->cx || iy != s->cy) {
+        s->rdx += ix - s->cx;
+        s->rdy += iy - s->cy;
+        s->cx = ix;
+        s->cy = iy;
+        wl_pointer_relative(s->rdx, s->rdy);
+        s->rdx = s->rdy = 0;
+    }
+    s->moved = 1;                           /* a hover over the same place still tells what is under it */
+    remote_settle(s);
+}
+static void hands_button(int button, int down) {
+    Server *s = remote_server;
+    if (s->nbuttons < MAX_BUTTONS) s->buttons[s->nbuttons++] = (ButtonEvent){ down, button };
+    remote_settle(s);
+}
+static void hands_wheel(int dx, int dy) {
+    Server *s = remote_server;
+    if (dy) { s->wheel += dy; remote_settle(s); }
+    if (dx) { tp_route_wheel120(0, dx * 120); tp_route_wheel_flush(); }
+}
+/* one key, as the remote desktop types it: the modifiers' state follows (remote_key) */
+static void hands_keyev(int code, int value) {
+    Server *s = remote_server;
+    if (pkagent_blocks_injected(value)) return;
+    if (code == KEY_LEFTCTRL || code == KEY_RIGHTCTRL) s->ctrl = value != 0;
+    if (code == KEY_LEFTALT || code == KEY_RIGHTALT) s->alt = value != 0;
+    if (code == KEY_LEFTMETA || code == KEY_RIGHTMETA) s->meta = value != 0;
+    js_key(code, value);
+}
+/* a key with its level's modifiers (Shift, AltGr) and the chord's, pressed and released */
+static void hands_press(int code, int level, unsigned mods) {
+    static const struct { unsigned m; int code; } M[] = {
+        { HANDS_M_CTRL, KEY_LEFTCTRL }, { HANDS_M_ALT, KEY_LEFTALT }, { HANDS_M_SUPER, KEY_LEFTMETA }, { HANDS_M_SHIFT, KEY_LEFTSHIFT },
+    };
+    if (level & OSK_LEVEL_SHIFT) mods |= HANDS_M_SHIFT;
+    int altgr = (level & OSK_LEVEL_ALTGR) && kb_has_altgr();
+    for (int i = 0; i < 4; i++) if (mods & M[i].m) hands_keyev(M[i].code, 1);
+    if (altgr) hands_keyev(KEY_RIGHTALT, 1);
+    hands_keyev(code, 1);
+    hands_keyev(code, 0);
+    if (altgr) hands_keyev(KEY_RIGHTALT, 0);
+    for (int i = 3; i >= 0; i--) if (mods & M[i].m) hands_keyev(M[i].code, 0);
+}
+static int hands_key(const HandsChord *c) {
+    int code = c->code, level = 0;
+    if (!code) {
+        if (!kb_labels_begin()) return -1;
+        int ok = share_key_of(c->ch, &code, &level);
+        kb_labels_end();
+        if (!ok) return -1;
+        if (c->mods & (HANDS_M_CTRL | HANDS_M_ALT | HANDS_M_SUPER)) level &= ~OSK_LEVEL_ALTGR;   /* ctrl+s: the key, not its symbol */
+    }
+    /* a paste, by the key that will be pressed (whatever the layout calls it): never while the clipboard holds a secret */
+    unsigned pm = c->mods | ((level & OSK_LEVEL_SHIFT) ? HANDS_M_SHIFT : 0);
+    if (term_clipboard_sensitive() && ((code == KEY_V && (pm & (HANDS_M_CTRL | HANDS_M_SUPER))) || (code == KEY_INSERT && (pm & HANDS_M_SHIFT)) ||
+                                       code == KEY_PASTE || hands_paste_chord(c))) return -2;
+    hands_press(code, level, c->mods);
+    return 0;
+}
+/* text with no line breaks or tabs (hands.c sends those as keys and checks the field again): through the active layout
+ * as share_text_pump does, all at once; a Linux app's field with text input gets it as one input method's commit */
+static int hands_type(const char *t, size_t n) {
+    if (!n) return 0;
+    if (js_text_input_app()) {
+        char *z = strndup(t, n);
+        if (!z) return HANDS_WHY_NOT_EDITABLE;
+        js_input_flush();
+        js_commit_text(z);
+        free(z);
+        return 0;
+    }
+    int labels = kb_labels_begin();
+    for (size_t off = 0; off < n;) {
+        int w = hands_keys_place();
+        if (w) { if (labels) kb_labels_end(); return w; }
+        uint32_t cp = 0;
+        int l = sw_utf8_next(t + off, n - off, &cp);
+        if (l <= 0) break;
+        char want[8] = "";
+        memcpy(want, t + off, (size_t)l);
+        int code, lv;
+        char base[8], dead[16];
+        const char *mark;
+        int dcode, dlv;
+        if (labels && share_key_of(want, &code, &lv)) hands_press(code, lv, 0);
+        else if (labels && sw_dead_split(cp, base, &mark) && (size_t)snprintf(dead, sizeof dead, "dead:%s", mark) < sizeof dead &&
+                 share_key_of(dead, &dcode, &dlv) && share_key_of(base, &code, &lv)) {
+            hands_press(dcode, dlv, 0);
+            hands_press(code, lv, 0);
+        } else {
+            js_input_flush();
+            js_commit_text(want);           /* no key types it: an input method's finished text (dropped where none takes it) */
+        }
+        off += (size_t)l;
+    }
+    if (labels) kb_labels_end();
+    return 0;
+}
+/* what a capture by an agent leaves out (hands/handsmark.c): the system band, handsDeny nodes, other apps' windows with
+ * an allowlist, marked for the capture and put back; when they can't all be marked, there is no capture (fail closed) */
+static int hands_marked[HANDS_MARK_MAX + HANDS_BLACK_MAX], hands_nmarked;
+static Node *hands_node_get(int id) { return node_get(id); }
+static uint8_t *hands_shot(int kind, uint32_t display, int node, double x, double y, double w, double h, int maxdim,
+                           const int *black, int nblack, const int *also, int nalso, size_t *len, int *iw, int *ih, char *meta, size_t metan) {
+    *len = 0;
+    MediaSrc *m = NULL;
+    double lx = 0, ly = 0, lw = remote_server->W, lh = remote_server->H;
+    if (hands_mark_nodes(ui.root, hands_node_get, black, nblack, hands_marked, (int)(sizeof hands_marked / sizeof hands_marked[0]), &hands_nmarked)) {
+        fprintf(stderr, "lord-server: Hands: a screenshot refused: not everything it must hide could be hidden\n");
+        return NULL;
+    }
+    /* an agent's capture: the marks black, its own cursor left out, a window refused only when it is itself protected */
+    paint_hands_capture = 1;
+    paint_hands_cursor = handscur_root();
+    if (kind != HANDS_SHOT_DISPLAY) {
+        /* the part of the desktop it really shows (a window partly off the screen): what lordos-mcp maps points with */
+        double W = remote_server->W, H = remote_server->H, x0 = fmax(0, floor(x)), y0 = fmax(0, floor(y));
+        double x1 = fmin(W, floor(x) + floor(w)), y1 = fmin(H, floor(y) + floor(h));
+        if (x1 - x0 < 1 || y1 - y0 < 1) { paint_hands_capture = 0; hands_unmark_nodes(hands_node_get, hands_marked, hands_nmarked); hands_nmarked = 0; return NULL; }
+        x = x0; y = y0; w = x1 - x0; h = y1 - y0;
+    }
+    if (kind == HANDS_SHOT_DISPLAY) {
+        const DisplayPlan *plan = display_current();
+        const DisplayOut *o = NULL;
+        for (int i = 0; i < plan->n && !o; i++) if (display ? plan->o[i].conn == display : i == plan->main) o = &plan->o[i];
+        if (display && !o) { paint_hands_capture = 0; hands_unmark_nodes(hands_node_get, hands_marked, hands_nmarked); hands_nmarked = 0; return NULL; }
+        if (o) { lx = o->v.x; ly = o->v.y; lw = o->v.w; lh = o->v.h; }
+        m = media_screenshot("hands", 0, 0, 0, 0, o ? o->conn : 0, 0, NULL, 0, NULL);
+    } else if (kind == HANDS_SHOT_WINDOW) {
+        lx = x; ly = y; lw = w; lh = h;
+        m = media_screenshot("hands", (int)x, (int)y, (int)w, (int)h, 0, node, also, nalso < PAINT_ALSO_MAX ? nalso : PAINT_ALSO_MAX, NULL);
+    } else {
+        lx = x; ly = y; lw = w; lh = h;
+        m = media_screenshot("hands", (int)x, (int)y, (int)w, (int)h, 0, 0, NULL, 0, NULL);
+    }
+    paint_hands_capture = 0;
+    hands_unmark_nodes(hands_node_get, hands_marked, hands_nmarked);
+    hands_nmarked = 0;
+    if (!m || !m->px) { if (m) media_src_close(m); return NULL; }
+    hands_fit(m->w, m->h, maxdim, kind == HANDS_SHOT_REGION, iw, ih);
+    uint8_t *rgb = hands_scale_rgb(m->px, m->w, m->w, m->h, *iw, *ih);
+    media_src_close(m);
+    uint8_t *png = rgb ? hands_png(rgb, *iw, *ih, len) : NULL;
+    free(rgb);
+    snprintf(meta, metan, "{\"x\":%.0f,\"y\":%.0f,\"w\":%.0f,\"h\":%.0f,\"width\":%d,\"height\":%d}", lx, ly, lw, lh, *iw, *ih);
+    return png;
+}
+static char *hands_shell(const char *op, const char *json) { return js_hands_call(op, json); }
+static double hands_now(void) { return now_ms(); }
+static int hands_clip_sensitive(void) { return term_clipboard_sensitive(); }
+static void hands_cursor_ev(int what, double x, double y, double w, double h) { handscur_event(what, x, y, w, h, now_ms()); }
+static int hands_pointer_at(double *x, double *y) {
+    const Server *s = remote_server;
+    *x = hands_borrowed ? hands_px : s->cx;
+    *y = hands_borrowed ? hands_py : s->cy;
+    return 1;
+}
+static const HandsHost hands_host_impl = {
+    hands_shell, js_hands_event, hands_size, hands_pointer_locked, hands_place, hands_same_target, hands_node_place_id, hands_keys_place,
+    hands_move, hands_button, hands_wheel, hands_key, hands_type, hands_shot, hands_now, hands_clip_sensitive,
+    hands_cursor_ev, hands_pointer_at,
+};
 
 static void remote_greeter(const char *json) { js_greeter_event(json); }
 static void remote_notice(const char *json) { js_remote_notice(json); }
@@ -1323,6 +1587,9 @@ static void vt_signal(Server *s) {
 }
 
 /* Ctrl and Alt as the kernel has them on one keyboard right now (EVIOCGKEY); 0 when it can't be asked */
+/* the community themes' watchdog (community_watch, below): Ctrl+Alt+Shift+Backspace sets rescue */
+static struct { double since; int healthy; volatile int rescue; char prev[1024]; } cw;
+
 static int zap_held(int fd, int *ctrl, int *alt) {
     unsigned char keys[KEY_MAX / 8 + 1];
     memset(keys, 0, sizeof keys);
@@ -1337,7 +1604,13 @@ static int zap_held(int fd, int *ctrl, int *alt) {
 static void tablet_input(Server *s, const InputDevice *d, const struct input_event *ev);
 static void on_input(void *ud, const InputDevice *d, const struct input_event *ev) {
     Server *s = ud;
-    if (ev->type == EV_KEY || ev->type == EV_REL || ev->type == EV_ABS) display_input(now_ms());
+    if (ev->type == EV_KEY || ev->type == EV_REL || ev->type == EV_ABS) {
+        display_input(now_ms());
+        hands_person_input();               /* the person's own input wins: an agent waits (hands.h) */
+        if (ev->type == EV_KEY && ev->value == 1) hands_person_press();   /* a real click or key: theirs again (not motion) */
+        /* their pointer, back where they left it (after hands_person_input: an agent's drag let go where it was) */
+        if (ev->type != EV_KEY || ev->code >= BTN_MISC) hands_reclaim(s);
+    }
     if (s->debug && ev->type != EV_SYN)
         fprintf(stderr, "ev %s type=%u code=%u value=%d\n", d->name, ev->type, ev->code, ev->value);
     if (d->tab) { tablet_input(s, d, ev); return; }     /* a graphics tablet's pen or pad (tablet.c) */
@@ -1402,6 +1675,16 @@ static void on_input(void *ud, const InputDevice *d, const struct input_event *e
         /* Ctrl+Alt+Backspace ends the session at once. The modifiers are tracked from every keyboard and a release can
          * be lost (another console, a keyboard that sleeps or reconnects), so the kernel is asked whether Ctrl and Alt
          * are really held on this keyboard: a stale state must never end a session on a lone Backspace. */
+        /* Ctrl+Alt+Shift+Backspace: back to Flow, whatever theme runs (a community theme can't take this key: it is
+         * handled here, before any JavaScript; community_watch does the switch) */
+        if (ev->code == KEY_BACKSPACE && ev->value == 1 && s->ctrl && s->alt && s->shift && !s->greeter) {
+            int ctrl = 0, alt = 0;
+            if (zap_held(d->fd, &ctrl, &alt) && ctrl && alt) {
+                fprintf(stderr, "lord-server: Ctrl+Alt+Shift+Backspace on %s: restoring Flow\n", d->name);
+                cw.rescue = 1;
+            }
+            break;
+        }
         if (ev->code == KEY_BACKSPACE && ev->value == 1 && s->ctrl && s->alt) {
             int ctrl = 0, alt = 0;
             if (zap_held(d->fd, &ctrl, &alt) && ctrl && alt) {
@@ -1410,6 +1693,16 @@ static void on_input(void *ud, const InputDevice *d, const struct input_event *e
             } else {
                 fprintf(stderr, "lord-server: Backspace on %s with Ctrl and Alt noted but not held: the session goes on\n", d->name);
                 s->ctrl = ctrl; s->alt = alt;
+            }
+        }
+        /* Hands' panic key, Ctrl+Alt+Esc: every agent stopped and Hands off for the session (hands.h), here on the
+         * physical keyboard, before any JavaScript; nothing an agent injects passes through on_input */
+        if (ev->code == KEY_ESC && ev->value == 1 && s->ctrl && s->alt && !s->shift) {
+            int ctrl = 0, alt = 0;
+            if (zap_held(d->fd, &ctrl, &alt) && ctrl && alt) {
+                fprintf(stderr, "lord-server: Ctrl+Alt+Esc on %s: every AI agent stopped (Hands)\n", d->name);
+                hands_panic();
+                break;
             }
         }
         /* ends a share with no JavaScript in the way; only here, on the physical keyboard: what the API or
@@ -1543,6 +1836,7 @@ static void tablet_gone(Server *s, const InputDevice *d) {
 /* the UI's repainted pixels, summed (render_ui) and taken by the test hooks' "painted" */
 static long long test_painted_px;
 static long long test_painted(void) { long long n = test_painted_px; test_painted_px = 0; return n; }
+static void test_where(int *x, int *y) { cursor_at(remote_server, x, y); }
 #endif
 
 #ifdef LORD_TEST_HOOKS
@@ -1821,6 +2115,9 @@ static void paint_verify(Out *o, int index, Rect skip) {
 }
 
 /* Paints a display's pending damage into its frame at its scale. Returns the physical rect painted. */
+/* the GPU's frosted glass may be used (paint_out): GPU composition, LORD_GPU_FROST not 0, and no remote viewer or
+ * recording reading the canvas (they would get the picture unblurred under the frosted nodes); set in the main loop */
+static int frost_want;
 static Rect paint_out(Server *s, Out *o, int index, int feed) {
     Rect r = { 0, 0, 0, 0 };
     Box b = o->pend;
@@ -1874,6 +2171,9 @@ static Rect paint_out(Server *s, Out *o, int index, int feed) {
     double t0 = now_ms(), px = 0;
     view_of(o, index);
     paint_blur_cache_on = 1;                /* a display's scene: its blurred backdrops may be kept and reused */
+    /* frosted nodes over a GPU-drawn moving wallpaper: blurred by the GPU (paint.c frost_source), on a GPU display that is
+     * not turned and while nothing reads the canvas as the screen (frost_want, the main loop) */
+    paint_gpu_frost = frost_want && o->gpu >= 0 && gpu_active() && !(o->d.rot & 3);
     for (int k = 0; k < nparts; k++) {
         Box q = parts[k];
         Rect pr = whole ? (Rect){ 0, 0, o->scene.w, o->scene.h } : out_phys_rect(&o->v, q.x0, q.y0, q.x1, q.y1);
@@ -1898,6 +2198,7 @@ static Rect paint_out(Server *s, Out *o, int index, int feed) {
         px += (double)(pr.x1 - pr.x0) * (pr.y1 - pr.y0);
     }
     paint_blur_cache_on = 0;
+    paint_gpu_frost = 0;
     canvas_set_clip(&o->scene, (Rect){ 0, 0, o->scene.w, o->scene.h });
     ui.damage = (Box){ 0, 0, 0, 0 };
     view_reset();
@@ -2540,11 +2841,14 @@ static int render_frame(Server *s) {
     if (wlk && gpu_active())
         for (int i = 0; i < OUT_MAX; i++) if (s->out[i].on && s->out[i].gpu >= 0 && (wlk >> i & 1)) s->out[i].wl_new = 1;
     /* a machine's new frame in the texture its window draws (media_src_present): only the displays it is on */
-    float mx0, my0, mx1, my1;
-    if (media_present_take(&mx0, &my0, &mx1, &my1) && gpu_active())
+    float mb[32][4];
+    int nmb = media_present_take(mb, 32);
+    if (nmb && gpu_active())
         for (int i = 0; i < OUT_MAX; i++) {
             Out *o = &s->out[i];
-            if (o->on && o->gpu >= 0 && mx0 < o->v.x + o->v.w && mx1 > o->v.x && my0 < o->v.y + o->v.h && my1 > o->v.y) o->wl_new = 1;
+            if (!o->on || o->gpu < 0) continue;
+            for (int b = 0; b < nmb; b++)
+                if (mb[b][0] < o->v.x + o->v.w && mb[b][2] > o->v.x && mb[b][1] < o->v.y + o->v.h && mb[b][3] > o->v.y) { o->wl_new = 1; break; }
         }
     Out *feed = feed_out(s), *mo = main_out(s);
     int main_shown = 0, main_built = 0;     /* the main display got this frame; built here (not prepared before) */
@@ -2737,6 +3041,10 @@ static void chosen_theme(const char *asked, char *out, size_t n) {
         snprintf(root, sizeof root, "%s", dirname(a));   /* .../themes */
         size_t bl = ok ? (size_t)snprintf(b, sizeof b, "%s/%s/theme.bundle.js", root, id) : 0;
         if (ok && bl < n && !access(b, R_OK)) memcpy(out, b, bl + 1);
+        /* (0.8.9.6.2) a community theme the person installed from a file (js_theme.c): unless it already ended too many
+         * sessions in a row (then it is marked failed and the session starts in the theme asked for) */
+        else if (ok && !jst_bundle_path(id, b, sizeof b) && strlen(b) < n && !access(b, R_OK) && !jst_session_starting(id))
+            memcpy(out, b, strlen(b) + 1);
         json_free(&doc);
     }
     free(text);
@@ -2751,7 +3059,16 @@ static int start_theme(const char *theme, int greeter, char *used, size_t n) {
     snprintf(used, n, "%s", theme);
     int r = js_init(theme);
     if (r == 0) return 0;
-    if (r != JS_REFUSED && codesig_state() != CODE_INVALID) return -1;
+    char cid[32];
+    int community = jst_is_user_bundle(theme, cid, sizeof cid);
+    if (community) {                    /* a community theme that didn't start: marked failed, the session goes on in ours */
+        const char *why = js_init_error();
+        snprintf(ui.theme_failed, sizeof ui.theme_failed, "%s", theme);
+        snprintf(ui.theme_failed_why, sizeof ui.theme_failed_why, "%s", why[0] ? why : "the theme's code did not load (see the log)");
+        ui.theme_failed_code = 0;
+        jst_mark_failed(cid, ui.theme_failed_why);
+    }
+    if (!community && r != JS_REFUSED && codesig_state() != CODE_INVALID) return -1;
     if (r == JS_REFUSED) {              /* lord.themes.use won't go back to it */
         snprintf(ui.theme_failed, sizeof ui.theme_failed, "%s", theme);
         snprintf(ui.theme_failed_why, sizeof ui.theme_failed_why, "refused by the verified-code check (sec/codesig.c)");
@@ -2765,6 +3082,7 @@ static int start_theme(const char *theme, int greeter, char *used, size_t n) {
         snprintf(root, sizeof root, "%s", d);
         snprintf(tmp, sizeof tmp, "%s", root);
         snprintf(root, sizeof root, "%s", dirname(tmp));   /* .../themes */
+        if (jst_system_themes()[0]) snprintf(root, sizeof root, "%s", jst_system_themes());
         static const char *const fallback[] = { "default", "classic" };
         for (size_t i = 0; i < sizeof fallback / sizeof fallback[0]; i++) {
             char alt[sizeof ui.theme_request];
@@ -2854,6 +3172,75 @@ static int check_code(int argc, char **argv) {
     return bad ? 1 : 0;
 }
 
+/* ---- the community themes' watchdog (js_theme.c; docs/THEMES-GUIDE.md, "Community themes") ----
+ * A community theme that throws at its start, draws nothing within COMMUNITY_FIRST_MS, has its tree die (React's
+ * uncaught error), or stalls the desktop until the main-loop watchdog stops it is taken off: it is marked failed in its
+ * install record (with why, for Settings → Appearance's Report), and the theme that ran before it comes back (Lord
+ * Flow when there was none). One that ends COMMUNITY_CRASHES sessions in a row is not started again (chosen_theme).
+ * Ctrl+Alt+Shift+Backspace always restores Flow, whatever theme runs (on_input, before any JavaScript). */
+#define COMMUNITY_FIRST_MS 6000
+#define COMMUNITY_HEALTHY_MS 60000
+
+static void default_bundle(char *out, size_t n) {
+    snprintf(out, n, "%s/default/theme.bundle.js", jst_system_themes());
+}
+
+static void community_watch_start(const char *current, double now) {
+    cw.since = now;
+    cw.healthy = 0;
+    default_bundle(cw.prev, sizeof cw.prev);
+    (void)current;
+}
+
+static void community_watch_switched(const char *before, const char *now_running, double now) {
+    cw.since = now;
+    cw.healthy = 0;
+    char id[32];
+    /* the theme to come back to: the one before, unless it is the failed one */
+    if (strcmp(before, ui.theme_failed)) snprintf(cw.prev, sizeof cw.prev, "%s", before);
+    (void)now_running;
+    (void)id;
+}
+
+static void community_back(const char *current, const char *why, int persist) {
+    char id[32];
+    /* only a community theme is marked failed: Ctrl+Alt+Shift+Backspace from one of LordOS's own (Classic) is the
+     * person's way back to Flow, not a failure, and Classic must stay choosable (QA 0.8.9.6.2, BUG-F) */
+    if (jst_is_user_bundle(current, id, sizeof id)) {
+        snprintf(ui.theme_failed, sizeof ui.theme_failed, "%s", current);
+        snprintf(ui.theme_failed_why, sizeof ui.theme_failed_why, "%s", why);
+        ui.theme_failed_code = 0;
+        if (persist) jst_mark_failed(id, why);
+    }
+    char back[sizeof ui.theme_request];
+    snprintf(back, sizeof back, "%s", cw.prev);
+    if (!back[0] || !strcmp(back, current) || access(back, R_OK)) default_bundle(back, sizeof back);
+    ui.theme_fell_back = 1;
+    fprintf(stderr, "lord-server: theme %s %s (%s): back to %s\n", current, ui.theme_failed[0] && !strcmp(ui.theme_failed, current) ? "taken off" : "left", why, back);
+    snprintf(ui.theme_request, sizeof ui.theme_request, "%s", back);
+}
+
+static void community_watch(const char *current, double now) {
+    if (cw.rescue) {                    /* Ctrl+Alt+Shift+Backspace: Flow, whatever runs */
+        cw.rescue = 0;
+        char def[sizeof ui.theme_request];
+        default_bundle(def, sizeof def);
+        if (strcmp(current, def) && !access(def, R_OK)) {
+            snprintf(cw.prev, sizeof cw.prev, "%s", def);
+            community_back(current, "restored with Ctrl+Alt+Shift+Backspace", 1);
+        }
+        return;
+    }
+    if (!js_community_theme() || ui.theme_request[0]) return;
+    char id[32];
+    if (!jst_is_user_bundle(current, id, sizeof id)) return;
+    const char *why = jst_failure();
+    if (!why && !jst_started() && now - cw.since > COMMUNITY_FIRST_MS) why = "it drew nothing within 6 seconds";
+    if (!why && jst_stopped()) why = "it stalled the desktop and the watchdog stopped it";
+    if (why) { community_back(current, why, 1); return; }
+    if (!cw.healthy && now - cw.since > COMMUNITY_HEALTHY_MS) { cw.healthy = 1; jst_session_healthy(id); }
+}
+
 static unsigned renders_done;          /* frames drawn: a theme switch waits for two (its overlay on screen) */
 
 /* 0 if the requested theme is running; -1 if it failed and `current` (the last one that loaded) was put
@@ -2867,6 +3254,7 @@ static int switch_theme(const char *current) {
     share_shell_gone();                 /* the indicator goes with the old shell */
     cast_end_all();                     /* and with it what Linux apps were shown (the ScreenCast portal) */
     js_shutdown();
+    bgsave_flush(NULL);                 /* the new theme reads settings.json and the clipboard's stores (bgsave.c) */
     ui_reset();
     term_detach_all();
     /* the bytes lord.themes.use verified when it was asked (js_sys.c f_themes_use): a refused theme never gets here */
@@ -2879,6 +3267,9 @@ static int switch_theme(const char *current) {
                  : why[0] ? why : "the theme's code did not load (see the log)");
         ui.theme_failed_code = r == JS_REFUSED;
         ui.theme_failed_gen = codesig_generation();
+        char cid[32];
+        if (jst_is_user_bundle(path, cid, sizeof cid)) jst_mark_failed(cid, ui.theme_failed_why);   /* kept for Report */
+        ui.theme_fell_back = 1;
         js_shutdown();
         ui_reset();
         /* the theme that was running, from the bytes verified when it loaded: not its file again, which a package
@@ -2930,9 +3321,9 @@ const char *lord_composition(void) {
 static void on_sigpipe(int sig) { (void)sig; }
 
 #ifdef LORD_TEST_HOOKS
-#define USAGE_HEADLESS "[--headless WIDTHxHEIGHT [--greeter | --test-hooks]]"
+#define USAGE_HEADLESS "[--headless WIDTHxHEIGHT [--greeter | --test-hooks | --hands-qa]]"
 #else
-#define USAGE_HEADLESS "[--headless WIDTHxHEIGHT [--greeter]]"
+#define USAGE_HEADLESS "[--headless WIDTHxHEIGHT [--greeter | --hands-qa]]"
 #endif
 static void usage(const char *argv0) {
     fprintf(stderr, "usage: %s [--theme bundle.js] [--fonts dir] [--shell dir] [--user name] [--card /dev/dri/cardN]\n"
@@ -3070,6 +3461,7 @@ int main(int argc, char **argv) {
     int test_hooks = 0;
 #endif
     static Server s;
+    int hands_qa_flag = 0;
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "--timeout") && i + 1 < argc) timeout_ms = atof(argv[++i]) * 1000;
         else if (!strcmp(argv[i], "--card") && i + 1 < argc) card = argv[++i];
@@ -3086,6 +3478,9 @@ int main(int argc, char **argv) {
             s.H = h & ~1;
         }
         else if (!strcmp(argv[i], "--greeter")) s.greeter = 1;      /* pantalla de ingreso (lord-sessiond) */
+        /* Hands' QA desktop (docs/HANDS.md): a private headless session an agent drives with no prompt; lordos-mcp
+         * --headless starts it with a private bus and a demo home. Never with a monitor or on the login screen. */
+        else if (!strcmp(argv[i], "--hands-qa")) hands_qa_flag = 1;
 #ifdef LORD_TEST_HOOKS
         else if (!strcmp(argv[i], "--test-hooks")) test_hooks = 1;  /* the conformance tool's socket (testhooks.h) */
 #endif
@@ -3095,6 +3490,7 @@ int main(int argc, char **argv) {
     }
 
     if (s.greeter && !s.headless) { usage(argv[0]); return 2; }
+    if (hands_qa_flag && (!s.headless || s.greeter)) { usage(argv[0]); return 2; }
 #ifdef LORD_TEST_HOOKS
     if (test_hooks && (!s.headless || s.greeter)) { usage(argv[0]); return 2; }   /* never on a monitor or the login screen */
 #endif
@@ -3175,6 +3571,13 @@ int main(int argc, char **argv) {
     /* the log folder (lordlog.h): /var/log/lordos/users/<user>, which lord-sessiond made at login, or
      * ~/.cache/lordos; worked out once, here, before anything forks a child that opens a log */
     if (ok) lordlog_dir();
+    /* the open files an app's buffers need (nofile.h, GitHub #251): the soft limit raised towards the hard one; every
+     * child forked from here on gets the usual one back */
+    if (ok) {
+        rlim_t nf0 = 0, nf1 = 0;
+        if (nofile_raise(&nf0, &nf1)) fprintf(stderr, "lord-server: the open files' limit stays at %llu\n", (unsigned long long)nf0);
+        else if (nf1 != nf0) fprintf(stderr, "lord-server: open files allowed: %llu (was %llu)\n", (unsigned long long)nf1, (unsigned long long)nf0);
+    }
     if (ok && s.headless && getenv("HOME")) {
         /* no terminal: stderr is stamped into compositor.log and shell.log there, the previous
          * session's kept as .prev (a small lord-log child; it outlives a crash, so nothing written is lost) */
@@ -3219,6 +3622,8 @@ int main(int argc, char **argv) {
     netrec_init(ok && !s.greeter && session_user != NULL);   /* the Monitor's traffic history (monitor/netrec.c) */
     if (getenv("LORD_DAMAGE") && !strcmp(getenv("LORD_DAMAGE"), "one")) paint_multi_damage = 0;    /* one box per frame, as before 0.8.8.10 (paint.c) */
     remote_server = &s;
+    hands_init(&hands_host_impl);           /* Hands (hands/hands.h): off until the person turns it on, or --hands-qa */
+    if (hands_qa_flag) { hands_qa(1); js_sys_set_demo_identity(1); fprintf(stderr, "lord-server: Hands QA desktop: an agent may use this private session (docs/HANDS.md)\n"); }
     tp_route_init(&tp_host);
     wl_warp_set_host(warp_move);                /* pointer-warp-v1 (wl/wl_warp.c) */
     static const MirrorInput mirror_in = { remote_pointer, remote_button, remote_wheel, remote_key, remote_clip, remote_clients,
@@ -3232,12 +3637,22 @@ int main(int argc, char **argv) {
     if (ok && !s.greeter && share_start(&share_host)) fprintf(stderr, "lord-server: no screen-sharing API (socket)\n");
 #ifdef LORD_TEST_HOOKS
     static const TestHooks test_host = { test_pointer, remote_button, remote_wheel, test_tablet, test_tablet_event, wl_test_xwl, drmlease_fake_card, test_key,
-                                         test_frame, test_painted };
+                                         test_frame, test_painted, test_where };
     if (ok && test_hooks && testhooks_start(&test_host)) fprintf(stderr, "lord-server: no test hooks socket\n");
 #endif
     char current[sizeof ui.theme_request];
     svgicon_enable();                       /* SVG icons drawn by lord-media (media/svgicon.c); never in app mode */
     char first[sizeof ui.theme_request];
+    {   /* the system's themes folder: the one holding the theme asked for (community themes live in the person's) */
+        char a[PATH_MAX], r[PATH_MAX];
+        if (realpath(theme, r)) {
+            snprintf(a, sizeof a, "%s", r);
+            char *d = dirname(a);
+            snprintf(r, sizeof r, "%s", d);
+            snprintf(a, sizeof a, "%s", dirname(r));
+            jst_set_system_themes(a);
+        }
+    }
     if (s.greeter) snprintf(first, sizeof first, "%s", theme);
     else chosen_theme(theme, first, sizeof first);
     if (ok) ok = start_theme(first, s.greeter, current, sizeof current) == 0;
@@ -3291,7 +3706,9 @@ int main(int argc, char **argv) {
     /* the watchdog (wdog.h): a stall of this loop never leaves the desktop frozen at real time */
     wdog_start();
     wdog_busy(mono_ns());
+    community_watch_start(current, now_ms());
     while (!s.quit && !ui.quit_requested) {
+        if (!s.greeter) community_watch(current, now_ms());
         if (ui.theme_request[0]) {
             /* two frames first (or 300 ms when none is drawn): the shell's "changing the desktop style" overlay (sdk
              * themeswitch.jsx) gets on screen, and stays there while the new theme loads behind it */
@@ -3303,8 +3720,11 @@ int main(int argc, char **argv) {
                 char next[sizeof current];
                 snprintf(next, sizeof next, "%s", ui.theme_request);
                 wdog_expect(1);                 /* a theme loads for a second or more by design */
+                char before[sizeof current];
+                snprintf(before, sizeof before, "%s", current);
                 if (!switch_theme(current)) snprintf(current, sizeof current, "%s", next);
                 wdog_expect(0);
+                if (strcmp(before, current)) community_watch_switched(before, current, now_ms());
             }
         }
         {   /* a pointer lock started, ended, or its owner moved the pointer image it shows (pointerlock.h) */
@@ -3375,6 +3795,14 @@ int main(int argc, char **argv) {
         double td = term_timeout(now);
         if (td >= 0 && (delay < 0 || td < delay)) delay = td;
         tp_tick(now);                       /* touchpad: tocar, arrastrar, inercia (tp/tp.c) */
+        {   /* Hands' human mode: a glide, a drag, a scroll's steps, typing; the agent cursor's ripple and fade (handscur.h) */
+            hands_tick();
+            handscur_keep(hands_acting());
+            handscur_tick(now_ms());
+            double hd = hands_timeout(), cd = handscur_timeout(now_ms());
+            if (hd >= 0 && (delay < 0 || hd < delay)) delay = hd;
+            if (cd >= 0 && (delay < 0 || cd < delay)) delay = cd;
+        }
         if (ptrlock_waiting() && (delay < 0 || delay > 50)) delay = 50;     /* a pointer lock whose node went away */
         /* shake to find it: the cursor grows and shrinks back (a new size serial redraws it below) */
         cursor_set_boost(cursor_shake() ? shake_level(&pointer_shake, now) : 0);
@@ -3415,15 +3843,31 @@ int main(int argc, char **argv) {
         if (mrd >= 0 && (delay < 0 || mrd < delay)) delay = mrd;
         media_reap();                       /* a stopped lord-media: not left a zombie */
         webmgr_reap();                      /* nor a lord-web that ended */
+        webalive_tick(now_ms());            /* and one that stopped answering is started again (ui/webalive.h) */
+        double wad = webalive_timeout(now_ms());
+        if (wad >= 0 && (delay < 0 || wad < delay)) delay = wad;
         double zd = media_reap_timeout();
         if (zd >= 0 && (delay < 0 || zd < delay)) delay = zd;
         /* sin monitor y sin nadie mirando no se dibuja (al conectarse alguien llega un cuadro entero) */
         /* LORD_HEADLESS_DRAW=1 (tests/perf_headless.sh): headless and nobody watching, it still lays out and paints */
         static int headless_draw = -1;
-        if (headless_draw < 0) headless_draw = getenv("LORD_HEADLESS_DRAW") != NULL;
+        if (headless_draw < 0) headless_draw = getenv("LORD_HEADLESS_DRAW") != NULL || hands_qa_mode();   /* an agent's QA desktop: laid out and painted */
         int unseen = s.headless && !headless_draw && !mirror_watchers() && !media_needs_cpu();   /* recording the screen: yes */
         if (!s.headless && display_is_off()) unseen = 1;     /* screen off after idle (DPMS): nothing to draw */
         js_sys_unseen = unseen;                     /* the desk widgets' data feeds rest too (lord.system.seen) */
+        /* moving wallpapers (media/mambient.c): which views show, their pause and stop, the loop cache's next frame */
+        media_ambient_tick(unseen);
+        {   /* the GPU's frosted glass on or off: everything painted again, the other way */
+            static int frost_env = -1, frost_last = -1;
+            if (frost_env < 0) { const char *e = getenv("LORD_GPU_FROST"); frost_env = !(e && !strcmp(e, "0")); }
+            int want = frost_env && gpu_active() && !mirror_watchers() && !media_needs_cpu();
+            if (want != frost_last) { if (frost_last >= 0) full_damage(&s); frost_last = want; }
+            frost_want = want;
+        }
+        {
+            double ad = media_ambient_due();
+            if (ad >= 0 && (delay < 0 || ad < delay)) delay = ad;
+        }
         /* the minimized windows and those on a hidden desktop: their frame callbacks once a second (wl/framegate.h) */
         if (!unseen) {
             double hd = wl_frame_hidden((unsigned)now_ms());
@@ -3479,6 +3923,8 @@ int main(int argc, char **argv) {
         cast_tick();
         double cad = cast_timeout();
         if (cad >= 0 && (delay < 0 || cad < delay)) delay = cad;
+        double fwd = fswatch_timeout(now_ms());        /* lord.fs.watch: a coalesced call waiting for its 150 ms */
+        if (fwd >= 0 && (delay < 0 || fwd < delay)) delay = fwd;
 
         {   /* a Linux app's content updates held for a refresh or a time (fifo-v1, commit-timing-v1, wl.c): after the
              * render, whose frame may have let some apply that now want the next one */
@@ -3489,6 +3935,8 @@ int main(int argc, char **argv) {
         int wait = delay < 0 ? -1 : (int)ceil(delay);
         if ((wants && (!all_busy(&s) || ahead) && pace <= 0) || ui.quit_requested) wait = 0;
         if (ui.theme_request[0] && (wait < 0 || wait > 16)) wait = 16;     /* a theme switch waits for its overlay's frames */
+        /* a modeset after a dropped flip, still on its thread (kms.h): its answer is looked for every 50 ms */
+        for (int i = 0; i < OUT_MAX; i++) if (s.out[i].kms.recover && (wait < 0 || wait > 50)) wait = 50;
         if (timeout_ms > 0) {
             double left = start + timeout_ms - now_ms();
             if (left <= 0) break;
@@ -3498,7 +3946,7 @@ int main(int argc, char **argv) {
         wl_flush();
         mirror_clipboard(term_clipboard(), term_clipboard_gen());
         share_clipboard(term_clipboard(), term_clipboard_gen(), term_clipboard_sensitive());
-        struct pollfd pfd[203 + INPUT_MAX_DEVICES + TERM_MAX];     /* +32 brokers of isolated apps, +40 media, +16 machines, +40 Spawn helpers, +5 test hooks (lord-server-test) */
+        struct pollfd pfd[214 + INPUT_MAX_DEVICES + TERM_MAX];     /* +32 brokers of isolated apps, +40 media, +26 machines (their pictures, the state's eventfd, the library's watch, 8 lord-vm pidfds), +40 Spawn helpers, +5 test hooks (lord-server-test) */
         int term_ids[TERM_MAX];
         int n = 0;
         pfd[n++] = (struct pollfd){ K0(&s)->fd, POLLIN, 0 };
@@ -3522,6 +3970,8 @@ int main(int argc, char **argv) {
         if (clbase >= 0) pfd[n++] = (struct pollfd){ cloud_fd(), POLLIN, 0 };
         int fabase = fsasync_fd() >= 0 ? n : -1;                 /* lord.fs.*Async answers (Files on slow mounts) */
         if (fabase >= 0) pfd[n++] = (struct pollfd){ fsasync_fd(), POLLIN, 0 };
+        int fwbase = fswatch_fd() >= 0 ? n : -1;                 /* lord.fs.watch's inotify (fswatch.c) */
+        if (fwbase >= 0) pfd[n++] = (struct pollfd){ fswatch_fd(), POLLIN, 0 };
         int imbase = image_async_fd() >= 0 ? n : -1;              /* thumbnails decoded off this thread (ui/image.c) */
         if (imbase >= 0) pfd[n++] = (struct pollfd){ image_async_fd(), POLLIN, 0 };
         int sbase = snd_fd() >= 0 ? n : -1;
@@ -3552,7 +4002,7 @@ int main(int argc, char **argv) {
         n += nmed;
         int hwbase = n, nhw = hw_pollfds(pfd + n, 48);   /* 16 fixed + up to 32 Spawn helpers */           /* uevents, the system bus and the session bus clients (src/hw) */
         n += nhw;
-        int vmbase = n, nvm = js_vm_pollfds(pfd + n, 16);        /* Machines: each picture's lord-vmdisplay (ui/js_vm.c) */
+        int vmbase = n, nvm = js_vm_pollfds(pfd + n, 26);        /* Machines: each picture's lord-vmdisplay, the state for the shell (ui/js_vm.c) */
         n += nvm;
         wdog_idle();
         int ready = poll(pfd, n, wait);
@@ -3568,6 +4018,7 @@ int main(int argc, char **argv) {
                 if (s.out[i].on && s.out[i].kms.fd >= 0) heads[nh++] = &s.out[i].kms;
             }
             if (nh) kms_dispatch_heads(heads, nh);
+            for (int i = 0; i < OUT_MAX; i++) if (waswho[i] && !s.out[i].kms.flip_pending) flip_recover[i] = 0;   /* flips again */
             /* the other displays' flips: the presentation feedback of the windows on them (the main one's below) */
             for (int i = 0; i < OUT_MAX; i++) {
                 const Kms *k = &s.out[i].kms;
@@ -3605,18 +4056,37 @@ int main(int argc, char **argv) {
         int vt_moved = vt_sfd >= 0 && (pfd[vt_i].revents & POLLIN);
         if (vt_moved) vt_signal(&s);           /* the input list changed: this pass's poll entries are stale */
         /* the watchdog's other half (wdog.h): a display whose page flip never completes leaves the desktop
-         * frozen on it while this loop runs on; said once per flip, from fields this loop already keeps */
+         * frozen on it while this loop runs on; said once per flip, from fields this loop already keeps. And
+         * (QA 0.8.9.6.2, BUG-B: virtio-gpu after an s2idle suspend never completed it, and the greeter never
+         * showed) recovered: the flip is taken as done and the next frame, painted whole, is a full modeset
+         * (kms_flip_abandon). At most FLIP_RECOVER_MAX times until one of its flips completes again, and never
+         * while the displays are off (a modeset would light them). */
         if (!s.headless) {
             static uint64_t flip_told[OUT_MAX];
+            int recovered = 0;
             for (int i = 0; i < OUT_MAX; i++) {
-                const Kms *k = &s.out[i].kms;
+                Kms *k = &s.out[i].kms;
+                if (k->recover) { kms_recover_poll(k); if (!k->recover) recovered = 1; }   /* its modeset answered */
                 if (!s.out[i].on || !k->flip_pending) { flip_told[i] = 0; continue; }
-                if (flip_told[i] != k->flip_submit_ns && k->flip_submit_ns && loop_wake > k->flip_submit_ns + 2000000000ull) {
+                if (flip_told[i] != k->flip_submit_ns && kms_flip_stuck(k, loop_wake, 2000000000ull)) {
                     flip_told[i] = k->flip_submit_ns;
                     fprintf(stderr, "lord-server: watchdog: %s: its page flip has not completed for %.1f s\n",
                             s.out[i].d.connector, (loop_wake - k->flip_submit_ns) / 1e9);
+                    if (display_is_off()) continue;
+                    if (flip_recover[i] >= FLIP_RECOVER_MAX) {
+                        if (flip_recover[i]++ == FLIP_RECOVER_MAX)
+                            fprintf(stderr, "lord-server: watchdog: %s: still no page flip after %d full modesets: left as it is\n",
+                                    s.out[i].d.connector, FLIP_RECOVER_MAX);
+                        continue;
+                    }
+                    flip_recover[i]++;
+                    fprintf(stderr, "lord-server: watchdog: %s: the flip is dropped and the next frame is a full modeset (%d of %d)\n",
+                            s.out[i].d.connector, flip_recover[i], FLIP_RECOVER_MAX);
+                    kms_flip_abandon(k);
+                    recovered = 1;
                 }
             }
+            if (recovered) full_damage(&s);
         }
         int lost[INPUT_MAX_DEVICES], nlost = 0;
         for (int i = 0; !vt_moved && i < s.input.count; i++) {
@@ -3646,6 +4116,8 @@ int main(int argc, char **argv) {
         if (bkbase >= 0 && pfd[bkbase].revents) backup_dispatch(js_backup_event);
         if (clbase >= 0 && pfd[clbase].revents) js_cloud_dispatch();
         if (fabase >= 0 && pfd[fabase].revents) js_fs_dispatch();
+        if (fwbase >= 0 && pfd[fwbase].revents) fswatch_read(now_ms());
+        js_fswatch_dispatch(now_ms());                  /* the watches whose coalesced call is due */
         if (imbase >= 0 && pfd[imbase].revents) image_async_dispatch();
         if (lgbase >= 0 && pfd[lgbase].revents) logs_dispatch(js_logs_event);
         if (lbibase >= 0 && pfd[lbibase].revents) lbi_drain();  /* taken once per frame by grab_script_tick */
@@ -3703,8 +4175,17 @@ int main(int argc, char **argv) {
      * desktop for seconds */
     wdog_stop();                          /* closing the apps below may take seconds by design */
     if (ui.quit_requested) fprintf(stderr, "lord-server: the theme asked to log out\n");
+    {   /* the session ended as the person asked, from outside a community theme's reach: lord-sessiond's SIGTERM (log
+         * out, shut down, restart, switch user), the physical Ctrl+Alt+Backspace, the end of a --timeout, or LordOS's own
+         * code asking to log out (a confirmation the theme can't answer): never a crash of the theme, however short. A
+         * lord.quit the theme's own code made (ui.quit_by_theme), a lord-server that died, a JS fatal or the watchdog
+         * keep the count (main.c community_watch, chosen_theme) */
+        char cid[32];
+        if (!s.greeter && !ui.quit_by_theme && jst_is_user_bundle(current, cid, sizeof cid)) jst_session_ended(cid);
+    }
     if (ui.quit_requested && !s.headless) mirror_session("{\"a\":\"logout\"}");
     js_before_exit();                     /* what is open goes to settings.json, marked clean */
+    bgsave_flush(NULL);                   /* every save still on bgsave.c's worker is on the disk before the session ends */
     wl_close_all(LOGOUT_CLOSE_MS);        /* the apps close as if the user did it, before wl_stop() */
     cloud_stop();                         /* B11: every cloud folder unmounted (lazily if busy), then rclone quits */
     if (s.renders)
@@ -3727,6 +4208,7 @@ int main(int argc, char **argv) {
     wl_stop();
     snd_stop();
     js_shutdown();
+    bgsave_flush(NULL);
     if (vt_tty >= 0) { struct vt_mode m = { .mode = VT_AUTO }; ioctl(vt_tty, VT_SETMODE, &m); }
     if (vt >= 0) { ioctl(vt, KDSETMODE, KD_TEXT); close(vt); }
     for (int i = 0; i < OUT_MAX; i++) out_free(&s.out[i]);

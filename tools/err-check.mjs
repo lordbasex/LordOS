@@ -139,8 +139,9 @@ export function checkErrors({ quiet = false } = {}) {
     });
     // Spanish in any string literal (not in files whose strings are data in other languages: the localized
     // mailbox names a server may use for Sent, Trash, Junk… in mail/folderrole.c, #28; the common words say uses to
-    // tell a text's language in tts/saytext.c)
-    const LANG_DATA = new Set(['mail/folderrole.c', 'tts/saytext.c']);
+    // tell a text's language in tts/saytext.c; ✨ AI Writing's worked examples in each language in llm/writing.c, and
+    // the lumo command's Spanish verbs, language names and examples in llm/lumo.c and cli/lumo.c)
+    const LANG_DATA = new Set(['mail/folderrole.c', 'tts/saytext.c', 'llm/writing.c', 'llm/lumo.c', 'cli/lumo.c']);
     for (let i = LANG_DATA.has(rel) ? -1 : src.indexOf('"'); i >= 0; ) {
       if (src[i - 1] === "'" && src[i + 1] === "'") { i = src.indexOf('"', i + 1); continue; }   // '"'
       const [t, end] = literal(src, i);

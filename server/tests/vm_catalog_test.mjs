@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const C = await import(path.join(here, '../../apps/machines/catalog.js'));
 const CAT = JSON.parse(fs.readFileSync(path.join(here, '../../assets/machines/systems.json'), 'utf8'));
-const { systemsFor, entryOf, parseSums, listingNames, newest, pickImage, versionIn, progressOf, resumedOf, compareNames, sizeMb, downloadedImages, IMAGES_DIR, unattendedOf, checkSetup, hostnameFor, userFor, cardSize, lordosLang } = C;
+const { systemsFor, entryOf, parseSums, listingNames, newest, pickImage, versionIn, progressOf, resumedOf, compareNames, sizeMb, downloadedImages, IMAGES_DIR, unattendedOf, checkSetup, hostnameFor, hostnameNext, userFor, cardSize, lordosLang } = C;
 const M = await import(path.join(here, '../../apps/machines/model.js'));
 
 let n = 0, bad = 0;
@@ -202,6 +202,8 @@ eq('setup ok', checkSetup({ user: 'ana', password: 'x', hostname: 'debian-13' })
 eq('setup errors', checkSetup({ user: 'Root', password: '', hostname: '-x' }).errors, { user: 'user', password: 'passwordEmpty', hostname: 'hostname' });
 eq('setup reserved', checkSetup({ user: 'root', password: 'x', hostname: 'h' }).errors, { user: 'userReserved' });
 eq('hostname from a name', [hostnameFor('Debian 13.7'), hostnameFor('Ubuntu Señal 26.04!'), hostnameFor('***')], ['debian-13-7', 'ubuntu-senal-26-04', 'machine']);
+eq('hostname follows the machine', [hostnameNext('', '', 'Debian 13'), hostnameNext('debian-13', 'debian-13', 'LordOS 0.8.9'),
+  hostnameNext('my-box', 'debian-13', 'LordOS 0.8.9'), hostnameNext('debian-13', '', 'LordOS 0.8.9')], ['debian-13', 'lordos-0-8-9', 'my-box', 'debian-13']);
 eq('user from home', [userFor('/home/federico'), userFor('/home/Root'), userFor('/root')], ['federico', 'user', 'user']);
 
 console.log(`== vm-catalog-test: ${n - bad} passed, ${bad} failed`);

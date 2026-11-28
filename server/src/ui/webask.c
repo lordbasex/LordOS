@@ -5,6 +5,9 @@
 #include "../web/webmgr.h"
 #include "../web/webedit.h"
 #include "../web/webscheme.h"
+#include "../web/websearch.h"
+
+#include "../sec/json.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -19,6 +22,11 @@ typedef struct {
     int kind;
     int menu, nitems;                /* a context menu (Menu) rather than a permission question (Ask) */
     int items[WEBMENU_N];
+    unsigned checked;                /* the items' positions with a check mark */
+    char text[WEBSEARCH_SNIPPET_MAX]; /* the selection's few words (Search the web), cleaned, or "" */
+    char guesses[WEBMENU_GUESSES_MAX][WEBSEARCH_SNIPPET_MAX];   /* WebKit's spelling suggestions (spell1…), cleaned */
+    char *ai;                        /* ✨ AI: the whole selection, cleaned (webai_clean), malloc'd, or NULL */
+    int ai_edit;                     /* it was in a text field: the shell may offer Replace (WriteReplace) */
 } Ask;
 
 static Ask asks[WEBASK_MAX];
@@ -36,7 +44,9 @@ static const char introspect[] =
     "    <method name=\"SetBadge\"><arg type=\"s\" name=\"app\" direction=\"in\"/><arg type=\"s\" name=\"profile\" direction=\"in\"/>"
     "<arg type=\"u\" name=\"count\" direction=\"in\"/></method>\n"
     "    <method name=\"Menu\"><arg type=\"s\" name=\"app\" direction=\"in\"/><arg type=\"s\" name=\"profile\" direction=\"in\"/>"
-    "<arg type=\"as\" name=\"items\" direction=\"in\"/><arg type=\"s\" name=\"item\" direction=\"out\"/></method>\n"
+    "<arg type=\"as\" name=\"items\" direction=\"in\"/><arg type=\"u\" name=\"checked\" direction=\"in\"/><arg type=\"s\" name=\"text\" direction=\"in\"/>"
+    "<arg type=\"as\" name=\"guesses\" direction=\"in\"/><arg type=\"s\" name=\"ai\" direction=\"in\"/>"
+    "<arg type=\"s\" name=\"item\" direction=\"out\"/></method>\n"
     "  </interface>\n"
     "</node>\n";
 
@@ -64,16 +74,59 @@ static void event(const char *kind, const Ask *a) {
     hw_emit(kind, j);
 }
 
-/* the menu for the shell: { id, app, profile, items: [names] } (names from webedit.c's list only) */
+/* a cleaned string (websearch_snippet: no control character) as a JSON string at j + o */
+static int json_text(char *j, size_t size, int o, const char *t) {
+    if (o < 0 || (size_t)o + 2 >= size) return -1;
+    j[o++] = '"';
+    for (const char *p = t; *p && (size_t)o + 4 < size; p++) {
+        if (*p == '"' || *p == '\\') j[o++] = '\\';
+        j[o++] = *p;
+    }
+    if ((size_t)o + 2 >= size) return -1;
+    j[o++] = '"';
+    j[o] = 0;
+    return o;
+}
+
+/* the menu for the shell: { id, app, profile, items: [names], checked: [names], text, guesses: [texts] } (names from webedit.c's list
+ * only; text cleaned by websearch_snippet, so it holds no control character: only " and \ need escaping) */
 static void menu_event(const char *kind, const Ask *a) {
-    char j[512];
+    char j[2048];
+    size_t cap = sizeof j - 8;
     int o = snprintf(j, sizeof j, "{\"id\":%d,\"app\":\"%s\",\"profile\":\"%s\",\"items\":[", a->id, a->app, a->profile);
-    for (int i = 0; i < a->nitems && o > 0 && (size_t)o < sizeof j - 32; i++) o += snprintf(j + o, sizeof j - (size_t)o, "%s\"%s\"", i ? "," : "", webmenu_name(a->items[i]));
-    if (o > 0 && (size_t)o < sizeof j - 3) { snprintf(j + o, sizeof j - (size_t)o, "]}"); hw_emit(kind, j); }
+    for (int i = 0; i < a->nitems && o > 0 && (size_t)o < cap; i++) o += snprintf(j + o, sizeof j - (size_t)o, "%s\"%s\"", i ? "," : "", webmenu_name(a->items[i]));
+    if (o > 0 && (size_t)o < cap) o += snprintf(j + o, sizeof j - (size_t)o, "],\"checked\":[");
+    for (int i = 0, first = 1; i < a->nitems && o > 0 && (size_t)o < cap; i++)
+        if (a->checked & (1u << i)) { o += snprintf(j + o, sizeof j - (size_t)o, "%s\"%s\"", first ? "" : ",", webmenu_name(a->items[i])); first = 0; }
+    if (o > 0 && (size_t)o < cap) o += snprintf(j + o, sizeof j - (size_t)o, "],\"text\":");
+    o = json_text(j, cap, o, a->text);
+    if (o > 0 && (size_t)o < cap) o += snprintf(j + o, sizeof j - (size_t)o, ",\"guesses\":[");
+    for (int i = 0, g = 0; i < a->nitems && o > 0; i++) {
+        if (a->items[i] < WEBMENU_SPELL_1 || a->items[i] >= WEBMENU_SPELL_1 + WEBMENU_GUESSES_MAX) continue;
+        if (g++ && (size_t)o < cap) j[o++] = ',';
+        o = json_text(j, cap, o, a->guesses[a->items[i] - WEBMENU_SPELL_1]);
+    }
+    if (o > 0 && (size_t)o < cap) o += snprintf(j + o, sizeof j - (size_t)o, "]");
+    if (o <= 0 || (size_t)o >= cap) return;
+    /* ✨ AI's text (with line breaks: JSON-quoted whole) and whether Replace may go back to the field */
+    size_t al = a->ai ? strlen(a->ai) : 0, n = (size_t)o + al * 6 + 64;
+    char *full = malloc(n);
+    if (!full) return;
+    memcpy(full, j, (size_t)o);
+    size_t at = (size_t)o;
+    if (a->ai) {
+        at += (size_t)snprintf(full + at, n - at, ",\"ai\":");
+        at += json_quote(full + at, n - at - 32, a->ai);
+        at += (size_t)snprintf(full + at, n - at, ",\"aiEdit\":%s", a->ai_edit ? "true" : "false");
+    }
+    snprintf(full + at, n - at, "}");
+    hw_emit(kind, full);
+    free(full);
 }
 
 static void drop(Ask *a, int tell) {
     if (tell && a->shown) { if (a->menu) menu_event("webapps-menu-gone", a); else event("webapps-ask-gone", a); }
+    if (a->ai) { memset(a->ai, 0, strlen(a->ai)); free(a->ai); }
     memset(a, 0, sizeof *a);
 }
 
@@ -129,7 +182,10 @@ void webask_call(DConn *c, const DMsg *m) {
         dbus_error(c, m, "org.freedesktop.DBus.Error.UnknownMethod", "unknown method");
         return;
     }
-    if (!m->sig || strcmp(m->sig, menu ? "ssas" : "sss") || !m->sender || strlen(m->sender) >= sizeof asks[0].sender || (m->flags & DBUS_NO_REPLY)) {
+    int menu4 = menu && m->sig && !strcmp(m->sig, "ssasusass");
+    int menu3 = menu4 || (menu && m->sig && !strcmp(m->sig, "ssasusas"));
+    int menu2 = menu3 || (menu && m->sig && !strcmp(m->sig, "ssasus"));
+    if (!m->sig || (strcmp(m->sig, menu ? "ssas" : "sss") && !menu2) || !m->sender || strlen(m->sender) >= sizeof asks[0].sender || (m->flags & DBUS_NO_REPLY)) {
         dbus_error(c, m, "org.freedesktop.DBus.Error.InvalidArgs", "arguments");
         return;
     }
@@ -137,6 +193,12 @@ void webask_call(DConn *c, const DMsg *m) {
     dr_init(&r, m);
     const char *app = dr_str(&r, NULL), *profile = dr_str(&r, NULL);
     int k = 0, items[WEBMENU_N], nitems = 0;
+    unsigned checked = 0;
+    char text[WEBSEARCH_SNIPPET_MAX] = "";
+    char guesses[WEBMENU_GUESSES_MAX][WEBSEARCH_SNIPPET_MAX];
+    memset(guesses, 0, sizeof guesses);
+    char *ai = NULL;
+    int ai_edit = 0;
     if (menu) {
         /* the items: names from the closed list (webedit.h), none twice; never text to show */
         const char *names[WEBMENU_N + 1];
@@ -144,12 +206,51 @@ void webask_call(DConn *c, const DMsg *m) {
         size_t end = dr_arr(&r, 4);
         while (dr_more(&r, end) && n <= WEBMENU_N) names[n++] = dr_str(&r, NULL);
         nitems = r.err || dr_more(&r, end) ? -1 : webmenu_parse(names, n, items);
+        if (menu2 && nitems > 0) {
+            checked = dr_u32(&r);
+            const char *t = dr_str(&r, NULL);
+            if (r.err) nitems = -1;
+            else {
+                checked &= nitems >= 32 ? ~0u : (1u << nitems) - 1;
+                int search = 0;
+                for (int i = 0; i < nitems; i++) search |= items[i] == WEBMENU_SEARCH;
+                /* the page's words, cleaned again here, and only for the item that shows them */
+                if (search) websearch_snippet(t, WEBSEARCH_SNIPPET_CHARS, text, sizeof text);
+                if (search && !text[0]) nitems = -1;
+            }
+        }
+        if (menu3 && nitems > 0) {
+            /* WebKit's spelling suggestions: one cleaned word each for spell1… in the items, in their order */
+            size_t gend = dr_arr(&r, 4);
+            int g = 0;
+            while (!r.err && dr_more(&r, gend) && g <= WEBMENU_GUESSES_MAX) {
+                const char *t = dr_str(&r, NULL);
+                if (g < WEBMENU_GUESSES_MAX) websearch_snippet(t, WEBSEARCH_SNIPPET_CHARS, guesses[g], sizeof guesses[g]);
+                g++;
+            }
+            int want = 0;
+            for (int i = 0; i < nitems; i++) if (items[i] >= WEBMENU_SPELL_1 && items[i] < WEBMENU_SPELL_1 + WEBMENU_GUESSES_MAX) want = items[i] - WEBMENU_SPELL_1 + 1 > want ? items[i] - WEBMENU_SPELL_1 + 1 : want;
+            if (r.err || g != want) nitems = -1;
+            for (int i = 0; i < g && i < WEBMENU_GUESSES_MAX && nitems > 0; i++) if (!guesses[i][0]) nitems = -1;
+        }
+        if (menu4 && nitems > 0) {
+            /* ✨ AI: the selection, cleaned again here; offered only with a selection (Copy or Cut among the items) */
+            const char *t = dr_str(&r, NULL);
+            int sel = 0, edit = 0;
+            for (int i = 0; i < nitems; i++) { sel |= items[i] == WEBMENU_COPY || items[i] == WEBMENU_CUT; edit |= items[i] == WEBMENU_CUT; }
+            if (r.err) nitems = -1;
+            else if (t && t[0] && sel && (ai = malloc(WEBAI_MAX + 1)) && webai_clean(t, ai)) { free(ai); ai = NULL; }
+            ai_edit = edit;
+        }
+        if (!menu3 && nitems > 0) {
+            for (int i = 0; i < nitems; i++) if (items[i] >= WEBMENU_SPELL_1 && items[i] < WEBMENU_SPELL_1 + WEBMENU_GUESSES_MAX) nitems = -1;
+        }
         k = nitems < 0 ? -1 : 0;
     } else {
         const char *kind = dr_str(&r, NULL);
         k = r.err ? -1 : webreg_perm_kind(kind);
     }
-    if (k < 0 || !webreg_id_ok(app) || !webreg_id_ok(profile)) { dbus_error(c, m, "org.freedesktop.DBus.Error.InvalidArgs", "arguments"); return; }
+    if (k < 0 || !webreg_id_ok(app) || !webreg_id_ok(profile)) { free(ai); dbus_error(c, m, "org.freedesktop.DBus.Error.InvalidArgs", "arguments"); return; }
     Ask *a = NULL;
     int mine = 0;
     for (int i = 0; i < WEBASK_MAX; i++) {
@@ -158,7 +259,7 @@ void webask_call(DConn *c, const DMsg *m) {
         if (asks[i].used && !strcmp(asks[i].sender, m->sender)) mine++;
         else if (!asks[i].used && !a) a = &asks[i];
     }
-    if (!a || mine >= 4) { dbus_error(c, m, "org.freedesktop.DBus.Error.LimitsExceeded", "too many questions"); return; }
+    if (!a || mine >= 4) { free(ai); dbus_error(c, m, "org.freedesktop.DBus.Error.LimitsExceeded", "too many questions"); return; }
     a->used = 1;
     a->id = next_id++;
     a->serial = m->serial;
@@ -166,6 +267,11 @@ void webask_call(DConn *c, const DMsg *m) {
     a->menu = menu;
     a->nitems = menu ? nitems : 0;
     for (int i = 0; i < a->nitems; i++) a->items[i] = items[i];
+    a->checked = menu ? checked : 0;
+    snprintf(a->text, sizeof a->text, "%s", menu ? text : "");
+    memcpy(a->guesses, guesses, sizeof a->guesses);
+    a->ai = ai;
+    a->ai_edit = ai && ai_edit;
     snprintf(a->sender, sizeof a->sender, "%s", m->sender);
     snprintf(a->app, sizeof a->app, "%s", app);
     snprintf(a->profile, sizeof a->profile, "%s", profile);
@@ -256,6 +362,23 @@ int webask_menu_answer(int id, const char *item) {
 }
 
 void webask_attach(DConn *c) { bus = c; }
+
+int webask_write_replace(const char *app, const char *profile, const char *text) {
+    char name[160];
+    char *clean = malloc(WEBAI_MAX + 1);
+    if (!bus || !clean || webai_clean(text, clean) || webreg_bus_name(app, profile, name, sizeof name)) { free(clean); return -1; }
+    DBuf b;
+    dw_init(&b);
+    dw_str(&b, clean);
+    DHdr h = { .type = DBUS_CALL, .flags = DBUS_NO_REPLY | DBUS_NO_AUTOSTART, .path = WEBREG_SHOW_PATH, .iface = WEBREG_SHOW_IFACE,
+               .member = "WriteReplace", .dest = name, .sig = "s" };
+    uint32_t serial = dbus_send(bus, &h, &b);
+    dw_free(&b);
+    memset(clean, 0, strlen(clean));
+    free(clean);
+    if (serial) dbus_flush(bus);
+    return serial ? 0 : -1;
+}
 
 int webask_edit(const char *app, const char *profile, const char *command) {
     char name[160];

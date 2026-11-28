@@ -88,6 +88,7 @@ void lm_probe_json(AVFormatContext *fmt, LmBuf *b);
 
 /* ---- frame output to lord-server (lm_out.c) ---- */
 void lm_out_init(int native);           /* native: original size (without scaling to the box) */
+void lm_out_format(int fmt);           /* MF_BGRA or MF_NV12 from the next frame on (MM_FORMAT) */
 int  lm_out_present(AVFrame *f, int64_t pts);   /* 0 presented, 1 dropped (no slot), -1 error */
 void lm_out_ack(uint32_t id);
 int  lm_out_box(int w, int h);          /* MM_SIZE; 1 if it changed */

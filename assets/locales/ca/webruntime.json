@@ -12,5 +12,9 @@
   "inspect.title": "Eines per a desenvolupadors activades",
   "inspect.body": "S'han obert al navegador i continuen actives fins que tanquis aquesta finestra.",
   "inspect.open": "Obre al navegador",
-  "inspect.failed": "No s'han pogut iniciar les eines per a desenvolupadors"
+  "inspect.failed": "No s'han pogut iniciar les eines per a desenvolupadors",
+  "save.image": "Desa la imatge",
+  "save.video": "Desa el vídeo",
+  "save.audio": "Desa l'àudio",
+  "hang.reloaded": "La pàgina no responia i s'ha tornat a carregar"
 }

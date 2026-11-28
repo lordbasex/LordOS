@@ -167,6 +167,7 @@
     "other": "{count} da aggiornare"
   },
   "remove": "Rimuovi",
+  "removeAsk": "Rimuovere {name}?",
   "rescue.ask": "Nessun account su questo computer è amministratore. Se conosci la password di root, puoi rendere amministratore questo account. La modifica ha effetto solo dopo il riavvio del computer.",
   "rescue.button": "Rendimi amministratore",
   "rescue.noSudo": "Nessun account su questo computer è amministratore e il pacchetto sudo non è installato. Come root, esegui apt install sudo, poi riprova qui.",
@@ -233,7 +234,7 @@
   },
   "suggest.nvidiaDriver.detail": "Al momento usa nouveau, il driver libero incluso in LordOS. Il driver del produttore ({packages}) di solito offre prestazioni 3D e gestione energetica migliori.",
   "suggest.nvidiaDriver.note.nouveau": "Finché non lo installi, resta in uso il driver libero nouveau; rimuovendo il pacchetto si torna a quello.",
-  "suggest.nvidiaDriver.note.older": "Le schede più vecchie del 2014 circa non sono supportate da questa versione del driver; su di esse mantieni il driver libero. La scrivania di LordOS non è ancora stata testata con questo driver.",
+  "suggest.nvidiaDriver.note.older": "Le schede precedenti al 2014 circa non sono supportate da questa versione del driver; su di esse tieni il driver libero. La scrivania di LordOS con questo driver è sperimentale: una segnalazione della comunità la mostra composta sulla scheda (una GTX 1070 con il driver 580); una precedente era composta dal processore.",
   "suggest.nvidiaDriver.note.secureBoot": "Il driver viene compilato per il tuo kernel su questo computer (DKMS) e di nuovo dopo ogni aggiornamento del kernel. Con Secure Boot attivo, devi registrare la sua chiave di firma al prossimo riavvio, altrimenti il driver non si caricherà.",
   "suggest.nvidiaDriver.title": "Driver grafico proprietario",
   "suggest.nvidiaDriver.unavailable": "Il driver del produttore richiede i componenti contrib e non-free di Debian, che non sono entrambi abilitati nelle sorgenti dei pacchetti di questo computer. Il driver libero, nouveau, continua a funzionare.",

@@ -7,7 +7,10 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const { captureView, captureRect, displaysToCapture, displayAt, dragRect, capturePixel, magnify, middleColor, LOUPE_PX, LOUPE_ZOOM } = await import(path.join(here, '../../apps/screenshots/geometry.js'));
+const {
+  captureView, captureRect, displaysToCapture, displayAt, dragRect, capturePixel, magnify, middleColor, LOUPE_PX, LOUPE_ZOOM,
+  displayById, thumbFrame, editorFrame, countdownFrame, badgeFrame,
+} = await import(path.join(here, '../../apps/screenshots/geometry.js'));
 
 let n = 0, bad = 0;
 const eq = (name, got, want) => {
@@ -73,6 +76,43 @@ eq('a selection on the left display lands in its capture', captureRect({ x: 100,
 eq('a selection on the 200 % right display, at its resolution', captureRect({ x: 3940, y: 50, w: 200, h: 100 }, 3840, 2160, three, three.displays[2]), { x: 200, y: 100, w: 400, h: 200 });
 eq('a drag stays inside the display it began on', dragRect({ x: 1800, y: 100 }, 2500, 300, three.displays[1]), { x: 1800, y: 100, w: 120, h: 200 });
 eq('a drag up and left', dragRect({ x: 500, y: 500 }, 100, 50, three.displays[1]), { x: 100, y: 50, w: 400, h: 450 });
+
+// ---- issue #252: two external displays, the laptop's lid closed; the main one (menu bar, Dock) is on the left
+// but lord-server lists it second (its outputs are in connector order) ----
+const lid = { width: 3840, height: 1080, mirror: false, displays: [
+  { id: 71, x: 1920, y: 0, w: 1920, h: 1080, pw: 1920, ph: 1080, scale: 100 },
+  { id: 64, x: 0, y: 0, w: 1920, h: 1080, pw: 1920, ph: 1080, scale: 100, main: true }] };
+eq('#252: Print Screen takes the main display first (its capture is the one copied)', displaysToCapture(lid).map((d) => d.id), [64, 71]);
+eq('#252: the display list itself is left as it was', lid.displays.map((d) => d.id), [71, 64]);
+eq('#252: a capture\'s display by its id', displayById(lid.displays, 71).id, 71);
+eq('#252: no id: the main one is used (null)', displayById(lid.displays, null), null);
+eq('#252: a display that went away: the main one is used (null)', displayById(lid.displays, 99), null);
+// the work areas the theme gives (menu bar 28 and Dock 72 on the main one, nothing on the other)
+const mainArea = { x: 0, y: 28, w: 1920, h: 980 }, otherArea = { x: 1920, y: 0, w: 1920, h: 1080 };
+const inside = (r, a) => r.x >= a.x && r.y >= a.y && r.x + r.w <= a.x + a.w && r.y + r.h <= a.y + a.h;
+const ed = editorFrame(mainArea);
+eq('#252: the markup editor of the main display\'s capture, inside the main display', inside(ed, mainArea), true);
+eq('#252: … centred on it, not on the whole 3840 px space (it started at x 1420, across both)', ed, { x: 460, y: 28 + 32, w: 1000, h: 680 });
+eq('#252: the editor of the other display\'s capture, inside that display', inside(editorFrame(otherArea), otherArea), true);
+eq('#252: the thumbnail in the main display\'s corner, above the Dock', thumbFrame(mainArea), { x: 1660, y: 838, w: 240, h: 150 });
+eq('#252: the other capture\'s thumbnail in its own display\'s corner', thumbFrame(otherArea), { x: 3580, y: 910, w: 240, h: 150 });
+eq('#252: the timer\'s countdown in the middle of the main display', countdownFrame(mainArea), { x: 900, y: 458, w: 120, h: 120 });
+eq('#252: the recording badge at the main display\'s top right', badgeFrame(mainArea), { x: 1710, y: 40, w: 190, h: 44 });
+// a small display: the editor shrinks to fit and stays inside it
+// the other display above and to the left at 200 % (the space is normalized to start at it): the main one, listed
+// last, is still taken first, and the frames stay inside it at its offset
+const aboveLeft = { width: 4480, height: 2520, mirror: false, displays: [
+  { id: 5, x: 0, y: 0, w: 1920, h: 1080, pw: 3840, ph: 2160, scale: 200 },
+  { id: 9, x: 4480 - 1280, y: 0, w: 1280, h: 720, pw: 1280, ph: 720, scale: 100 },
+  { id: 6, x: 1920, y: 1080, w: 2560, h: 1440, pw: 2560, ph: 1440, scale: 100, main: true }] };
+eq('main display away from the origin: taken first, the others in their order', displaysToCapture(aboveLeft).map((d) => d.id), [6, 5, 9]);
+const offArea = { x: 1920, y: 1080 + 28, w: 2560, h: 1440 - 100 };
+eq('main display away from the origin: the editor inside it', inside(editorFrame(offArea), offArea), true);
+eq('main display away from the origin: the thumbnail in its corner', thumbFrame(offArea), { x: 1920 + 2560 - 260, y: 1080 + 28 + 1340 - 170, w: 240, h: 150 });
+eq('a 1280 × 720 display: the editor fits inside', inside(editorFrame({ x: 3200, y: 0, w: 1280, h: 720 }), { x: 3200, y: 0, w: 1280, h: 720 }), true);
+const small = { x: 0, y: 28, w: 1024, h: 700 };
+eq('a small display: the editor fits inside', inside(editorFrame(small), small), true);
+eq('a small display: 80 px narrower than it', editorFrame(small).w, 944);
 
 // ---- the magnifier and the color picker (0.8.8.6) ----
 eq('the capture pixel on a 200 % display', capturePixel(3940.5, 10.7, 3840, 2160, three, three.displays[2]), { x: 201, y: 21 });

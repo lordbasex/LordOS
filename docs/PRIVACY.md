@@ -508,8 +508,8 @@ its own section (see connections per app, locate them on the map) through
 
 (Since 0.8.9.5, 2026-11-22; before it, a green dot for the camera, an orange one for the microphone and a red pill per screen
 share.) While anything captures the screen, the camera or the microphone, a **green pill** stays by the clock in every
-theme (where `<PrivacyIndicators />` is: Lord Flow's menu bar, the Lord Classic taskbar — also on the side, where the
-other status items are left out — Lord Workspaces' status cluster and Lord Celeste's bar). Its glyph says what, system-wide:
+theme (where `<PrivacyIndicators />` is: Flow's menu bar, the Classic taskbar — also on the side, where the
+other status items are left out — Workspaces' status cluster and Celeste's bar). Its glyph says what, system-wide:
 
 | Captured now | Glyph |
 |---|---|
@@ -542,12 +542,21 @@ Where it knows from (`sdk/capturemodel.js`, `sdk/capturestatus.jsx`, `server/tes
 | `lord.media` in native apps (`sdk/media.js` → `markDeviceUse`) | — | per app, with a preview | per app |
 | The broker, for isolated `.lpk` apps (`device` events) | — | per app | per app |
 | The PipeWire guard (`server/src/sec/pwguard.c`, hw event `capture-use`) | a stream linked to a shared screen | a stream linked to a camera | a stream linked to a microphone |
+| A camera opened directly (`server/src/hw/camuse.c`, hw event `camera-use`; in development) | — | a process holding a `/dev/video*` device: a web app's web process, a V4L2 Linux app | — |
 
 The PipeWire guard follows every link from a capture node (a microphone, a camera, lord-screencast's screen) into a
 capture stream, and names the stream's owner as it does for the restrictions: the PID's cgroup and the launcher's scope,
 a Flatpak app by its sandbox, and a PulseAudio client's own word (`application.process.id`) always checked against the
 connections it really holds. lord-server's own streams are left out: they are the recordings and calls it makes for an
 app, already shown under that app.
+
+A camera opened directly (in development, awaiting the maintainer's approval): WebKit's web process opens the camera
+itself (docs/WEBAPPS.md, "Cameras"), and so does a Linux app using V4L2, so neither passes the PipeWire guard. lord-server
+watches every `/dev/video*` node with inotify (`IN_OPEN`, `IN_CLOSE`: a watch is on the inode, so an open inside WebKit's
+sandbox counts too; no privileges, no device opened) and 300 ms after a change, and every 3 s while one is held, lists
+the session user's processes with an fd on a video4linux device (`camera_scan_holders`; never lord-server itself or its
+own helpers, already shown under their app), named by their cgroup as above. The row has no Turn off: nothing in LordOS
+stands between such a program and the device, apart from the firewall's device rules.
 
 When there is no verified app, the indicator (and only the indicator: never the restrictions, the portals' gates or the
 restore token) still names it from what the kernel says (`sec/appid.h`, "only to show it"; since 2026-11-22):
@@ -566,8 +575,8 @@ restore token) still names it from what the kernel says (`sec/appid.h`, "only to
 - **Anything else:** "An unknown program (<executable>)", from `/proc/<pid>/exe`, or "an unknown program" when not
   even that is known; shown and never hidden, with nothing to turn off from the panel.
 
-Not covered: a program that opens `/dev/video*` or an ALSA capture device itself, without PipeWire (many browsers still
-read the camera through V4L2 directly), isn't seen by the indicator; "no camera" still blocks it through the device rules
+Not covered: a program that opens an ALSA capture device itself, without PipeWire, isn't seen by the indicator (one that
+opens `/dev/video*` itself is, as "A camera opened directly" above, in development); "no camera" still blocks it through the device rules
 (docs/FIREWALL.md). A capture stream that is linked but paused counts as in use. The remote desktop's viewers keep their
 own notice (`RemoteBadge`, docs/REMOTE.md).
 
@@ -640,7 +649,7 @@ denied the framebuffer device.
   caches filled first; each captured whole at 100, 125, 150 and 200 % and at an offset, each window as Screenshots'
   `until` and shared alone: no capture may hold one protected pixel). `test_damage_fuzz` and `test_damage_pipeline`
   unchanged.
-- `tests/protected_headless.sh` (run by `make test`): a headless `lord-server-test` with the real Lord Flow opens
+- `tests/protected_headless.sh` (run by `make test`): a headless `lord-server-test` with the real Flow opens
   Calculator protected and Notes beside it; the test hooks (`frame`, `testhooks.h`) write the display's picture, a
   screenshot, the remote desktop's frame, the Screenshot portal's still and each window shared alone, and
   `tests/protected_check.py` wants Calculator drawn on the display and the fill everywhere else, Notes identical.
@@ -1160,7 +1169,7 @@ synchronous RPC (`js_broker_pending`), events are NUL-terminated before `JS_Pars
   ❖Space, ❖⌥Space, ❖V, ❖., ❖Tab, ❖`, ❖Esc, ❖⇧3/4/5 and ❖F1–F12 (`system_meta_key` in
   `wl/wl.c`) and those of the theme's fixed table (`wl/keygrab.c`, [SHORTCUTS.md](SHORTCUTS.md)), which
   isolated apps cannot change: `lord.wayland` does not exist in their process. A Linux app still gets no ❖
-  combination, except Lord Flow's ❖ as Ctrl, sent as Ctrl to that client only.
+  combination, except Flow's ❖ as Ctrl, sent as Ctrl to that client only.
 - **Keyboard layout:** the app compiles the keymap that the compositor sends over
   `wl_keyboard.keymap` (`kb_set_keymap_string`), which is already expanded and reads no files.
   `kb_set()` inside the sandbox failed, because Landlock hides `/usr/share/X11/xkb`

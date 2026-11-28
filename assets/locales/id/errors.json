@@ -234,6 +234,7 @@
   "fs.moveRemoveFailed": "Sudah disalin, tetapi aslinya tidak dapat dihapus: {errno}",
   "fs.noTrash": "Tidak ada Sampah untuk lokasi itu",
   "fs.notFile": "Itu bukan berkas",
+  "fs.notFolder": "Ini bukan folder",
   "fs.notInTrash": "Tidak ada di Sampah",
   "fs.notRegular": "Itu bukan berkas biasa (apakah itu tautan?)",
   "fs.openFailed": "Tidak dapat membuka berkas: {errno}",
@@ -243,11 +244,13 @@
   "fs.systemFolder": "Berkas tidak menampilkan folder internal sistem (/proc, /sys, /dev, dan /run)",
   "fs.tooLarge": "Berkas terlalu besar (maks. {max})",
   "fs.tooManyCopies": "Terlalu banyak penyalinan yang sedang berjalan; coba lagi saat salah satunya selesai",
+  "fs.tooManyWatches": "Terlalu banyak folder yang dipantau (maks. {max})",
   "fs.trashBadOrigin": "Lokasi asli tidak valid",
   "fs.trashEntryFailed": "Tidak dapat membuat entri Sampah",
   "fs.trashOriginGone": "Folder asli sudah tidak ada",
   "fs.trashOtherDisk": "Berada di disk yang berbeda dari Sampah-nya",
   "fs.trashRestoreExists": "Sudah ada berkas dengan nama itu di lokasi asli",
+  "fs.watchRemote": "Perubahan di folder cloud dan jaringan tidak dapat diikuti; folder akan dicantumkan ulang sebagai gantinya",
   "fw.bpfConfig": "tidak dapat mengonfigurasi BPF: {errno}",
   "fw.bpfMaps": "tidak dapat membuat map BPF: {errno}",
   "fw.bpfMissing": "program {program} tidak ada",
@@ -962,5 +965,9 @@
   "sentinela.notBlocked": "Program itu tidak ada di daftar blokir.",
   "sentinela.noAppNetwork": "Proses ini tidak memiliki aplikasi sendiri yang jaringannya bisa diblokir.",
   "sys.failed": "Terjadi kesalahan.",
-  "sys.unsupported": "Versi LordOS ini tidak dapat melakukannya."
+  "sys.unsupported": "Versi LordOS ini tidak dapat melakukannya.",
+  "theme.notAllowed": "{call} tidak tersedia untuk tema komunitas",
+  "theme.noHost": "Bagian LordOS dari gaya desktop tidak ada",
+  "hands.refused": "Hanya Anda yang dapat melakukan ini: tidak pernah masukan agen AI",
+  "install.diskTooManyParts": "Disk ini memiliki terlalu banyak partisi untuk dicantumkan oleh penginstal"
 }

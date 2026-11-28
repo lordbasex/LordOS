@@ -712,6 +712,7 @@
   "agent.toolsAutoFailed": "The automatic update didn't work ({have} → {want}).",
   "agent.toolsUpdateBtn": "Update",
   "agent.st.needsTools": "Needs the tools",
+  "agent.st.oldLordos": "Update LordOS in it",
   "agent.st.needsXclip": "Needs xclip",
   "agent.toolsInstalled": "The LordOS tools are installed and running in the machine; they start again at every sign-in.",
   "agent.timesync": "Set the Clock",
@@ -880,6 +881,8 @@
   "un.how.preseed": "The answers go into the installer's own start files, your password only as a hash, and they are removed once the system is installed.",
   "un.how.autoinstall": "The answers go on a small disk the installer reads, your password only as a hash, and the disk is removed once the system is installed.",
   "un.how.kickstart": "The answers go on a small disk the installer reads, your password only as a hash, and the disk is removed once the system is installed.",
+  "un.how.kali": "The answers go into the installer's own start files, your password only as a hash, and they are removed once the system is installed.",
+  "un.how.lordos": "The answers go on a small disk the installer reads, your password only as a hash, and the disk is removed once the system is installed.",
   "un.image": "Installs from {file}, also checked against its maker's signed list",
   "un.review": "Without questions: account {user} on {host}",
   "un.reviewOff": "You answer the installer's questions",
@@ -1100,6 +1103,7 @@
   "apps.menu": "Applications",
   "apps.needsAgent": "Apps mode needs the machine's agent, connected",
   "win.appsNeedsTools": "Apps mode needs LordOS or Windows in the machine, with its LordOS tools",
+  "win.appsOldLordos": "Apps mode needs LordOS {version} or later inside the machine. Update LordOS in the machine; the LordOS tools alone can’t add it.",
   "apps.noApps": "The machine hasn't listed its apps yet",
   "apps.gone": "This window closed in the machine",
   "apps.dropTitle": "Drop to give these files to this window in the machine",
@@ -2027,5 +2031,7 @@
   "req.row.answers": "Install answers",
   "req.use.answers": "Made by Machines itself: nothing to install",
   "req.st.download": "At Create",
-  "req.st.builtin": "Built in"
+  "req.st.builtin": "Built in",
+  "cfg.closeOnStop": "Close the window when the machine stops",
+  "cfg.closeOnStopNote": "After a shutdown or Turn Off. If it stops because of a problem, the window stays open to show what happened."
 }

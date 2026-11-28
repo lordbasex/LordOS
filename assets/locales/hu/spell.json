@@ -1,0 +1,22 @@
+{
+  "menu.looking": "Javaslatok keresése…",
+  "menu.none": "Nincs javaslat",
+  "menu.add": "„{word}” hozzáadása a szótárhoz",
+  "menu.ignore": "Kihagyás",
+  "settings.title": "Helyesírás",
+  "settings.hint": "A hibásan írt szavakat piros hullámos aláhúzás jelöli a LordOS szövegmezőiben; kattints rájuk jobb gombbal a javaslatokért. Az ellenőrzés ezen a számítógépen történik, sosem online. A jelszó-, kereső- és címmezőket nem ellenőrzi.",
+  "settings.check": "Helyesírás ellenőrzése gépelés közben",
+  "settings.languages": "Helyesírás: nyelvek",
+  "settings.defaultHint": "Nincs kiválasztva: a felület nyelve és az angol, ha a szótáraik telepítve vannak. A webes alkalmazások ugyanezeket használják.",
+  "settings.chosenHint": "Egy szó akkor helyes, ha bármelyik kiválasztott nyelv ismeri (legfeljebb 4). A webes alkalmazások a felület nyelvét és az angolt használják.",
+  "settings.none": "Nincs telepítve szótár. Telepíts egyet lent.",
+  "settings.useDefault": "Alapértelmezések használata",
+  "settings.more": "További nyelvek",
+  "settings.moreHint": "Szótárak a Debianból. A telepítéshez rendszergazdai jelszó kell.",
+  "settings.installing": "Telepítés…",
+  "settings.install": "Telepítés",
+  "settings.words": "Saját szótár",
+  "settings.wordsHint": "A „Hozzáadás a szótárhoz” paranccsal felvett szavak, itt vagy egy webes alkalmazásban.",
+  "settings.remove": "Eltávolítás",
+  "settings.noWords": "Még nincsenek szavak."
+}

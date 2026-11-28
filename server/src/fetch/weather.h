@@ -1,4 +1,4 @@
-/* weather.h — the weather widget's forecast (0.8.8.10, Lord Workspaces; maintainer's approval 2026-11-16):
+/* weather.h — the weather widget's forecast (0.8.8.10, Workspaces; maintainer's approval 2026-11-16):
  * what lord-fetch asks Open-Meteo and the little it keeps of the answer. Pure functions, no I/O
  * (tests/weather_test.c).
  *

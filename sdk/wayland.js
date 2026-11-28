@@ -21,11 +21,12 @@ import { webOwnerOf } from './webapps.js';
 import { osk } from './osk.js';
 import { ime } from './ime.js';
 import { rememberedFrame } from './windowmemory.js';
+import { menusWithSpeech } from './voice.js';
 import { settings } from './settings.js';
 import { dockIdOfWindow } from './dock.js';
 import { promptForServer } from './privacy.js';
 import { fitFrame } from './sessionmodel.js';
-import { chromeInset, dragFrameAt, tagKey, placeKeyOf, descriptionTitle, restoredFrame, bellAction, blurBoxes, BLUR_RADIUS } from './shellxmodel.js';
+import { chromeInset, dragFrameAt, tagKey, placeKeyOf, descriptionTitle, restoredFrame, bellAction, blurBoxes, BLUR_RADIUS, fullscreenRectOf } from './shellxmodel.js';
 import { dndActive } from './notify.js';
 import { sound } from './sound.js';
 
@@ -33,6 +34,10 @@ import { sound } from './sound.js';
 const launcherKeyFor = (appId) => (!appId ? null : getApp(appId)?.package || getApp(appId)?.isolated ? appId : windowLinuxApp(appId)?.id || null);
 
 const idOf = (sid) => `linux#${sid}`;
+// What a Linux window's frame adds around its content (sdk/shellxmodel.js chromeInset): the theme's borders and title bar
+// and, in a theme with a menu strip per window (Classic, Workspaces, Celeste), that strip when it shows one,
+// as every Linux window with the Edit menu with Speech does. win: the window, or { id, args } of one about to open.
+const frameInset = (win) => chromeInset(windowChrome(), !!win?.args?.csd, !win?.args?.csd && !!menusWithSpeech(win.id, undefined, win)?.length);
 export const surfaceOf = (wid) => (String(wid).startsWith('linux#') ? Number(String(wid).slice(6)) || 0 : 0);
 
 // ext-background-effect: blurred boxes right under the surface, where the app asked (server/src/wl/bgeffect.c; lord-server
@@ -94,7 +99,7 @@ function followDrag(px, py) {
   if (!g) { tdrag = null; return; }
   if (w.maximized) wm.toggleMaximize(tdrag.id);
   const f = wm.frame(wm.get(tdrag.id));
-  const at = dragFrameAt(f, g, g.ox, g.oy, px, py, chromeInset(windowChrome(), !!w.args?.csd));
+  const at = dragFrameAt(f, g, g.ox, g.oy, px, py, frameInset(w));
   if (at.x !== f.x || at.y !== f.y) wm.move(tdrag.id, at.x, at.y);
 }
 addListener('pointermove', (e) => { if (tdrag) followDrag(e.x, e.y); });
@@ -139,7 +144,6 @@ globalThis.__lordWayland = (sid, type, d = {}) => {
       // a Flatpak app's window: lord-server tells the app from the client's root-owned scope; its own app_id may be
       // anything ("tuxocide" for an SDL game), so the Flatpak id names and draws it (docs/FLATPAK.md)
       if (d.flatpak && !linuxAppFor(d.appId)) d = { ...d, appId: d.flatpak };
-      const c = d.csd ? { w: 0, h: 0 } : windowChrome();
       const area = openingArea(launcherKeyFor(d.appId));   // its assigned display, or under the pointer (docs/DISPLAYS.md)
       // a browser's own notification popup (no app id, title or parent): floating in the top corner, never
       // the front window, so it doesn't take the keyboard (sdk/desktopmodel.js isNoticeWindow)
@@ -150,14 +154,16 @@ globalThis.__lordWayland = (sid, type, d = {}) => {
         wm.setCloseGuard(id, () => { lord.wayland.close(sid); return false; });
         break;
       }
-      const w = Math.min(area.w, d.width + c.w), hh = Math.min(area.h, d.height + c.h);
-      const n = windows.get().length;
-      // cascaded, but always inside the work area (never under the Dock)
-      const x = Math.round(area.x + (area.w - w) / 2 + (n % 5) * 24), y = Math.round(area.y + Math.max(8, (area.h - hh) / 2 - 30) + (n % 5) * 24);
       const args = { surface: sid, csd: !!d.csd, appId: d.appId || '', x11: !!d.x11, pkg: !!(d.appId && (getApp(d.appId)?.package || getApp(d.appId)?.isolated)) };
       // a web app's window (lordos-web.<app>.<profile>): lord-server says whether its process is that lord-web
       const web = d.x11 ? null : webOwnerOf(sid, d.appId);
       if (web) args.web = web;
+      // the size it asked for, with the theme's frame (and menu strip) around it
+      const c = frameInset({ id, args });
+      const w = Math.min(area.w, d.width + c.w), hh = Math.min(area.h, d.height + c.h);
+      const n = windows.get().length;
+      // cascaded, but always inside the work area (never under the Dock)
+      const x = Math.round(area.x + (area.w - w) / 2 + (n % 5) * 24), y = Math.round(area.y + Math.max(8, (area.h - hh) / 2 - 30) + (n % 5) * 24);
       // a dialog over the window it belongs to (sdk/dialogmodel.js), on that window's desktop
       const owner = d.parent ? wm.get(idOf(d.parent)) : null;
       const saved = owner ? null : placeLinuxWindow(dockIdOfWindow({ id, args }));   // session restore: the place it had
@@ -166,7 +172,7 @@ globalThis.__lordWayland = (sid, type, d = {}) => {
       if (tagKey(tg?.tag)) args.tag = tagKey(tg.tag);
       if (descriptionTitle(tg?.description)) args.tagDescription = descriptionTitle(tg.description);
       // xdg-session-management: the app restored this window by name: its own place comes first (given once)
-      const restored = linuxRestored(sid, !!d.csd);
+      const restored = linuxRestored(sid, c);
       // a dialog goes where its app asks and isn't remembered; a fixed window keeps its size
       if (d.dialog) args.dialog = true;
       if (d.fixed) args.fixedLinux = true;
@@ -228,7 +234,7 @@ globalThis.__lordWayland = (sid, type, d = {}) => {
       // a notice popup grew: never past a notification's size (sdk/desktopmodel.js NOTICE_MAX_*), so it can't come to cover
       // the screen; what doesn't fit is cut off
       if (win.args?.notice && win.pip) { wm.setPip(id, { ...win.pip, w: Math.max(1, Math.min(Math.round(d.width) || 1, NOTICE_MAX_W)), h: Math.max(1, Math.min(Math.round(d.height) || 1, NOTICE_MAX_H)) }); break; }
-      const c = win.args?.csd ? { w: 0, h: 0 } : windowChrome();
+      const c = frameInset(win);
       if (Math.abs(win.w - (d.width + c.w)) > 1 || Math.abs(win.h - (d.height + c.h)) > 1) wm.resize(id, d.width + c.w, d.height + c.h);
       break;
     }
@@ -238,6 +244,10 @@ globalThis.__lordWayland = (sid, type, d = {}) => {
     // A hidden desktop's window never gets to bring itself forward: these requests come from the app.
     case 'move': if (acceptsAppRequest(win, activeDesktop.get())) { wm.focus(id); if (!wm.beginMove(id)) drag = { id, edges: null, start: { x: d.x, y: d.y, f: wm.frame(wm.get(id)) } }; } break;
     case 'resize': if (acceptsAppRequest(win, activeDesktop.get())) { wm.focus(id); if (!wm.beginResize(id, d.edges || 10)) drag = { id, edges: d.edges || 10, start: { x: d.x, y: d.y, f: wm.frame(wm.get(id)) } }; } break;
+    // lord-server shows it over a whole display (its own frame stays the size it comes back to): the display's box, for
+    // whoever needs where it really is (Hands' windows_context, BUG-30b of the ws170 QA)
+    case 'fullscreen': if (win) wm.setArgs(id, { fullscreenRect: fullscreenRectOf(d) }); break;
+    case 'unfullscreen': if (win && win.args?.fullscreenRect) wm.setArgs(id, { fullscreenRect: null }); break;
     case 'maximize': if (win && !win.maximized) wm.toggleMaximize(id); break;
     case 'unmaximize': if (win && win.maximized) wm.toggleMaximize(id); break;
     case 'minimize':        // a move still under way ends with it: a minimized window never follows the pointer (#189)
@@ -306,10 +316,10 @@ globalThis.__lordWayland = (sid, type, d = {}) => {
 function linuxTag(sid) {
   try { return typeof lord.wayland.tag === 'function' ? lord.wayland.tag(sid) : null; } catch (e) { return null; }
 }
-function linuxRestored(sid, csd) {
+function linuxRestored(sid, inset) {
   let r = null;
   try { r = typeof lord.wayland.sessionFrame === 'function' ? lord.wayland.sessionFrame(sid) : null; } catch (e) { r = null; }
-  const f = restoredFrame(r, chromeInset(windowChrome(), csd));
+  const f = restoredFrame(r, inset);
   if (!f) return null;
   const main = Math.max(0, (screen.displays || []).findIndex((x) => x.main));
   return { frame: fitFrame(f, screen.displays, (x) => workAreaOf(x), main), max: !!r.max };

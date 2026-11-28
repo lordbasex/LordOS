@@ -2,7 +2,8 @@
 // Choose… next to the destination opens the system file dialog in folder mode without the Cloud accounts, its button is
 // off in a Cloud account's folder (with the note), and choosing a disk's folder makes it the destination. Choose… in
 // Exclusions adds a folder of the home folder, relative to it; a typed folder outside the home folder, or the home folder
-// itself, shows the error and is not stored. Prints "ok <name>" or "FAIL <name> <detail>".
+// itself, shows the error and is not stored. New Folder in the dialog makes a folder in the one in view, opens it, and it can
+// be chosen (GitHub #262). Prints "ok <name>" or "FAIL <name> <detail>".
 import './battery_settings_scene_stubs.js';
 import React from 'react';
 import * as rt from '@lordos/runtime';
@@ -25,6 +26,7 @@ const TREE = {
   [HOME]: ['Cloud', 'Videos'], [`${HOME}/Cloud`]: ['Drive'], [DRIVE]: ['Photos'], [`${DRIVE}/Photos`]: [],
   [`${HOME}/Videos`]: ['Large'], [`${HOME}/Videos/Large`]: [], [DISK]: ['Saved'], [`${DISK}/Saved`]: [],
 };
+const made = [];
 const dirEntry = (name) => ({ name, dir: true, size: 0, mtime: 0 });
 lord.fs = { ...(lord.fs || {}),
   home: () => HOME,
@@ -32,6 +34,7 @@ lord.fs = { ...(lord.fs || {}),
     { path: DRIVE, name: 'Drive', fs: 'fuse.rclone', total: 0, free: 0 }],
   list: (p) => (TREE[p] || []).map(dirEntry),
   stat: (p) => (TREE[p] ? { dir: true, writable: true, size: 0, mtime: 0 } : null),
+  mkdir: (p) => { made.push(p); TREE[p] = []; const at = p.slice(0, p.lastIndexOf('/')); TREE[at] = [...(TREE[at] || []), p.slice(at.length + 1)]; return true; },
 };
 let cfg = { dest: '', interval: 'hourly', pauseOnBattery: true, encrypt: false, exclude: [] };
 const configured = [];
@@ -115,4 +118,18 @@ check('…and nothing stored either', configured.length === before && cfg.exclud
 await typeAndAdd('~/Music', '~');
 check('a typed folder in home is stored relative to it', JSON.stringify(cfg.exclude) === '["Videos/Large","Music"]', JSON.stringify(cfg.exclude));
 check('…and the error is gone', !shown(backupEn.excludeHome) && !shown(backupEn.excludeOutside));
+
+// ---- New Folder in the dialog (GitHub #262) ----
+// the dialog opens on the destination (the disk's Saved); this harness has only the shell catalog, so the proposed name
+// is its key, files.newFolder
+const NEW = `${DISK}/Saved/files.newFolder`;
+await clickText(backupEn.choose, () => shown(backupEn.pickDest), 0);
+check('New Folder\'s button in a folder dialog', nodes('+').length > 0);
+await clickText('+', () => shown('Create'), -1);
+check('New Folder asks for a name', shown('Create') && shown('files.newFolder'));
+await press('Create');
+check('…and makes it in the folder in view', JSON.stringify(made) === JSON.stringify([NEW]), JSON.stringify(made));
+check('…and opens it', !shown('Create') && shown('files.newFolder'));
+await clickText('Choose this folder', () => cfg.dest === NEW);
+check('the new folder can be chosen', cfg.dest === NEW, JSON.stringify(cfg));
 process.exit(0);

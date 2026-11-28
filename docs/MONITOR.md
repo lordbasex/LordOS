@@ -882,7 +882,8 @@ on 2026-11-24; AGENTS.md, `lord-nvgpu`). `lord-server` never links or loads NVML
   tries at once.
 - **The helper** (`monitor/nvgpu_main.c`): no arguments, an empty environment, fd 3 a `SOCK_SEQPACKET` socketpair,
   fds 0–2 `/dev/null`, every other fd closed, `no_new_privs`. It `dlopen`s only `libnvidia-ml.so.1` from
-  `/usr/lib/x86_64-linux-gnu`, `/usr/lib/aarch64-linux-gnu`, `/usr/lib64` or `/usr/lib`, after checking that the
+  `/usr/lib/x86_64-linux-gnu`, `/usr/lib/aarch64-linux-gnu`, `/usr/lib64`, `/usr/lib` or Debian's own
+  `/usr/lib/<arch>-linux-gnu/nvidia/current` (where the libnvidia-ml1 package puts it; GitHub #273), after checking that the
   folder and each parent, and the real file behind the symlink (in one of those folders), belong to root and aren't
   writable by group or others; `RTLD_NOW | RTLD_LOCAL`. Then `nvmlInit_v2`, the device handles and one warm-up sample,
   and only then `sandbox_apply_helper` (scope `lordos-nvgpu`, 256 MB): no network or new sockets, no exec, threads
@@ -1423,7 +1424,7 @@ numbers and charts and the clocks changing between the partial and the full copy
 `build/engine-test` `test_hidden_blur_damage` covers it (three of its checks fail without the change).
 
 Checked again after rebasing onto the frame-cost work (2026-10-29). `blur_hidden` stays off with a
-dragged window, on the GPU path (so with GPU drag) and inside a transform; a frame the pipeline undoes
+dragged window (so with GPU drag) and inside a transform (on the GPU path too since 0.8.9.6.2, below); a frame the pipeline undoes
 and GPU drag's rectangle repainted on the CPU join the next frame's damage, and `paint_damage_settle`
 applies the rule, this one included, to the tree being painted. That first check of the 0.8.2
 scenario had a flaw: with no leftover holder, a fresh Terminal opens at 240,153, and the scenario's
@@ -1442,6 +1443,17 @@ sparkline or its own footer clock, so those were added to the live areas.) `--pr
 build, Terminal hidden behind Monitor → Network, last 150 frames: 11.2 % of the screen per frame in
 one box (paint 1.24 ms) and 3.3 % in 5.8 rectangles (0.82 ms); Monitor → Network alone: 9.1 % and
 3.2 % in 6.1 rectangles.
+
+**On the GPU path too (0.8.9.6.2, in development).** QA on the maintainer's PC (ws174: three 4K displays at 200 %,
+about 18 windows under Monitor) logged a 0.8 to 1.6 s `stall: paint display` every two seconds with `lord-server` at
+100 %, gone with Monitor closed. The opaque-cover skip and `blur_hidden` ran only on the CPU path, so on the GPU path
+each of Monitor's live rectangles (about 4 frames a second, 9 to 10 % of a display in 6 to 8 rectangles) painted every
+window under it again. Both now hold on the GPU path as well: what the cover leaves out is not painted, only walked to
+note its app windows and GPU pictures in the frame's list in paint order (`skip_note_walk`), and only when nothing
+before the cover is transformed (`cover_notable`); never in a capture or with a dragged window. `build/engine-test`
+`test_gpu_cover` (18 windows with shadows, three app windows and a blurred one under an opaque Monitor whose chart
+changes): every frame equals a full repaint, the list of app windows equals the full repaint's, and no covered window
+is painted; GPU path 6.2 → 0.55 ms a frame, CPU path unchanged (0.2 to 0.3 ms).
 
 VM 119: 4 vCPU Xeon Silver 4108 at 1.8 GHz, `virtio` GPU without 3D, CPU compositing, 1280×800.
 Network tab in front, ten slow downloads to mirrors in ten countries (arcs to 8–11 countries, about

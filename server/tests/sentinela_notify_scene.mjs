@@ -163,12 +163,16 @@ const gw = { id: 'aaaa-1', name: 'Whonix-Gateway', dir: `${HOME}/Machines/Whonix
   vcpus: 1, memoryMb: 2048, network: 'shared', ports: [], role: 'gateway', profileLock: 'anonymity' };
 let vmScope = 'in';
 lord.vm = {
-  list: () => [{ ...gw }],
+  list: () => { vmCalls.list = (vmCalls.list || 0) + 1; return [{ ...gw }]; },
   stats: () => { vmCalls.stats++; return { at: clock, cpuUsec: clock, memBytes: 1 << 30, qemuPid: 900, scope: vmScope, seccomp: 2, noNewPrivs: 1, sandbox: 511, cgMode: 'nested', passt: true }; },
   stop: (dir, how) => { vmCalls.stop.push([dir, how]); return true; },
 };
 lord.monitor.machinesWatched = () => ({ t: clock, ok: true, machines: { 'aaaa-1': { socks: 3, listen: 0, peers: 1, bytes: 20000 } } });
 const analyzedBefore = calls.analyze.length, nBefore = notifyHistory.get().length;
+// lord-server hasn't said a machine runs: the machines aren't read at all (sdk/vmlibrary.js)
+await run(1);
+check('no machine active: lord.vm.list is never called', !vmCalls.list && !vmCalls.stats, JSON.stringify(vmCalls));
+globalThis.__lordVm('state', JSON.stringify({ active: [gw.dir], apps: [] }));
 await run(2);
 check('machines: watched with the processes', calls.watchVm[0] === true && vmCalls.stats >= 2);
 check('a machine in its scope: nothing', notifyHistory.get().length === nBefore);

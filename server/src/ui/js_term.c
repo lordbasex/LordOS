@@ -7,9 +7,12 @@
  * only the login shell, the same way; lord-server then types the slot's argv into it once, quoted in C,
  * followed by one of three fixed exit rules (programExit: 'close' | 'closeIfOk' | 'keep'). JS never sees
  * or chooses the command: an unknown, used or expired token throws term.createFailed and nothing starts. */
+#include "js_hands.h"
 #include "js_term.h"
+#include "../hands/hands.h"
 #include "../wl/wl.h"
 #include "../wl/urilist.h"
+#include "../bgsave.h"
 #include "ui.h"
 #include "../term/term.h"
 #include "../term/termfill.h"
@@ -190,6 +193,8 @@ static JSValue f_configure(JSContext *c, JSValueConst this_val, int argc, JSValu
 static JSValue f_write(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
     (void)this_val; (void)argc;
     Session *s = arg_session(c, argv[0]);
+    /* a program asking for a password: never an AI agent's keys (Hands, docs/HANDS.md) */
+    if (s && hands_injecting() && term_asks_secret(s, NULL, 0)) return JS_UNDEFINED;
     size_t n;
     uint8_t *raw = JS_GetArrayBuffer(c, &n, argv[1]);      /* raw bytes as-is ("hex" mappings) */
     if (raw) { if (s) term_input(s, (const char *)raw, n); return JS_UNDEFINED; }
@@ -203,6 +208,8 @@ static JSValue f_write(JSContext *c, JSValueConst this_val, int argc, JSValueCon
 static JSValue f_key(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
     (void)this_val; (void)argc;
     Session *s = arg_session(c, argv[0]);
+    /* a program asking for a password: never an AI agent's keys (Hands, docs/HANDS.md) */
+    if (s && hands_injecting() && term_asks_secret(s, NULL, 0)) return JS_UNDEFINED;
     const char *key = JS_ToCString(c, argv[1]), *chr = JS_ToCString(c, argv[2]), *base = JS_ToCString(c, argv[3]);
     int32_t mods = 0;
     JS_ToInt32(c, &mods, argv[4]);
@@ -216,6 +223,8 @@ static JSValue f_key(JSContext *c, JSValueConst this_val, int argc, JSValueConst
 static JSValue f_paste(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
     (void)this_val; (void)argc;
     Session *s = arg_session(c, argv[0]);
+    /* a program asking for a password: never an AI agent's keys (Hands, docs/HANDS.md) */
+    if (s && hands_injecting() && term_asks_secret(s, NULL, 0)) return JS_UNDEFINED;
     const char *d = JS_ToCString(c, argv[1]);
     if (s && d) term_paste(s, d);
     if (d) JS_FreeCString(c, d);
@@ -748,6 +757,7 @@ static int arg_token(JSContext *c, JSValueConst v, unsigned *token) {
 /* saveSecret(sid, token): the typed password the "save" event offered goes to Passwords (termfill_save); JS never
  * has it. false if the offer is gone (declined, expired, another prompt). The "saved" event says how it ended. */
 static JSValue f_save_secret(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
+    HANDS_GUARD(c);                         /* never on an AI agent's input (Hands) */
     (void)this_val;
     int32_t sid = 0;
     unsigned token = 0;
@@ -757,6 +767,7 @@ static JSValue f_save_secret(JSContext *c, JSValueConst this_val, int argc, JSVa
 
 /* dropSecret(sid, token): "Not Now": the typed password is wiped */
 static JSValue f_drop_secret(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
+    HANDS_GUARD(c);                         /* never on an AI agent's input (Hands) */
     (void)this_val;
     int32_t sid = 0;
     unsigned token = 0;
@@ -769,6 +780,7 @@ static JSValue f_drop_secret(JSContext *c, JSValueConst this_val, int argc, JSVa
 /* fill(sid, vault, entry, field, index): the entry's field goes from lord-vault to the pty without passing
  * through here; the "fill" event says how it ended. false when it couldn't be asked for. */
 static JSValue f_fill(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
+    HANDS_GUARD(c);                         /* never on an AI agent's input (Hands) */
     (void)this_val;
     if (argc < 5) return JS_FALSE;
     int32_t sid = 0, idx = 0;
@@ -909,7 +921,8 @@ static JSValue f_clip_delete_saved(JSContext *c, JSValueConst this_val, int argc
 /* lord.clipboard.saveStore(name, text): the history's or the Snippets' file (GitHub #205), written whole and atomically
  * in ~/.local/share/lordos/clipboard. name is "history.json" or "snippets.json", nothing else (no path from JS). The file
  * is 0600 and the folder is made, or set back to, 0700: what someone copied or kept as a snippet is theirs to read only,
- * the history's images included. At most 32 MB, as lord.fs.write. true, or throws. */
+ * the history's images included. At most 32 MB, as lord.fs.write. true once queued (the write itself runs on bgsave.c's
+ * worker, GitHub #250), or throws. */
 #define CLIP_STORE_MAX (32u << 20)
 static int clip_mkdir(const char *p) { return mkdir(p, 0700) && errno != EEXIST ? -1 : 0; }
 static JSValue f_clip_save_store(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
@@ -939,20 +952,10 @@ static JSValue f_clip_save_store(JSContext *c, JSValueConst this_val, int argc, 
     if (dfd >= 0) close(dfd);
     ok = ok && snprintf(tmp, sizeof tmp, "%s/.%s.lordos-XXXXXX", dir, name) < (int)sizeof tmp
             && snprintf(dst, sizeof dst, "%s/%s", dir, name) < (int)sizeof dst;
-    int fd = ok ? mkstemp(tmp) : -1;                /* mkstemp makes it 0600 */
-    ok = fd >= 0;
-    if (ok) {
-        if (fchmod(fd, 0600)) ok = 0;
-        for (size_t off = 0; ok && off < len;) {
-            ssize_t w = write(fd, text + off, len - off);
-            if (w < 0 && errno == EINTR) continue;
-            if (w <= 0) ok = 0; else off += (size_t)w;
-        }
-        if (ok && fsync(fd)) ok = 0;
-        if (close(fd)) ok = 0;
-        if (ok && rename(tmp, dst)) ok = 0;
-        if (!ok) unlink(tmp);
-    }
+    /* the file itself (mkstemp next to it, 0600, fsync, rename) is written on bgsave.c's worker: on a spinning disk the
+     * fsync took up to 360 ms on the interface's thread after every copy (GitHub #250). A write that fails there is
+     * logged; the folder's checks above stay here, before anything is queued. */
+    ok = ok && !bgsave_put(dst, tmp, text, len, BGS_FSYNC | BGS_PRIVATE | BGS_UNIQUE);
     int err = errno;
     JS_FreeCString(c, text);
     if (!ok) return js_throw_code(c, "sys.errno", "errno", lerr_errno(err ? err : EIO), NULL);

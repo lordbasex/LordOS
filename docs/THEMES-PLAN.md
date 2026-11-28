@@ -1,6 +1,6 @@
 # Many appearances: community themes, installing from a file, and a theme store (plan)
 
-Status: **plan, asked for by the maintainer on 2026-11-21**. Nothing here is built yet. How a theme is made today:
+Status: **plan, asked for by the maintainer on 2026-11-21**. Stage 2 is built (0.8.9.6.2, in development); stages 1 and 3 as noted. How a theme is made today:
 [THEMES-GUIDE.md](THEMES-GUIDE.md). Steps that widen what third-party code can do go through the maintainer's review
 and an AGENTS.md entry before they are built.
 
@@ -25,6 +25,10 @@ below). It is a useful test case for every stage of this plan.
 
 ## Stage 2 — install a theme from a file
 
+**Built (0.8.9.6.2, in development; approved by the maintainer on 2026-11-26):** [THEMES-GUIDE.md](THEMES-GUIDE.md#6-community-themes-installed-from-a-file).
+What differs from the plan below: capabilities give read access only (no setters); `notifications` is a capability
+(a notification centre's history); a community theme may launch apps through the shell's list.
+
 - **Browse… → a `.zip`** with a `theme.json` manifest: id, name, author, license, version, minimum LordOS/SDK version,
   the capabilities it needs (below), its options, and the source files.
 - **Validation on install:** schema; allowed file types and sizes; no path traversal or links; **source only** (LordOS
@@ -38,7 +42,7 @@ below). It is a useful test case for every stage of this plan.
   permissions or direct app launching — `launchApp` goes through the shell). The manifest declares capabilities such as
   `wifi`, `bluetooth`, `brightness`, `media` and LordOS grants only those, as for isolated apps.
 - **Watchdog with fallback (also useful for official themes):** an exception at start, no first frame within a few
-  seconds, a long JS stall or repeated crashes → back to the previous theme (or Lord Flow), the theme marked failed, the
+  seconds, a long JS stall or repeated crashes → back to the previous theme (or Flow), the theme marked failed, the
   error kept for a report; plus a fixed key combination that always restores the default theme.
 
 ## Stage 3 — a theme store ("Desktop styles")

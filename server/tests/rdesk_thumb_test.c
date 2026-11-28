@@ -46,7 +46,7 @@ int main(void) {
     CHECK(rd_thumb_save(home, "../evil", px, w, h, 640) == -1);
     CHECK(rd_thumb_save("relative", "dev1", px, w, h, 640) == -1);
     CHECK(rd_thumb_save(home, "dev1", px, w, h, 640) == 0);
-    char path[512], dir[512];
+    char path[600], dir[512];
     snprintf(dir, sizeof dir, "%s/.local/share/lordos/remote-desk/thumbs", home);
     snprintf(path, sizeof path, "%s/dev1.png", dir);
     struct stat st;

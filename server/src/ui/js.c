@@ -22,6 +22,10 @@
 #include "js_sql.h"
 #include "js_weather.h"
 #include "js_sentinela.h"
+#include "js_hands.h"
+#include "../hands/hands.h"
+#include "../term/term.h"
+#include "js_err.h"
 #include "js_studio.h"
 #include "js_webapps.h"
 #include "js_sftp.h"
@@ -38,17 +42,23 @@
 #include "js_vmcli.h"
 #include "js_broker.h"
 #include "js_wasm.h"
+#include "js_theme.h"
+#include "logclean.h"
+#include "js_err.h"
+#include "themestore.h"
 #include "../media/svgicon.h"
 #include "js_net.h"
 #include "js_media.h"
 #include "js_wm.h"
 #include "js_disk.h"
 #include "../fsasync.h"
+#include "../fswatch.h"
 #include "js_imager.h"
 #include "js_logs.h"
 #include "js_flatpak.h"
 #include "js_help.h"
 #include "js_voice.h"
+#include "js_spell.h"
 #include "js_hw.h"
 #include "portal.h"
 #include "../wl/keygrab.h"
@@ -82,17 +92,33 @@ static double now_ms(void) {
 /* The last exception, kept short (its message and the first lines of its stack) for js_init_error() */
 static char last_error[1024];
 
+/* (security scan 0.8.9.6.2, F8) In a community session a theme's text reaches the log only cleaned and prefixed:
+ * its lord.log and console lines, and an exception's message and stack (whatever realm threw: a theme's Error can
+ * travel through LordOS's code), every line on its own with control characters neutralised (logclean.h), so no
+ * line it writes can pass for another subsystem's. With the theme's code on the stack or in its realm the prefix
+ * is "js: theme <id>: ". */
+static char community_id[32];
+static void log_prefix(JSContext *c, char *out, size_t n) {
+    if (jst_active() && community_id[0] && (c == jst_realm() || jst_on_stack(c))) snprintf(out, n, "js: theme %s: ", community_id);
+    else snprintf(out, n, "js: ");
+}
+
 static void dump_exception(JSContext *c) {
     JSValue e = JS_GetException(c);
     const char *msg = JS_ToCString(c, e);
-    fprintf(stderr, "js: %s\n", msg ? msg : "(exception)");
+    char pre[64];
+    log_prefix(c, pre, sizeof pre);
+    int clean = jst_active();
+    if (clean) logclean_print(stderr, pre, msg ? msg : "(exception)");
+    else fprintf(stderr, "js: %s\n", msg ? msg : "(exception)");
     snprintf(last_error, sizeof last_error, "%s", msg ? msg : "(exception)");
     if (msg) JS_FreeCString(c, msg);
     if (JS_IsObject(e)) {
         JSValue st = JS_GetPropertyStr(c, e, "stack");
         const char *s = JS_IsUndefined(st) ? NULL : JS_ToCString(c, st);
         if (s) {
-            fprintf(stderr, "%s\n", s);
+            if (clean) logclean_print(stderr, pre, s);
+            else fprintf(stderr, "%s\n", s);
             size_t used = strlen(last_error), lines = 0;
             for (const char *p = s; *p && lines < 6 && used + 2 < sizeof last_error; lines++) {
                 size_t l = strcspn(p, "\n");
@@ -183,11 +209,24 @@ static void stall_sample(void) {
  * the next run does (a call with no jobs after it). */
 static struct { int open; double t_end; JSAtom name; JSValue detail; } run;
 
+/* Where the run in progress came from (hands.h HANDS_ORIGIN_*), for the security-state natives (prof_call): the agent's
+ * when its input or a shell call made for it runs; the shell's for the main loop's timers and frames (each callback then
+ * runs as what set it: the prelude's lord.__originSet) and a theme's start; other for any other call from C. Back to
+ * other when the run ends, so a callback nobody classified (a JS_Call of another module) takes the sticky check. */
+static int run_origin = HANDS_ORIGIN_OTHER;
+static int next_origin = -1;           /* what the next run that starts is (call_hot, eval), -1 by the rule above */
+static int hot_call;                   /* inside __lordTick or __lordFrame: lord.__originSet is taken */
+static int hot_worst;                  /* the most refused origin a callback of that call ran as: its promise jobs' */
+
 static void js_run_finish(void);
 
 static void js_run_begin(void) {
     if (stall.depth == 0 && run.open) js_run_finish();
-    if (stall.depth++ == 0) { stall.t0 = now_ms(); stall.sampled = 0; stall.sample[0] = 0; }
+    if (stall.depth++ == 0) {
+        stall.t0 = now_ms(); stall.sampled = 0; stall.sample[0] = 0;
+        run_origin = hands_delivering() ? HANDS_ORIGIN_AGENT : next_origin >= 0 ? next_origin : HANDS_ORIGIN_OTHER;
+    }
+    next_origin = -1;
 }
 
 /* the outermost call returned: the run stays open for its jobs (name and first argument kept) */
@@ -228,6 +267,7 @@ static void stall_report(const char *what, const char *detail, double ms) {
 static void js_run_finish(void) {
     if (!run.open) return;
     run.open = 0;
+    run_origin = HANDS_ORIGIN_OTHER;
     double ms = run.t_end - stall.t0;
     stall.busy_js += ms;
     if (ms > stall.max_run) stall.max_run = ms;
@@ -246,6 +286,7 @@ static void js_run_finish(void) {
 /* a run that isn't a call_global_atom (js_wm_end, jobs with no call before them) */
 static void js_run_end(const char *what, const char *detail) {
     if (--stall.depth > 0) return;
+    run_origin = HANDS_ORIGIN_OTHER;
     double ms = now_ms() - stall.t0;
     stall.busy_js += ms;
     if (ms > stall.max_run) stall.max_run = ms;
@@ -255,23 +296,82 @@ static void js_run_end(const char *what, const char *detail) {
 void js_stall_begin(void) { js_run_begin(); }
 void js_stall_end(const char *what) { js_run_end(what, NULL); }
 
-/* lord.<ns>.<fn>(): the native call, timed; data[0] the real function, data[1] its name ("pkg.apps") */
+/* lord.<ns>.<fn>(): the native call, timed; data[0] the real function, data[1] its name ("pkg.apps"), data[2] its
+ * policy for a community theme (js_theme.c): with the theme's code on the stack, a call its policy refuses throws */
+/* ---- Hands (hands/hands.h): security-state natives refuse what an AI agent's input set off ----
+ * While the agent's input is delivered or was the last input (hands_agent_recent), these never run: the vault, filling a
+ * password into a terminal, the firewall's changes, permissions, administrator actions, Sentinela's blocklist, theme
+ * trust and removal, signing keys, screen-sharing answers, Hands' own switch, power. A surface that misses its handsDeny
+ * can't reopen them. lord.clipboard.get answers "" then while the clipboard holds a secret. Closed list, by name. */
+#define hands_guard_of hands_native_guard        /* the closed list is hands.c's (tested by hands-test) */
 static JSValue prof_call(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv, int magic, JSValue *data) {
     (void)magic;
+    {
+        int32_t hg = HANDS_G_NONE;
+        JS_ToInt32(c, &hg, data[3]);
+        /* a secret on the clipboard is nobody's to read while an agent is connected; the rest refuses when the agent's
+         * input set it off */
+        if (hg == HANDS_G_CLIP && hands_active() && term_clipboard_sensitive()) return JS_NewString(c, "");
+        if (hg == HANDS_G_REFUSE && hands_origin_refused(run_origin)) {
+            const char *n = JS_ToCString(c, data[1]);
+            int admin = n && !strcmp(n, "admin.request");
+            if (n) JS_FreeCString(c, n);
+            /* lord.admin.request: only the closed catalog-wallpaper actions (hands.c hands_admin_allowed, maintainer-
+             * approved 2026-11-26). Both values must already be strings: a primitive string can't change between this
+             * check and f_admin_request reading it (an object's toString could) */
+            if (admin) {
+                int ok = 0;
+                char act[48] = "";
+                if (argc >= 2 && JS_IsString(argv[0]) && JS_IsString(argv[1])) {
+                    size_t len = 0;
+                    const char *a = JS_ToCString(c, argv[0]), *arg = JS_ToCStringLen(c, &len, argv[1]);
+                    if (a) snprintf(act, sizeof act, "%s", a);
+                    ok = a && arg && hands_admin_allowed(a, arg, len);
+                    if (a) JS_FreeCString(c, a);
+                    if (arg) JS_FreeCString(c, arg);
+                }
+                /* one line, in the Hands log (shell.log): the action's name when it has an action's shape, and where the
+                 * run came from (a native callback after the agent's input is "callback", not the agent's own run) */
+                hands_admin_log(act, ok, hands_delivering() ? HANDS_ORIGIN_AGENT : run_origin);
+                if (!ok) return js_throw_code(c, "hands.refused", NULL);
+            } else {
+                const char *n = JS_ToCString(c, data[1]);
+                fprintf(stderr, "js: hands: lord.%s refused (an AI agent's input)\n", n ? n : "?");
+                if (n) JS_FreeCString(c, n);
+                return js_throw_code(c, "hands.refused", NULL);
+            }
+        }
+    }
+    if (jst_active()) {
+        int32_t pol = JST_DENY;
+        JS_ToInt32(c, &pol, data[2]);
+        if (pol == JST_NODE_PROP && jst_prop_guard(c, argc, argv)) return JS_EXCEPTION;
+        if (pol != JST_ALLOW && jst_on_stack(c)) {
+            const char *n = JS_ToCString(c, data[1]);
+            int r = jst_check(c, pol, n ? n : "?", argc, argv);
+            if (n) JS_FreeCString(c, n);
+            if (r) return JS_EXCEPTION;
+        }
+    }
     double t0 = now_ms();
     JSValue r = JS_Call(c, data[0], this_val, argc, argv);
     double ms = now_ms() - t0;
     if (ms > SLOW_CALL_MS) {
         stall.slow_calls++;
         const char *n = JS_ToCString(c, data[1]);
-        stall_line("call", n ? n : "?", NULL, NULL, ms);
+        /* past the stall limit, also who called it (its caller's frames; the native's own frame is "native"), so a
+         * slow call at session start names the module that made it (QA 0.8.9.6.2: fs.recent, vm.list, pkg.available) */
+        char where[384] = "";
+        if (ms > stall_limit()) JS_GetStackText(c, where, (int)sizeof where, 5);
+        stall_line("call", n ? n : "?", NULL, where, ms);
         if (n) JS_FreeCString(c, n);
     }
     return r;
 }
 
 /* Every function of every lord.<ns> object (and one level below: lord.settings.x, lord.fs.trash.y) is replaced by a
- * timed one with the same length. Done once the native API is complete, before any JavaScript runs. */
+ * timed one with the same length. Done once the native API is complete, before any JavaScript runs. In a community
+ * theme's session (js_theme.c) the functions of lord itself (setStyle, createNode…) are wrapped too, for the guard. */
 static void prof_wrap_obj(JSContext *c, JSValueConst obj, const char *prefix, int level) {
     JSPropertyEnum *props = NULL;
     uint32_t n = 0;
@@ -284,13 +384,13 @@ static void prof_wrap_obj(JSContext *c, JSValueConst obj, const char *prefix, in
         const char *key = JS_AtomToCString(c, props[i].atom);
         char name[96];
         snprintf(name, sizeof name, "%s%s%s", prefix, prefix[0] ? "." : "", key ? key : "?");
-        if (data_prop && JS_IsFunction(c, d.value) && level > 0) {
+        if (data_prop && JS_IsFunction(c, d.value) && (level > 0 || jst_active())) {
             int len = 0;
             JSValue l = JS_GetPropertyStr(c, d.value, "length");
             JS_ToInt32(c, &len, l);
             JS_FreeValue(c, l);
-            JSValue data[2] = { d.value, JS_NewString(c, name) };
-            JSValue w = JS_NewCFunctionData(c, prof_call, len, 0, 2, data);
+            JSValue data[4] = { d.value, JS_NewString(c, name), JS_NewInt32(c, jst_policy(name)), JS_NewInt32(c, hands_guard_of(name)) };
+            JSValue w = JS_NewCFunctionData(c, prof_call, len, 0, 4, data);
             JS_FreeValue(c, data[1]);
             JS_DefinePropertyValue(c, obj, props[i].atom, w, d.flags & (JS_PROP_WRITABLE | JS_PROP_ENUMERABLE | JS_PROP_CONFIGURABLE));
         } else if (data_prop && JS_IsObject(d.value) && !JS_IsFunction(c, d.value) && !JS_IsArray(c, d.value) && level < 2) {
@@ -461,7 +561,7 @@ static JSValue f_set_prop(JSContext *c, JSValueConst this_val, int argc, JSValue
                     stamp[vl] = 0;
                     rest += vl + 1;
                 }
-                /* the path may also be an "asset:" one (0.8.9: Lord Workspaces' wallpaper slideshow decodes the next picture
+                /* the path may also be an "asset:" one (0.8.9: Workspaces' wallpaper slideshow decodes the next picture
                  * off this thread, sdk/slideshow.jsx) */
                 if (rest && rest[0] == '/') n->img = image_get_thumb(rest, atoi(num), stamp);
                 else if (rest && !strncmp(rest, "asset:", 6) && !strstr(rest, "..")) {
@@ -569,6 +669,8 @@ static JSValue f_set_prop(JSContext *c, JSValueConst this_val, int argc, JSValue
     } else if (n && key && !strcmp(key, "protected")) {
         n->protect = JS_ToBool(c, argv[2]) ? 1 : 0;     /* protected window (wm.setProtected) */
         node_invalidate(n);
+    } else if (n && key && !strcmp(key, "handsDeny")) {
+        n->hands_deny = JS_ToBool(c, argv[2]) ? 1 : 0;  /* out of an AI agent's reach (hands/hands.h) */
     } else if (n && key && !strcmp(key, "surface") && n->type == NODE_SURFACE) {
         int32_t id = 0;                     /* window of a Wayland app (wl/wl.c) */
         if (JS_IsNumber(argv[2])) JS_ToInt32(c, &id, argv[2]);
@@ -635,7 +737,13 @@ static JSValue f_now(JSContext *c, JSValueConst this_val, int argc, JSValueConst
 static JSValue f_log(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
     (void)this_val; (void)argc;
     const char *s = JS_ToCString(c, argv[0]);
-    if (s) { fprintf(stderr, "js: %s\n", s); JS_FreeCString(c, s); }
+    if (!s) return JS_UNDEFINED;
+    if (jst_active()) {                  /* a community session: line by line, cleaned, the theme's prefixed (F8) */
+        char pre[64];
+        log_prefix(c, pre, sizeof pre);
+        logclean_print(stderr, pre, s);
+    } else fprintf(stderr, "js: %s\n", s);
+    JS_FreeCString(c, s);
     return JS_UNDEFINED;
 }
 
@@ -674,6 +782,25 @@ static JSValue f_stats(JSContext *c, JSValueConst this_val, int argc, JSValueCon
     return o;
 }
 
+/* lord.__origin() and lord.__originSet(o): the prelude's timers and animation frames keep the origin of the run that set
+ * them and run as it (hands.h HANDS_ORIGIN_*). The prelude takes both and deletes them from lord before any bundle runs.
+ * __originSet is taken only inside the main loop's __lordTick or __lordFrame, never lowers what the agent's delivered
+ * input is, and can't name anything but the three origins. */
+static JSValue f_origin(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
+    (void)this_val; (void)argc; (void)argv;
+    return JS_NewInt32(c, hands_delivering() ? HANDS_ORIGIN_AGENT : run_origin);
+}
+static JSValue f_origin_set(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
+    (void)this_val;
+    int32_t o = HANDS_ORIGIN_OTHER;
+    if (!hot_call || argc < 1 || JS_ToInt32(c, &o, argv[0])) return JS_UNDEFINED;
+    if (o < HANDS_ORIGIN_SHELL || o > HANDS_ORIGIN_AGENT) o = HANDS_ORIGIN_OTHER;
+    if (hands_delivering()) o = HANDS_ORIGIN_AGENT;
+    run_origin = o;
+    if (o > hot_worst) hot_worst = o;
+    return JS_UNDEFINED;
+}
+
 static const JSCFunctionListEntry lord_funcs[] = {
     JS_CFUNC_DEF("createNode", 1, f_create_node),
     JS_CFUNC_DEF("setText", 2, f_set_text),
@@ -688,16 +815,23 @@ static const JSCFunctionListEntry lord_funcs[] = {
     JS_CFUNC_DEF("now", 0, f_now),
     JS_CFUNC_DEF("log", 1, f_log),
     JS_CFUNC_DEF("stats", 0, f_stats),
+    JS_CFUNC_DEF("__origin", 0, f_origin),
+    JS_CFUNC_DEF("__originSet", 1, f_origin_set),
 };
 
 /* Runs JS code. Only used with the internal prelude and with the theme bundle that
  * is passed on the command line (trusted local file); never with external data. */
 static int eval(const char *src, size_t len, const char *name) {
+    /* a theme's start (and the prelude) is the shell's own: what it sets runs as the shell's, even after a switch the
+     * agent clicked (its start's refreshes were refused before, BUG-10) */
+    run_origin = hands_delivering() ? HANDS_ORIGIN_AGENT : HANDS_ORIGIN_SHELL;
     JSValue r = JS_Eval(ctx, src, len, name, JS_EVAL_TYPE_GLOBAL);
     int ok = !JS_IsException(r);
     if (!ok) dump_exception(ctx);
     JS_FreeValue(ctx, r);
+    next_origin = run_origin;
     drain_jobs();
+    run_origin = HANDS_ORIGIN_OTHER;
     return ok ? 0 : -1;
 }
 
@@ -715,8 +849,14 @@ static JSValue call_global_atom(JSAtom name, int argc, JSValueConst *argv) {
 }
 
 static JSValue call_global(const char *name, int argc, JSValueConst *argv) {
+    /* input (a pointer, a key, a gesture, the input method): the person's own unless the agent's is being delivered
+     * (js_run_begin makes that the agent's), so what it sets runs as the shell's; never a continuation of anything */
+    if (stall.depth == 0 && (!strcmp(name, "__lordEvent") || !strcmp(name, "__lordKey") || !strcmp(name, "__lordGesture")
+                             || !strcmp(name, "__lordIme")))
+        next_origin = HANDS_ORIGIN_SHELL;
     JSAtom a = JS_NewAtom(ctx, name);
     JSValue r = call_global_atom(a, argc, argv);
+    next_origin = -1;
     JS_FreeAtom(ctx, a);
     return r;
 }
@@ -733,7 +873,13 @@ static JSValue call_hot(int which, int argc, JSValueConst *argv) {
         for (int i = 0; i < HOT_N; i++) hot_atom[i] = JS_NewAtom(ctx, hot_name[i]);
         hot_rt = rt;
     }
-    return call_global_atom(hot_atom[which], argc, argv);
+    /* the main loop's own call: the shell's, each timer or frame callback then as what set it (lord.__originSet), and
+     * the promise jobs after them as the most refused of those (they can't be told apart once queued) */
+    int top = stall.depth == 0 && which != HOT_WANTS_FRAME;
+    if (top) { next_origin = HANDS_ORIGIN_SHELL; hot_call = 1; hot_worst = HANDS_ORIGIN_SHELL; }
+    JSValue r = call_global_atom(hot_atom[which], argc, argv);
+    if (top) { hot_call = 0; run_origin = hands_delivering() ? HANDS_ORIGIN_AGENT : hot_worst; next_origin = -1; }
+    return r;
 }
 
 /* Reads a bundle of LordOS's own code through the verified-code check (sec/codesig.c): the bytes
@@ -767,6 +913,7 @@ static int on_interrupt(JSRuntime *r, void *opaque) {
         return 0;
     }
     if (w == 2) fprintf(stderr, "lord-server: watchdog: the JavaScript task stopped (its stack follows)\n");
+    if (w == 2) jst_note_stop();        /* a community theme then goes back to the one before (main.c community_watch) */
     return w == 2;
 }
 
@@ -842,7 +989,10 @@ static void session_context(void) {
     js_hw_register(ctx, lord);         /* lord.display/power/bt/mime/timedate (Settings, src/hw) */
     js_voice_register(ctx, lord);      /* lord.voice: reading text aloud through lord-say (tts/speak.c, docs/VOICE.md) */
     js_sentinela_register(ctx, lord);  /* lord.sentinela: Sentinela's local model engine (llm/engine.c, docs/SENTINELA.md) */
-    prof_wrap_obj(ctx, lord, "", 0);   /* every lord.<ns>.* call timed (the stall detector) */
+    js_hands_register(ctx, lord);      /* lord.hands: an AI agent using the desktop (hands/hands.h, docs/HANDS.md) */
+    js_spell_register(ctx, lord);      /* lord.spell: the spell checker through lord-spell (spell/spellsvc.c, docs/SPELLING.md) */
+    if (jst_active()) jst_register_main(ctx, lord);    /* a community theme's session: its host's natives (js_theme.c) */
+    prof_wrap_obj(ctx, lord, "", 0);   /* every lord.<ns>.* call timed (the stall detector) and guarded (js_theme.c) */
     JS_SetPropertyStr(ctx, g, "lord", lord);
     JS_FreeValue(ctx, g);
 }
@@ -852,7 +1002,108 @@ static void session_context(void) {
  * package update may have replaced meanwhile (and the manifest that would verify it may not be in use). And the
  * bytes of the theme lord.themes.use asked for, verified when it was asked (js_theme_prepare): a refused theme is
  * known before the running one is discarded, and what runs is what was checked. */
-static struct { char *src; size_t len; char path[1024]; } theme_run, theme_next;
+/* A community theme (js_theme.c): the theme host's bytes (LordOS's own code, through the verified-code check) run in
+ * the session's realm, and the theme's own code, read from the per-user folder and checked against the SHA-256 its
+ * install record keeps, runs in a second realm with a restricted `lord`. */
+typedef struct { char *code; size_t len; unsigned caps; char id[32]; } Community;
+static struct { char *src; size_t len; char path[1024]; Community cm; } theme_run, theme_next;
+
+static void community_free(Community *cm) { free(cm->code); memset(cm, 0, sizeof *cm); }
+
+static void host_path(char *b, size_t n) { snprintf(b, n, "%s/theme-host.bundle.js", js_sys_assets()); }
+
+/* the bytes to run for bundle_path: a bundle of LordOS's own code, or for a community theme the host's (and cm) */
+static char *load_theme(const char *bundle_path, size_t *len, int *refused, Community *cm) {
+    char id[32], why[256];
+    memset(cm, 0, sizeof *cm);
+    if (!jst_is_user_bundle(bundle_path, id, sizeof id)) return load_code(bundle_path, len, refused);
+    *refused = 0;
+    cm->code = jst_load_code(id, &cm->len, &cm->caps, why, sizeof why);
+    if (!cm->code) {
+        fprintf(stderr, "js: community theme %s not loaded: %s\n", id, why);
+        snprintf(last_error, sizeof last_error, "%s", why);
+        return NULL;
+    }
+    char hp[1024];
+    codesig_init(js_sys_assets());
+    host_path(hp, sizeof hp);
+    char *src = load_code(hp, len, refused);
+    if (!src) { community_free(cm); return NULL; }
+    snprintf(cm->id, sizeof cm->id, "%s", id);
+    return src;
+}
+
+/* the theme's realm: a restricted lord, the globals the host made for it and its SDK; then its code */
+static int start_community(const Community *cm) {
+    JSValue g = JS_GetGlobalObject(ctx);
+    JSValue host = JS_GetPropertyStr(ctx, g, "__lordThemeHost");
+    JSValue prep = JS_GetPropertyStr(ctx, host, "prepare");
+    JSValue caps = JS_NewArray(ctx);
+    uint32_t k = 0;
+    for (unsigned b = 1; b <= (1u << 15); b <<= 1) {
+        if ((cm->caps & b) && ts_cap_name(b)) JS_SetPropertyUint32(ctx, caps, k++, JS_NewString(ctx, ts_cap_name(b)));
+    }
+    JSValue args[2] = { JS_NewString(ctx, cm->id), caps };
+    JSValue made = JS_IsFunction(ctx, prep) ? JS_Call(ctx, prep, host, 2, args) : js_throw_code(ctx, "theme.noHost", NULL);
+    JS_FreeValue(ctx, args[0]);
+    JS_FreeValue(ctx, args[1]);
+    JS_FreeValue(ctx, prep);
+    int r = -1;
+    if (JS_IsException(made)) { dump_exception(ctx); goto out; }
+    JSContext *t = JS_NewContext(rt);
+    if (!t) goto out;
+    JSValue tg = JS_GetGlobalObject(t);
+    /* the theme's own lord: natives of its realm that always apply its policy (js_theme.c jst_theme_lord) */
+    JSValue lord = JS_GetPropertyStr(ctx, g, "lord");
+    JSValue rl = jst_theme_lord(t, ctx, lord);
+    JS_SetPropertyStr(t, rl, "version", JS_NewString(t, LORD_VERSION));
+    JS_FreeValue(ctx, lord);
+    JS_SetPropertyStr(t, tg, "lord", rl);
+    /* the host's globals for it (console, timers, animation frames: its own wrappers) and its SDK */
+    JSValue glob = JS_GetPropertyStr(ctx, made, "globals");
+    JSPropertyEnum *pe = NULL;
+    uint32_t pn = 0;
+    if (JS_IsObject(glob) && !JS_GetOwnPropertyNames(ctx, &pe, &pn, glob, JS_GPN_STRING_MASK | JS_GPN_ENUM_ONLY)) {
+        for (uint32_t i = 0; i < pn; i++) {
+            JS_SetProperty(t, tg, pe[i].atom, JS_GetProperty(ctx, glob, pe[i].atom));
+            JS_FreeAtom(ctx, pe[i].atom);
+        }
+        js_free(ctx, pe);
+    }
+    JS_FreeValue(ctx, glob);
+    JS_SetPropertyStr(t, tg, "__lordThemeSdk", JS_GetPropertyStr(ctx, made, "sdk"));
+    JS_FreeValue(t, tg);
+    /* from here LordOS's realm is locked down (its built-ins frozen, no code from text): sdk/themeapi.js */
+    JSValue lock = JS_GetPropertyStr(ctx, host, "lockdown");
+    JSValue lr = JS_IsFunction(ctx, lock) ? JS_Call(ctx, lock, host, 0, NULL) : js_throw_code(ctx, "theme.noHost", NULL);
+    JS_FreeValue(ctx, lock);
+    if (JS_IsException(lr)) { dump_exception(ctx); JS_FreeContext(t); goto out; }
+    JS_FreeValue(ctx, lr);
+    jst_set_realm(t);
+    char name[64];
+    snprintf(name, sizeof name, "<theme:%s>", cm->id);
+    snprintf(community_id, sizeof community_id, "%s", cm->id);
+    JSValue v = JS_Eval(t, cm->code, cm->len, name, JS_EVAL_TYPE_GLOBAL | JS_EVAL_FLAG_STRICT);
+    r = JS_IsException(v) ? -1 : 0;
+    if (r) dump_exception(t);
+    JS_FreeValue(t, v);
+    drain_jobs();
+    if (!r) {                           /* the shell, started by LordOS's code with the element the theme gave */
+        JSValue run = JS_GetPropertyStr(ctx, host, "run");
+        JSValue ran = JS_IsFunction(ctx, run) ? JS_Call(ctx, run, host, 0, NULL) : js_throw_code(ctx, "theme.noHost", NULL);
+        JS_FreeValue(ctx, run);
+        if (JS_IsException(ran)) { dump_exception(ctx); r = -1; }
+        else if (!JS_ToBool(ctx, ran)) { snprintf(last_error, sizeof last_error, "the theme never called startShell()"); r = -1; }
+        JS_FreeValue(ctx, ran);
+        drain_jobs();
+    }
+    if (!r) fprintf(stderr, "js: community theme %s started (capabilities %#x)\n", cm->id, cm->caps);
+out:
+    JS_FreeValue(ctx, made);
+    JS_FreeValue(ctx, host);
+    JS_FreeValue(ctx, g);
+    return r;
+}
 
 static void set_theme_dir(const char *bundle_path) {
     char dir[1024];
@@ -861,22 +1112,29 @@ static void set_theme_dir(const char *bundle_path) {
 }
 
 /* A new session context running src (not freed here): 0 if it started. */
-static int run_theme(const char *bundle_path, const char *src, size_t len) {
+static int run_theme(const char *bundle_path, const char *src, size_t len, const Community *cm) {
     set_theme_dir(bundle_path);
     last_error[0] = 0;
+    int community = cm && cm->code;
+    if (community) jst_begin(cm->caps);
     session_context();
     double t0 = now_ms();
+    char hp[1024];
+    host_path(hp, sizeof hp);
     int r = eval(prelude, sizeof prelude - 1, "<prelude>");
-    if (!r) r = eval(src, len, bundle_path);
+    if (!r) r = eval(src, len, community ? hp : bundle_path);
+    if (!r && community) r = start_community(cm);
     fprintf(stderr, "js: theme %s loaded in %.1f ms (%zu KB)\n", bundle_path, now_ms() - t0, len / 1024);
     return r;
 }
 
 /* src (owned) started: it is the running theme's code from now on */
-static void keep_running(const char *bundle_path, char *src, size_t len) {
+static void keep_running(const char *bundle_path, char *src, size_t len, Community *cm) {
     if (theme_run.src != src) free(theme_run.src);
+    if (theme_run.cm.code != cm->code) community_free(&theme_run.cm);
     theme_run.src = src;
     theme_run.len = len;
+    theme_run.cm = *cm;
     snprintf(theme_run.path, sizeof theme_run.path, "%s", bundle_path);
 }
 
@@ -885,24 +1143,28 @@ int js_init(const char *bundle_path) {
     size_t len = 0;
     int refused = 0;
     last_error[0] = 0;
-    char *src = load_code(bundle_path, &len, &refused);
+    Community cm;
+    char *src = load_theme(bundle_path, &len, &refused, &cm);
     if (!src) return refused ? JS_REFUSED : -1;
-    int r = run_theme(bundle_path, src, len);
-    if (r) free(src);
-    else keep_running(bundle_path, src, len);
+    int r = run_theme(bundle_path, src, len, &cm);
+    if (r) { free(src); community_free(&cm); }
+    else keep_running(bundle_path, src, len, &cm);
     return r;
 }
 
 int js_theme_prepare(const char *bundle_path) {
     free(theme_next.src);
+    community_free(&theme_next.cm);
     theme_next.src = NULL;
     theme_next.path[0] = 0;
     size_t len = 0;
     int refused = 0;
-    char *src = load_code(bundle_path, &len, &refused);
+    Community cm;
+    char *src = load_theme(bundle_path, &len, &refused, &cm);
     if (!src) return refused ? JS_REFUSED : -1;
     theme_next.src = src;
     theme_next.len = len;
+    theme_next.cm = cm;
     snprintf(theme_next.path, sizeof theme_next.path, "%s", bundle_path);
     return 0;
 }
@@ -911,18 +1173,22 @@ int js_init_prepared(const char *bundle_path) {
     if (!theme_next.src || strcmp(theme_next.path, bundle_path)) return js_init(bundle_path);
     char *src = theme_next.src;
     size_t len = theme_next.len;
+    Community cm = theme_next.cm;
+    memset(&theme_next.cm, 0, sizeof theme_next.cm);
     theme_next.src = NULL;
     theme_next.path[0] = 0;
-    int r = run_theme(bundle_path, src, len);
-    if (r) free(src);
-    else keep_running(bundle_path, src, len);
+    int r = run_theme(bundle_path, src, len, &cm);
+    if (r) { free(src); community_free(&cm); }
+    else keep_running(bundle_path, src, len, &cm);
     return r;
 }
 
 int js_init_previous(const char *bundle_path) {
     if (!theme_run.src || strcmp(theme_run.path, bundle_path)) return js_init(bundle_path);
-    return run_theme(bundle_path, theme_run.src, theme_run.len);
+    return run_theme(bundle_path, theme_run.src, theme_run.len, &theme_run.cm);
 }
+
+int js_community_theme(void) { return jst_active(); }
 
 /* ---- the recovery screen ----
  * When the theme (or the login screen, or an isolated app's code) was refused, lord-server shows
@@ -1078,10 +1344,13 @@ int js_app_recovery(void) {
 void js_shutdown(void) {
     media_shutdown();                   /* the lord-media helpers belong to this context */
     if (ctx) js_wasm_shutdown(ctx);
+    js_sys_fswatch_reset(ctx);          /* lord.fs.watch's watches end with the context that made them */
     if (ctx && run.open) { run.open = 0; JS_FreeAtom(ctx, run.name); JS_FreeValue(ctx, run.detail); run.detail = JS_UNDEFINED; }
     stall.depth = 0;
     if (ctx && hot_rt == rt) for (int i = 0; i < HOT_N; i++) JS_FreeAtom(ctx, hot_atom[i]);
     hot_rt = NULL;
+    if (jst_realm()) { JSContext *t = jst_realm(); jst_set_realm(NULL); JS_FreeContext(t); }
+    jst_set_realm(NULL);
     if (ctx) JS_FreeContext(ctx);
     if (rt) JS_FreeRuntime(rt);
     ctx = NULL;
@@ -1258,9 +1527,13 @@ void js_key(int code, int value) {
     if (value && !to_app && !composed) {
         char commit[512];
         int used = ime_key(&k, commit, sizeof commit);
+        /* The finished syllable goes first, and React renders it (the microtasks of that key) before the key that
+         * ended it (Space, Enter, punctuation, an arrow) reaches the field: a field that read its value from its last
+         * render applied the Space over the old value and lost the syllable (가 + Space gave " "; ws170 QA BUG-20). */
         if (commit[0]) ime_commit(commit);
         if (ime_changed()) ime_event();
-        if (used) { drain_jobs(); return; }
+        if (used || commit[0]) drain_jobs();
+        if (used) return;
     }
     int flags = k.shift | k.ctrl << 1 | k.alt << 2 | k.altgr << 3 | k.meta << 4 | k.caps << 5 | k.dead << 6 | (to_app == 2) << 7;
     JSValueConst args[6] = { JS_NewInt32(ctx, code), JS_NewInt32(ctx, value), JS_NewString(ctx, k.key),
@@ -1368,8 +1641,52 @@ void js_fs_dispatch(void) {
     if (fsasync_dispatch(fs_reply, NULL)) drain_jobs();
 }
 
+/* lord.fs.watch (fswatch.c): a watched folder changed → its fn({ changed: true, overflow, gone }), no file names. */
+static void fswatch_call(void *ud, int id, int overflow, int gone) {
+    (void)ud;
+    JSValue fn = js_sys_fswatch_fn(ctx, id);
+    if (!JS_IsFunction(ctx, fn)) { JS_FreeValue(ctx, fn); return; }
+    JSValue ev = JS_NewObject(ctx);
+    JS_SetPropertyStr(ctx, ev, "changed", JS_TRUE);
+    JS_SetPropertyStr(ctx, ev, "overflow", JS_NewBool(ctx, overflow));
+    JS_SetPropertyStr(ctx, ev, "gone", JS_NewBool(ctx, gone));
+    js_run_begin();
+    JSValue r = JS_Call(ctx, fn, JS_UNDEFINED, 1, (JSValueConst *)&ev);
+    if (JS_IsException(r)) dump_exception(ctx);
+    JSAtom name = JS_NewAtom(ctx, "lord.fs.watch");
+    js_run_called(name, 0, NULL);
+    JS_FreeAtom(ctx, name);
+    JS_FreeValue(ctx, r);
+    JS_FreeValue(ctx, ev);
+    JS_FreeValue(ctx, fn);
+}
+
+void js_fswatch_dispatch(double now) {
+    if (!ctx) return;
+    if (fswatch_dispatch(now, fswatch_call, NULL)) drain_jobs();
+}
+
 /* Network (net/state.c): something changed in links, addresses or routes → __lordNet("link"|"addr"|"route"). */
 /* Disks (disk/disk.c): something was mounted, unmounted, plugged in or changed → __lordDisks(what). */
+/* Machines (ui/js_vm.c "the machines' state for the shell"): __lordVm('library') when the library changed,
+ * __lordVm('state', json) when what runs or what is in apps mode changed */
+void js_vm_library_event(void) {
+    if (!ctx) return;
+    JSValue arg = JS_NewString(ctx, "library");
+    JS_FreeValue(ctx, call_global("__lordVm", 1, &arg));
+    JS_FreeValue(ctx, arg);
+    drain_jobs();
+}
+
+void js_vm_state_event(const char *json) {
+    if (!ctx || !json) return;
+    JSValue args[2] = { JS_NewString(ctx, "state"), JS_NewString(ctx, json) };
+    JS_FreeValue(ctx, call_global("__lordVm", 2, args));
+    JS_FreeValue(ctx, args[0]);
+    JS_FreeValue(ctx, args[1]);
+    drain_jobs();
+}
+
 void js_disk_event(const char *what) {
     if (!ctx) return;
     if (!ctx) return;
@@ -1445,6 +1762,34 @@ void js_remote_event(const char *json) {
     if (!ctx) return;
     JSValueConst args[1] = { JS_NewString(ctx, json) };
     JS_FreeValue(ctx, call_global("__lordRemote", 1, args));
+    JS_FreeValue(ctx, args[0]);
+    drain_jobs();
+}
+
+/* Hands (hands/hands.h): an agent's call answered by the shell → __lordHands(op, json), sdk/hands.jsx; its answer is
+ * JSON text (malloc'd), NULL when the shell has none. */
+char *js_hands_call(const char *op, const char *json) {
+    if (!ctx || !op || !json) return NULL;
+    JSValueConst args[2] = { JS_NewString(ctx, op), JS_NewString(ctx, json) };
+    JSValue r = call_global("__lordHands", 2, args);
+    JS_FreeValue(ctx, args[0]);
+    JS_FreeValue(ctx, args[1]);
+    char *out = NULL;
+    if (JS_IsString(r)) {
+        size_t n = 0;
+        const char *s = JS_ToCStringLen(ctx, &n, r);
+        if (s) { out = malloc(n + 1); if (out) { memcpy(out, s, n); out[n] = 0; } JS_FreeCString(ctx, s); }
+    }
+    JS_FreeValue(ctx, r);
+    drain_jobs();
+    return out;
+}
+
+/* Hands: the clients changed, a prompt, Stop, a log line → __lordHandsEvent(json) */
+void js_hands_event(const char *json) {
+    if (!ctx || !json) return;
+    JSValueConst args[1] = { JS_NewString(ctx, json) };
+    JS_FreeValue(ctx, call_global("__lordHandsEvent", 1, args));
     JS_FreeValue(ctx, args[0]);
     drain_jobs();
 }

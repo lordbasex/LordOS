@@ -32,6 +32,10 @@ if not os.access("/dev/kvm", os.R_OK | os.W_OK):
     skip("KVM")
 if subprocess.run(["unshare", "-Urm", "true"], capture_output=True).returncode:
     skip("unprivileged user namespaces")
+# lord-vm runs with an empty folder over the real home (ns_prefix): a tree inside the home vanishes there
+_home = os.path.realpath(realhome())
+if os.path.realpath(SERVER).startswith(_home + os.sep):
+    skip("the tree outside the home folder (lord-vm's namespace hides %s; build it under /srv or another disk)" % _home)
 
 RENDER = next((p for p in ("/dev/dri/renderD128", "/dev/dri/renderD129") if os.access(p, os.R_OK | os.W_OK)), None)
 GL = ARCH == "amd64" and all(os.path.exists("/usr/lib/x86_64-linux-gnu/qemu/" + m)

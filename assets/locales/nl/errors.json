@@ -234,6 +234,7 @@
   "fs.moveRemoveFailed": "Gekopieerd, maar het origineel kon niet worden verwijderd: {errno}",
   "fs.noTrash": "Er is geen prullenmand voor die locatie",
   "fs.notFile": "Het is geen bestand",
+  "fs.notFolder": "Het is geen map",
   "fs.notInTrash": "Het staat niet in de prullenmand",
   "fs.notRegular": "Het is geen gewoon bestand (is het een koppeling?)",
   "fs.openFailed": "Het bestand kon niet worden geopend: {errno}",
@@ -243,11 +244,13 @@
   "fs.systemFolder": "Bestanden toont de interne mappen van het systeem niet (/proc, /sys, /dev en /run)",
   "fs.tooLarge": "Het bestand is te groot (max. {max})",
   "fs.tooManyCopies": "Te veel kopieën bezig; probeer het opnieuw als er een klaar is",
+  "fs.tooManyWatches": "Er worden te veel mappen gevolgd (max. {max})",
   "fs.trashBadOrigin": "De oorspronkelijke locatie is ongeldig",
   "fs.trashEntryFailed": "Het item in de prullenmand kon niet worden gemaakt",
   "fs.trashOriginGone": "De oorspronkelijke map bestaat niet meer",
   "fs.trashOtherDisk": "Het staat op een andere schijf dan zijn prullenmand",
   "fs.trashRestoreExists": "Er staat al een bestand met die naam op de oorspronkelijke locatie",
+  "fs.watchRemote": "Wijzigingen in cloud- en netwerkmappen kunnen niet worden gevolgd; de map wordt in plaats daarvan opnieuw weergegeven",
   "fw.bpfConfig": "BPF kon niet worden geconfigureerd: {errno}",
   "fw.bpfMaps": "de BPF-maps konden niet worden gemaakt: {errno}",
   "fw.bpfMissing": "het programma {program} ontbreekt",
@@ -963,5 +966,9 @@
   "sentinela.notBlocked": "Dat programma staat niet op de blokkeerlijst.",
   "sentinela.noAppNetwork": "Dit proces heeft geen eigen app waarvan het netwerk kan worden geblokkeerd.",
   "sys.failed": "Er is iets misgegaan.",
-  "sys.unsupported": "Deze versie van LordOS kan dat niet."
+  "sys.unsupported": "Deze versie van LordOS kan dat niet.",
+  "theme.notAllowed": "{call} is niet beschikbaar voor communitythema's",
+  "theme.noHost": "Het LordOS-deel van de bureaubladstijl ontbreekt",
+  "hands.refused": "Alleen jij kunt dit doen: nooit de invoer van een AI-agent",
+  "install.diskTooManyParts": "Deze schijf heeft te veel partities om door het installatieprogramma te worden weergegeven"
 }

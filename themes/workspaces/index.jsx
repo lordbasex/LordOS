@@ -1,4 +1,4 @@
-// "Lord Workspaces" theme (id workspaces) — a desktop organized by activities. Each activity is one of the SDK's
+// "Workspaces" theme (id workspaces) — a desktop organized by activities. Each activity is one of the SDK's
 // desktops (at most 9) with a name, an icon, a colour, pinned apps and a tiling layout per display; its windows sit in a
 // group frame per display. The Context Spine on the side opens Activities (the Overview), Apps, Files and
 // the Control Center; Search opens with ❖Space, Ctrl+Space or ❖ alone. Every surface takes one of three effects styles:
@@ -12,7 +12,7 @@
 //   motion.js                   the transitions: cached transforms from one frame loop, none with Reduce motion
 //   components/                 Spine, TopBar (activity strip, status cluster), GroupFrame, Window, Search,
 //                               ControlCenter, ActivityEditor (onboarding and edit), SnapAssist, Surface
-// The menus and the notification panel are Lord Classic's own components, restyled by these tokens.
+// The menus and the notification panel are Classic's own components, restyled by these tokens.
 import {
   startShell, settings, View, Image, Layer, screen, addListener, ThemeProvider, useSettings, useTrackedSettings, useWindows, useStore, configureWindows, getApp, wm, t as tr,
   DesktopWidgets, registerGestureActions, screenDisplays, mainDisplay, displayFor, displayAt, startDeskWidgets, WidgetDropTarget, findWallpaper, wallpaperIdFor, wallpaperSrc, MotionWallpaper, SlideshowWallpapers, slideshowPrefs, snapPreview, notifyHistory,
@@ -252,7 +252,7 @@ function App() {
     const m = activityOf(id);
     return { color: m.color, Icon: ({ size }) => <ActivityIcon icon={m.icon} color="#ffffff" bg={m.color} size={size} /> };
   }), []);
-  // Lord Flow's key table plus ⌃F2 (server/src/wl/keygrab.c "workspaces")
+  // Flow's key table plus ⌃F2 (server/src/wl/keygrab.c "workspaces")
   useShortcuts({ grabs: switcherGrabs(flowGrabs().replace('flow', 'workspaces')), table, onSuperTap: () => openSearch('apps'), appsPaste: true });
   // the bars' keyboard (barfocus.js): the spine from the crown down, then the strip's pills and New
   useEffect(() => {
@@ -321,7 +321,7 @@ function App() {
     { label: tr('shell.menu.settings'), onClick: () => openHere('settings') },
     { label: tr('shell.ws.help.menu'), onClick: () => H.help() },
     '-',
-    // as Lord Flow's menu: an app that doesn't answer is ended from here (❖⌥Esc)
+    // as Flow's menu: an app that doesn't answer is ended from here (❖⌥Esc)
     ...(getApp('forcequit') ? [{ label: tr('shell.menu.forceQuit'), hint: '❖⌥Esc', onClick: () => openHere('forcequit') }, '-'] : []),
     ...(session.managed() ? [{ label: tr('shell.menu.lock'), onClick: () => session.lock() }, { label: tr('shell.menu.switchUser'), onClick: () => session.switchUser() }] : []),
     { label: tr('shell.menu.logout'), onClick: () => session.quit() },

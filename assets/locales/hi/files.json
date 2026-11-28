@@ -95,7 +95,7 @@
   "menu.emptyTrash": "ट्रैश खाली करें",
   "menu.file": "फ़ाइल",
   "menu.forward": "आगे",
-  "menu.getInfo": "जानकारी देखें",
+  "menu.getInfo": "गुण",
   "menu.go": "जाएँ",
   "menu.groupBy": "इसके अनुसार समूह",
   "menu.newFolder": "नया फ़ोल्डर",
@@ -342,5 +342,9 @@
   "readOnly.denied": "यह फ़ोल्डर केवल पढ़ने के लिए है: इसकी अनुमतियाँ आपको इसे बदलने नहीं देतीं। इसे बदलने के लिए टर्मिनल या कोई दूसरा ऐप इस्तेमाल करें।",
   "fromMachineNoRun": "«{name}» मशीन {machine} से आई है। फ़ाइलें किसी मशीन के प्रोग्राम या इंस्टॉलर नहीं खोलता: भरोसा हो तो «इसके साथ खोलें» इस्तेमाल करें।",
   "info.from": "स्रोत",
-  "info.fromMachine": "मशीन {machine}"
+  "info.fromMachine": "मशीन {machine}",
+  "skin.address": "पता",
+  "skin.tasks": "फ़ाइल और फ़ोल्डर कार्य",
+  "skin.otherPlaces": "अन्य स्थान",
+  "skin.details": "विवरण"
 }

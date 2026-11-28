@@ -1,4 +1,4 @@
-// topband.js — the room in Lord Workspaces' top band (tested by server/tests/workspaces_model_test.mjs).
+// topband.js — the room in Workspaces' top band (tested by server/tests/workspaces_model_test.mjs).
 //
 // The band holds the activity strip at its start and the status cluster at its end, in one row (components/TopBar.jsx,
 // TopBand): the cluster keeps the width of what it shows (the date and the clock are longer in some languages) and the

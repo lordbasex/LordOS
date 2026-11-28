@@ -1,6 +1,6 @@
 // displayapps.js — the apps used on each display, at runtime (the rules: sdk/displayappsmodel.js). A theme starts it
 // once (startDisplayApps) and then shows, on an empty display, its quick launch (useQuickApps) and the usual apps as a
-// suggestion (useDisplaySuggestion): it never opens anything itself. Lord Workspaces does both in each display's
+// suggestion (useDisplaySuggestion): it never opens anything itself. Workspaces does both in each display's
 // empty-activity card; Settings shows the switch and "Clear" for a theme whose theme.json says "displayApps": true.
 //
 // What it records, in settings.displayApps (this computer only; nothing leaves it):

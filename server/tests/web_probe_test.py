@@ -9,7 +9,10 @@ Serves a small web app from a local HTTP server of its own (127.0.0.1: the one p
   - `lord-web --probe` on a page without a manifest: the title, the folder as the scope, the page's own icons;
   - `lord-web --probe` with a bad request line and with an https-less address elsewhere: an error, nothing loaded;
   - `lord-web --probe-icon` with the chosen icon: its type, its size and exactly its bytes; an HTML "icon" and an
-    icon over 1 MB are refused.
+    icon over 1 MB are refused;
+  - WhatsApp's pattern on an origin of its own: a redirect to a sign-in page with no manifest link and a WebP icon,
+    the manifest at /data/manifest.json with WebPs labelled PNG and a maskable SVG, strict CSP/COOP/COEP/
+    Document-Isolation-Policy headers, and 400 to a request that isn't Chrome's.
 Each probe runs with a throwaway HOME: nothing may be left in it. With --pss it also prints the probe's memory: the
 largest total PSS of lord-web and every process under it (WebKit's web and network processes) while it ran.
 Needs WPE WebKit and WebKit's sandbox (bubblewrap, xdg-dbus-proxy); no compositor (the probe has no window).
@@ -195,6 +198,67 @@ def answer(data):
         return {}
 
 
+# WhatsApp's pattern (2026-11-26), on an origin of its own: the start address redirects to a sign-in page that links
+# no manifest and only a WebP shortcut icon; the manifest is at /data/manifest.json, where the probe looks when the
+# page links none, and labels WebP files "image/png" next to a real PNG and an SVG typed "image/svg" that is only
+# "maskable". Every answer carries a strict CSP, COOP, COEP and Document-Isolation-Policy, and the server answers
+# 400 to a request that isn't Chrome's (as WhatsApp's did to WebKit's own download request).
+WEBP = b'RIFF\x24\x00\x00\x00WEBPVP8 \x18\x00\x00\x00' + b'\x00' * 24
+WA_SVG = b'<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512"><rect width="512" height="512" fill="#25d366"/></svg>'
+WA_PNG = png(64, 64)
+WA = {
+    '/login/': (b'<!doctype html><html><head><title>WhatsApp</title>'
+                b'<link rel="preconnect" href="/rsrc/">'
+                b'<link rel="shortcut icon" href="/rsrc/fav.webp"></head><body>sign in</body></html>', 'text/html'),
+    '/data/manifest.json': (json.dumps({
+        'name': 'Chat Web', 'start_url': '/', 'scope': '/', 'theme_color': '#f7f5f3',
+        'icons': [{'src': '/rsrc/192.webp', 'sizes': '192x192', 'type': 'image/png'},
+                  {'src': '/rsrc/512.webp', 'sizes': '512x512', 'type': 'image/png'},
+                  {'src': '/pwa_icon_512.png', 'sizes': '512x512', 'type': 'image/png'},
+                  {'src': '/rsrc/logo.svg', 'sizes': '512x512', 'type': 'image/svg', 'purpose': 'maskable'}]}).encode(),
+        'application/json'),
+    '/rsrc/fav.webp': (WEBP, 'image/webp'),
+    '/rsrc/192.webp': (WEBP, 'image/webp'),
+    '/rsrc/512.webp': (WEBP, 'image/webp'),
+    '/rsrc/logo.svg': (WA_SVG, 'image/svg+xml'),
+    '/pwa_icon_512.png': (WA_PNG, 'image/png'),
+}
+
+
+class WaHandler(http.server.BaseHTTPRequestHandler):
+    def strict(self):
+        self.send_header('Content-Security-Policy', "default-src 'self'; img-src 'self' data: blob:; connect-src 'self'; "
+                         "manifest-src 'self'; script-src 'none'")
+        self.send_header('Cross-Origin-Opener-Policy', 'same-origin-allow-popups')
+        self.send_header('Cross-Origin-Embedder-Policy', 'require-corp')
+        self.send_header('Document-Isolation-Policy', 'isolate-and-require-corp')
+        self.send_header('Vary', 'Sec-Fetch-Site, Sec-Fetch-Mode')
+
+    def do_GET(self):
+        path = self.path.split('?', 1)[0]
+        if path == '/':
+            self.send_response(302)
+            self.send_header('Location', '/login/')
+            self.send_header('Content-Length', '0')
+            self.strict()
+            self.end_headers()
+            return
+        body, ctype = WA.get(path, (None, None))
+        if body is None or 'Chrome/' not in self.headers.get('User-Agent', ''):
+            body, ctype = (b'<!doctype html><title>Error</title>', 'text/html')
+            self.send_response(400 if path in WA else 404)
+        else:
+            self.send_response(200)
+        self.send_header('Content-Type', ctype)
+        self.send_header('Content-Length', str(len(body)))
+        self.strict()
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, *args):
+        pass
+
+
 srv = http.server.ThreadingHTTPServer(('127.0.0.1', 0), Handler)
 threading.Thread(target=srv.serve_forever, daemon=True).start()
 base = 'http://127.0.0.1:%d' % srv.server_address[1]
@@ -211,8 +275,9 @@ check(a.get('scope') == base + '/app/', 'scope: %r' % a.get('scope'))
 check(a.get('origin') == base, 'origin: %r' % a.get('origin'))
 check(a.get('themeColor') == '#25d366', 'themeColor: %r' % a.get('themeColor'))
 check(a.get('manifest') is True, 'manifest: true')
-check(a.get('icons') == [{'src': base + '/app/icons/192.png', 'sizes': '192x192', 'type': 'image/png'}],
-      'icons, resolved, javascript: dropped: %r' % a.get('icons'))
+check(a.get('icons') == [{'src': base + '/app/icons/192.png', 'sizes': '192x192', 'type': 'image/png'},
+                         {'src': base + '/favicon.png', 'sizes': '16x16', 'type': ''}],
+      'icons, resolved, javascript: dropped, the page\'s own after the manifest\'s: %r' % a.get('icons'))
 check(not left, 'nothing left in the throwaway home: %r' % left[:5])
 check(boxed, 'the web process ran in WebKit\'s sandbox (a mount namespace of its own)')
 if WANT_PSS:
@@ -254,6 +319,33 @@ data, code, left, _, _ = probe('--probe-icon', (base + '/plain/notanicon.png\n')
 check(answer(data) == {'ok': False, 'error': 'web.probe.iconType'}, 'an HTML icon refused: %r' % data[:200])
 data, code, left, _, _ = probe('--probe-icon', (base + '/plain/huge.png\n').encode())
 check(answer(data) == {'ok': False, 'error': 'web.probe.iconTooBig'}, 'an icon over 1 MB refused: %r' % data[:200])
+
+# WhatsApp's pattern, end to end
+wa = http.server.ThreadingHTTPServer(('127.0.0.1', 0), WaHandler)
+threading.Thread(target=wa.serve_forever, daemon=True).start()
+wbase = 'http://127.0.0.1:%d' % wa.server_address[1]
+data, code, left, _, _ = probe('--probe', (wbase + '/\n').encode())
+a = answer(data)
+check(a.get('ok') is True and a.get('manifest') is True and a.get('origin') == wbase, 'WhatsApp\'s pattern: the manifest no link names: %r' % a)
+check(a.get('name') == 'Chat Web' and a.get('startUrl') == wbase + '/', 'its name and start address: %r' % a)
+srcs = [i.get('src') for i in a.get('icons', [])]
+check(srcs == [wbase + '/rsrc/192.webp', wbase + '/rsrc/512.webp', wbase + '/pwa_icon_512.png', wbase + '/rsrc/logo.svg', wbase + '/rsrc/fav.webp'],
+      'the manifest\'s icons, then the page\'s: %r' % srcs)
+check({'src': wbase + '/rsrc/logo.svg', 'sizes': '512x512', 'type': 'image/svg', 'purpose': 'maskable'} in a.get('icons', []),
+      'the SVG with its purpose: %r' % a.get('icons'))
+data, code, left, _, _ = probe('--probe-icon', (wbase + '/pwa_icon_512.png\n').encode())
+head, _, body = data.partition(b'\n')
+check(answer(head) == {'ok': True, 'type': 'image/png', 'size': len(WA_PNG)} and body == WA_PNG,
+      'the PNG, asked for as Chrome asks (a request WebKit makes for itself gets 400): %r' % head)
+check(not left, 'nothing left in the throwaway home: %r' % left[:5])
+data, code, left, _, _ = probe('--probe-icon', (wbase + '/rsrc/logo.svg\n').encode())
+head, _, body = data.partition(b'\n')
+check(answer(head) == {'ok': True, 'type': 'image/svg+xml', 'size': len(WA_SVG)} and body == WA_SVG, 'the SVG: %r' % head)
+data, code, left, _, _ = probe('--probe-icon', (wbase + '/rsrc/512.webp\n').encode())
+check(answer(data) == {'ok': False, 'error': 'web.probe.iconType'}, 'a WebP labelled PNG refused: %r' % data[:200])
+data, code, left, _, _ = probe('--probe-icon', (wbase + '/rsrc/missing.png\n').encode())
+check(answer(data) == {'ok': False, 'error': 'web.probe.load'}, 'an error page is no icon: %r' % data[:200])
+wa.shutdown()
 
 srv.shutdown()
 print('web-probe-test: %s' % ('ok' if not failed else '%d failed' % failed))

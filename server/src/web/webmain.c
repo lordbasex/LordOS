@@ -21,7 +21,9 @@
 #include "webwin.h"
 #include "webback.h"
 #include "../sec/cgroup.h"
+#include "../ui/webicon.h"
 #include "../sec/sandbox.h"
+#include "../lordlog.h"
 
 #include <errno.h>
 #include <execinfo.h>
@@ -65,7 +67,9 @@ static int clean_env(void) {
         fprintf(stderr, "lord-web: WebKit's sandbox is never turned off\n");
         return -1;
     }
-    static const char *const drop[] = { "WEBKIT_", "WPE_", "GST_PLUGIN", "GST_REGISTRY", "GIO_EXTRA_MODULES", "GIO_MODULE_DIR", "LD_PRELOAD", "LD_LIBRARY_PATH", "LD_AUDIT", NULL };
+    /* JSC_*: JavaScriptCore options (JSC_useSharedArrayBuffer would hand SharedArrayBuffer to every page, not only the
+     * cross-origin-isolated ones WebKit turns it on for itself) */
+    static const char *const drop[] = { "WEBKIT_", "WPE_", "JSC_", "GST_PLUGIN", "GST_REGISTRY", "GIO_EXTRA_MODULES", "GIO_MODULE_DIR", "LD_PRELOAD", "LD_LIBRARY_PATH", "LD_AUDIT", NULL };
     for (int again = 1; again;) {
         again = 0;
         for (char **e = environ; e && *e; e++) {
@@ -218,9 +222,15 @@ void web_inspect_watch(Web *w) {
 /* ---- one process per app and profile ---- */
 
 /* Show(token): anyone may (a second start of the app does); Edit(command), SetColorScheme("light" | "dark") and
- * SetUserAgent("chrome" | "edge" | "firefox" | "lordos"): only lord-server, checked by pid (webbus.c) */
+ * SetUserAgent("chrome" | "edge" | "firefox" | "lordos"): only lord-server, checked by pid (webbus.c). Ping() → "ok" or
+ * "page": anyone may; answered from this main loop, so an answer says lord-web isn't hung (lord-server's watch,
+ * ui/webalive.c); "page" says a ping of the page is late (webhang.c), which lord-web handles itself. */
 static void show_call(GDBusConnection *c, const char *sender, const char *path, const char *iface, const char *method, GVariant *p, GDBusMethodInvocation *inv, gpointer d) {
     (void)c; (void)path; (void)iface;
+    if (!strcmp(method, "Ping")) {
+        g_dbus_method_invocation_return_value(inv, g_variant_new("(s)", web_hang_word()));
+        return;
+    }
     if (!strcmp(method, "Show")) {
         const char *token = NULL;
         g_variant_get(p, "(&s)", &token);
@@ -243,6 +253,15 @@ static void show_call(GDBusConnection *c, const char *sender, const char *path, 
             return;
         }
         webbus_scheme(d, sender, k);
+    } else if (!strcmp(method, "WriteReplace")) {
+        /* ✨ AI's Replace (docs/AI.md "Writing"): only lord-server, checked by pid like Edit */
+        const char *text = NULL;
+        g_variant_get(p, "(&s)", &text);
+        if (!text || !sender || strlen(text) > WEBAI_MAX) {
+            g_dbus_method_invocation_return_dbus_error(inv, "org.freedesktop.DBus.Error.InvalidArgs", "text");
+            return;
+        }
+        webbus_write_replace(d, sender, text);
     } else if (!strcmp(method, "SetUserAgent")) {
         const char *word = NULL;
         g_variant_get(p, "(&s)", &word);
@@ -257,9 +276,11 @@ static void show_call(GDBusConnection *c, const char *sender, const char *path, 
 }
 static const GDBusInterfaceVTable show_vt = { show_call, NULL, NULL, { 0 } };
 static const char SHOW_XML[] = "<node><interface name='" SHOW_IFACE "'><method name='Show'><arg type='s' direction='in'/></method>"
+                               "<method name='Ping'><arg type='s' direction='out'/></method>"
                                "<method name='Edit'><arg type='s' direction='in'/></method>"
                                "<method name='SetColorScheme'><arg type='s' direction='in'/></method>"
-                               "<method name='SetUserAgent'><arg type='s' direction='in'/></method></interface></node>";
+                               "<method name='SetUserAgent'><arg type='s' direction='in'/></method>"
+                               "<method name='WriteReplace'><arg type='s' direction='in'/></method></interface></node>";
 
 /* org.lordos.WebApp.app_<app>.profile_<profile> (webreg_bus_name: the name lord-server calls too) */
 static void bus_name(const Web *w, char *out, size_t n) {
@@ -320,7 +341,18 @@ static int run_app(Web *w) {
     w->profile = webreg_profile(&w->app, w->args.profile);
     snprintf(w->window_id, sizeof w->window_id, "lordos-web.%s.%s", w->app.id, w->profile->id);
     if (snprintf(w->profile_dir, sizeof w->profile_dir, "%s/.local/share/lordos/web/%s/%s", w->home, w->app.id, w->profile->id) >= (int)sizeof w->profile_dir) return 2;
-    if (w->app.icon[0]) {
+    /* the site's own icon, fetched by lord-server into ~/.cache/lordos/web/icons/<app>.png (ui/webicon.c: the name is the
+     * app id, the file checked as a PNG there), comes before the registry's: a catalog app's registry icon is only
+     * LordOS's letter tile, so the tray and the notifications showed the letter after the Store or Settings had fetched
+     * the real one. A PNG only (the tray sends pixels), a regular file of ours, no link, at most WEBREG_ICON_BYTES. */
+    {
+        char p[PATH_MAX];
+        struct stat st;
+        if (snprintf(p, sizeof p, "%s/" WEBICON_DIR "/%s.png", w->home, w->app.id) < (int)sizeof p && !lstat(p, &st) &&
+            S_ISREG(st.st_mode) && st.st_uid == getuid() && st.st_size > 0 && st.st_size <= WEBREG_ICON_BYTES && strlen(p) < sizeof w->icon_path)
+            snprintf(w->icon_path, sizeof w->icon_path, "%s", p);
+    }
+    if (!w->icon_path[0] && w->app.icon[0]) {
         char p[PATH_MAX + WEBREG_ICON_PATH_MAX + 2];
         struct stat st;
         snprintf(p, sizeof p, "%s/%s", w->config_dir, w->app.icon);
@@ -330,7 +362,7 @@ static int run_app(Web *w) {
     char state[PATH_MAX + 16];
     size_t slen = 0;
     snprintf(state, sizeof state, "%s/state.json", w->profile_dir);
-    char *stext = webreg_read_file(state, 4096, &slen);
+    char *stext = webreg_read_file(state, WEBPAGE_STATE_MAX, &slen);
     webpage_state_parse(stext, stext ? slen : 0, &w->state);
     free(stext);
     w->audio_ms = w->note_ms = -1;
@@ -351,6 +383,11 @@ static int run_app(Web *w) {
     if (isolate(scope)) return 1;
 
     weblang_init();
+    /* the app's name for what WebKit sends the notification server itself: a service worker's notification
+     * (registration.showNotification) goes there from WebKit, not through the view's "show-notification"
+     * (docs/WEBAPPS.md, "Notifications"). Without a name GLib's is NULL: WebKit's Notify carried "[Invalid UTF-8]" and
+     * GLib logged a critical for each one. The registry's name is checked UTF-8 already; anything else gets the program's name. */
+    g_set_application_name(w->app.name[0] && g_utf8_validate(w->app.name, -1, NULL) ? w->app.name : "lord-web");
     w->loop = g_main_loop_new(NULL, FALSE);
     webbus_init(w);
     WebWin *win = webwin_new(w);
@@ -400,6 +437,15 @@ int main(int argc, char **argv) {
     static Web web;
     Web *w = &web;
     if (webargs_parse(argc, argv, &w->args) == WEBARGS_BAD) { usage(); return 2; }
+    {
+        /* its log (web/<app>-<profile>.log or web/probe.log, opened by webmgr.c as this stderr) gets a time, a level and
+         * a subsystem on every line, WebKit's processes' lines too: a lord-log child stamps them (lordlog.h). Before any
+         * thread; a stderr that isn't that file (a terminal) is left as it is */
+        char name[2 * WEBREG_ID_MAX + 2];
+        if (w->args.mode == WEBARGS_APP) snprintf(name, sizeof name, "%.*s-%.*s", WEBREG_ID_MAX, w->args.app, WEBREG_ID_MAX, w->args.profile);
+        else snprintf(name, sizeof name, "probe");
+        lordlog_stamp_start("web", name, "webkit");
+    }
     w->server_pid = getppid();          /* lord-server forks and execs lord-web itself (web/webmgr.c) */
     if (clean_env()) return 2;
     const char *home = getenv("HOME");

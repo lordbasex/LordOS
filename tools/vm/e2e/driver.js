@@ -43,7 +43,10 @@ function start() {
     } catch (e) {
       out = { ok: false, error: String((e && (e.code || e.message)) || e), detail: e && e.stack ? String(e.stack) : null, logs: mine };
     }
-    try { lord.fs.write(`${dir}/out-${id}.json`, JSON.stringify(out)); } catch (e) { /* the bench times out */ }
+    // on fsasync's worker: under a busy disk (QA ws174 on a Raspberry Pi during an SD copy) a sync write held the
+    // interface 2–8 s in mkstemp for every command the bench sent
+    const done = typeof lord.fs.writeAsync === 'function' ? sdk.fs.writeAsync : async (p, d) => lord.fs.write(p, d);
+    try { await done(`${dir}/out-${id}.json`, JSON.stringify(out)); } catch (e) { /* the bench times out */ }
   };
   const tick = () => {
     for (;;) {

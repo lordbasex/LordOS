@@ -16,8 +16,8 @@ covers the Dock goes to the menu.
 | Dock on the right: its menu over the window and the menu bar | The Control Center over the Dock on the right |
 | ![select list](layers-select-passwords-light.png) | ![select list, dark](layers-select-passwords-dark.png) |
 | Passwords → New item → Category: the list covers the form (the fields used to show through it) | Dark mode |
-| ![Lord Classic](layers-classic-left-menu.png) | ![RTL](layers-crown-dock-right-rtl.png) |
-| Lord Classic theme, taskbar on the left: its menu over the windows | Arabic, Dock on the right: the crown menu over the Dock |
+| ![Classic](layers-classic-left-menu.png) | ![RTL](layers-crown-dock-right-rtl.png) |
+| Classic theme, taskbar on the left: its menu over the windows | Arabic, Dock on the right: the crown menu over the Dock |
 
 ## Why it broke
 
@@ -37,15 +37,15 @@ in it, so an empty part of a layer lets the click through to whatever is below.
 | Layer | zIndex | What goes there |
 |---|---|---|
 | base | 0 | the theme's own tree: wallpaper, desktop widgets, windows (in tree order: kept below, normal, always on top; `WINDOWS.md`, "Always on top") |
-| `dock` | 10 | the Dock; the Lord Classic taskbar |
+| `dock` | 10 | the Dock; the Classic taskbar |
 | `menubar` | 20 | the top menu bar |
 | `floating` | 30 | fullscreen and picture-in-picture windows |
 | `overlay` | 40 | the app launcher, search |
-| `popover` | 50 | menus, context menus, the Dock's menus, the Control Center, select lists, popovers, the clipboard and emoji panels, the Lord Classic start menu, quick settings, notification panel and snap layouts |
+| `popover` | 50 | menus, context menus, the Dock's menus, the Control Center, select lists, popovers, the clipboard and emoji panels, the Classic start menu, quick settings, notification panel and snap layouts |
 | `modal` | 60 | shell sheets and confirmations (Empty Trash, Restart…, Shut Down…), the print dialog |
-| `notification` | 70 | notification banners, the clipboard toast, the remote desktop badge, the displays' Identify numbers (0.8.5, they never take clicks) |
-| `tooltip` | 80 | tooltips (the Dock's and the Lord Classic taskbar's names) |
+| `tooltip` | 80 | tooltips (the Dock's and the Classic taskbar's names) |
 | `drag` | 90 | drag images, the Dock's «poof» |
+| `notification` | 95 | notification banners, the clipboard toast, the remote desktop badge, the displays' Identify numbers (0.8.5, they never take clicks), the privacy pill in each display's corner (always with a community theme). Since 0.8.9.6.2 above `tooltip` and `drag`: no layer a theme draws in covers them |
 | `system` | 100 | permission prompts, the keyring password prompt, the administrator password prompt, Bluetooth pairing, «Keep this display?», the file chooser |
 | `input` | 110 | the input method's candidate window, the on-screen keyboard (`ON-SCREEN-KEYBOARD.md`) |
 | `capture` | 120 | Screenshots' area selection (❖⇧4, `wm.setFullscreen(id, true, { capture: true })`): a still of the whole screen, so it covers every other layer and takes the pointer even with a sheet, menu, prompt or Live Speech open. A press on it is `keepFocus`: what was open under the still stays as it was |
@@ -68,7 +68,7 @@ import { Layer, Overlay, LAYERS } from '@lordos/sdk';
 </Overlay>
 ```
 
-- **Themes:** put every surface above the windows in its layer. The Lord Flow theme's `Menu.jsx`
+- **Themes:** put every surface above the windows in its layer. The Flow theme's `Menu.jsx`
   does it by itself, so any menu built with it is in `popover`. `startShell` places the SDK's own
   surfaces (search, notifications, prompts, fullscreen windows) in theirs.
 - **`Overlay`:** its children are positioned against the anchor's box, so `top: h + 4, left: 0`
@@ -91,11 +91,17 @@ import { Layer, Overlay, LAYERS } from '@lordos/sdk';
   Dock's, a right-click's: the themes' `Menu.jsx`), which holds it while it shows (`holdKeyboard()` in
   `@lordos/runtime`, in development): its keys, Escape included, are the menu's and never reach the app or a machine's
   guest behind it (`server/tests/vm_keys_scene.mjs`).
-- **A window's sheets (0.8.8.7).** A `<Layer name="modal">` rendered inside an app's window (Settings' file
-  dialogs and sheets) is drawn in a box of the layer's size registered as that window's (`wm.addSheet`,
-  `wm.sheetNodes`). Screenshots' window capture paints those boxes over the window (`media.screenshot`'s `also`,
-  `paint_capture_until`), so a window with a dialog open comes out with its dialog, and the other windows'
-  sheets and every other layer are still left out (#58).
+- **A window's sheets (0.8.9.6.2).** A dialog over one app window (Settings' file dialogs, a model's or a wallpaper's
+  details, its confirmations) is a `<WindowSheet>` (`sdk/layers.js`): drawn in the window's own overlay host (the node
+  `AppHost` puts over the window's content), so it moves, stacks and is captured with its window, and a window, the
+  launcher or a menu opened later is drawn above it. Never `<Layer name="modal">` for that: the modal layer is above
+  every window, and while it shows anything no Linux app gets the keys (above), so Settings → AI's model sheet stayed
+  over Thunderbird and the launcher (QA, BUG-D; `server/tests/window_sheet_scene.mjs` also checks that no app under
+  `apps/` uses it). `children` may be a function of the sheet's area `{ x: 0, y: 0, w, h }` (`useWindowSheetArea()`).
+- **A modal layer inside a window (0.8.8.7).** A `<Layer name="modal">` still rendered inside an app's window is drawn
+  in a box of the layer's size registered as that window's (`wm.addSheet`, `wm.sheetNodes`). Screenshots' window
+  capture paints those boxes over the window (`media.screenshot`'s `also`, `paint_capture_until`), so a window with
+  such a dialog open comes out with it, and the other windows' sheets and every other layer are still left out (#58).
 - **Don't** fight the order with large `zIndex` values: they only order siblings. A new kind of
   surface gets a row in the table above (and in `sdk/layers.js`) instead.
 
@@ -143,7 +149,8 @@ per frame with Monitor's moving dots over a hidden Terminal (MONITOR.md, "A blur
 behind Monitor"). The test is the opaque-cover skip's (opaque background, opacity 1 down the tree, no
 transform, away from rounded corners, clipped by its ancestors), in paint order; when the window on
 top moves, turns translucent or closes, the change reaches the blurred surface and the rule applies
-again (`test_hidden_blur_damage`).
+again (`test_hidden_blur_damage`). Since 0.8.9.6.2 the rule and the opaque-cover skip hold on the GPU path too: what
+the cover leaves out is only noted for the GPU's list of app windows (`test_gpu_cover`, MONITOR.md).
 
 | | |
 |---|---|

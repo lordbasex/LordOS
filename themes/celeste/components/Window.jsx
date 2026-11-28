@@ -1,8 +1,8 @@
-// Lord Celeste's window frame: a 38 px title bar with round lights (close, minimize, maximize, in the order and on the
+// Celeste's window frame: a 38 px title bar with round lights (close, minimize, maximize, in the order and on the
 // side Settings → Desktop & Dock → Title bars asks, useWindowButtons; its Size makes the bar, the lights, their glyphs and
-// their hit areas larger, px, GitHub #151 and #219, and index.jsx's chrome follows it) and the title in the middle. Lord Celeste has no
+// their hit areas larger, px, GitHub #151 and #219, and index.jsx's chrome follows it) and the title in the middle. Celeste has no
 // global menu bar, so an app that declares menus (useAppMenus, via useMenusWithSpeech) gets them in a strip under the
-// title bar, with Window and Help, as Lord Classic and Lord Workspaces do; F10, or ⌥ pressed and released alone, opens
+// title bar, with Window and Help, as Classic and Workspaces do; F10, or ⌥ pressed and released alone, opens
 // the focused window's first menu (addMenuBarKeys). A right click on the title opens the app menu (About, Settings…,
 // Hide, Quit: appMenuItems) and the Window menu (windowMenuItems). Moving and resizing are lord-server's
 // (<WindowShell>, wm.beginMove); a maximized window is dragged out of its place by JS and snaps where it is dropped.
@@ -13,7 +13,7 @@ import {
   snapZoneAt, solidOver, t as tr, useMenusWithSpeech, useWindowButtons, webHelpItems, windowAccent, windowMenuItems,
   windowTitle, wm,
 } from '@lordos/sdk';
-import { useEffect, useRef, useState } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import { Menu } from '../../classic/components/Menu.jsx';
 
 export const TITLE_H = 38;          // at the normal size: px(TITLE_H) is the bar now (useWindowButtons)
@@ -120,7 +120,7 @@ function fxStyle(fx, geo) {
   return { transform: `translate(${dx}px, ${dy}px) scale(${1 - 0.9 * e})`, opacity: 1 - 0.7 * e, pointerEvents: 'none' };
 }
 
-export function Window({ win, app, t, focused, fx }) {
+function WindowFrame({ win, app, t, focused, fx }) {
   const drag = useRef(null);
   const [menu, setMenu] = useState(null);
   const { atStart, order, px } = useWindowButtons(true);
@@ -192,3 +192,7 @@ export function Window({ win, app, t, focused, fx }) {
     </WindowShell>
   );
 }
+
+// memo: a window draws again for its own changes (win, focused, the tokens, the minimize effect, a maximized one's work
+// area: frameKey), never because another window's title or the desktop around it changed (0.8.9.6.2 QA, BUG-9)
+export const Window = memo(WindowFrame);

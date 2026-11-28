@@ -204,6 +204,7 @@
   "power.healthNormal": "Kondycja baterii: {pct}% (normalna)",
   "power.healthService": "Kondycja baterii: {pct}% (zalecany serwis)",
   "power.healthUnknown": "Kondycja baterii: nieznana",
+  "power.h": "{h} godz.",
   "power.hm": "{h} godz. {m} min",
   "power.immediately": "Natychmiast",
   "power.left": "Pozostało {time}",

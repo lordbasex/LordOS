@@ -10,7 +10,7 @@ import {
 } from '@lordos/sdk';
 import CATALOG from '../../assets/machines/systems.json';
 import { useEffect, useRef, useState } from 'react';
-import { installError, startPhase, playStarts, stateView, offers2d, restartsAgain, offHint, actionsFor, toPicture, guestSize, refreshRate, wheelSteps, budgetPlan, failCause, failActions, pipFrame, actualFrame, infoLines, isolationGaps, usage, CTRL_ALT_DEL, windowTitle, closeChoice, resolutions, agentLines, agentTone, clipNeedsTool, clipTo, clipFrom, clipInUse, clipBlocked, unreadableOf, clipAskEmpty, clipAskRequest, clipAskPush, clipAskCopied, clipAskAnswer, clipAskTick, clipAskShown, thumbSrc, AGENT_CAPS, guestWindows, mountCommand, noSuspend, soundOf, soundDevs, audible, muteToggle, micLive, micAsk, dropBlocker, copyLine, midName, guestFolder, followStuck, appsBlocker, transferState, dropWay, winfspFor, autoTransferSetup, toolsOutdated, runningWindows, runningKey, launcherApps, latchToggle, latchKeyUp, comboSend, familyOf, guestKeys, toolsWant, toolsLine, toolsAutoStep, toolsAutoOn, toolsAutoFailed, TOOLS_TRIES, launchPending, discOffer, discCommands, discCanCopy, scaleFrame, shapeFrame, SCALES, deviceDots, cableOffered, usbRows, usbCamLive, usbMicLive, usbNeedsPerm, toolsSnapOk } from './model.js';
+import { installError, startPhase, playStarts, stateView, offers2d, restartsAgain, closesOnStop, offHint, actionsFor, toPicture, guestSize, refreshRate, wheelSteps, budgetPlan, failCause, failActions, pipFrame, actualFrame, infoLines, isolationGaps, usage, CTRL_ALT_DEL, windowTitle, closeChoice, resolutions, agentLines, agentTone, clipNeedsTool, clipTo, clipFrom, clipInUse, clipBlocked, unreadableOf, clipAskEmpty, clipAskRequest, clipAskPush, clipAskCopied, clipAskAnswer, clipAskTick, clipAskShown, thumbSrc, AGENT_CAPS, guestWindows, mountCommand, noSuspend, soundOf, soundDevs, audible, muteToggle, micLive, micAsk, dropBlocker, copyLine, midName, guestFolder, followStuck, appsBlocker, transferState, dropWay, winfspFor, autoTransferSetup, toolsOutdated, runningWindows, runningKey, launcherApps, latchToggle, latchKeyUp, comboSend, familyOf, guestKeys, toolsWant, toolsLine, toolsAutoStep, toolsAutoOn, toolsAutoFailed, TOOLS_TRIES, launchPending, discOffer, discCommands, discCanCopy, scaleFrame, shapeFrame, SCALES, deviceDots, cableOffered, usbRows, usbCamLive, usbMicLive, usbNeedsPerm, toolsSnapOk, APPS_GUEST_LORDOS } from './model.js';
 import { useAppsMode, appsMenuItems, guests, guestFocus, CLIP_HOLD_MS, launchGuest } from './appsmode.jsx';
 import { launchAsks, dropLaunchAsk } from './guestlaunch.js';
 import { launchAskStep } from '../../sdk/guestappsmodel.js';
@@ -19,7 +19,9 @@ import { readMeta, writeMeta, isProtectedMachine } from './meta.js';
 import { disposableOf, disposableAllowed, disposableToggle } from './storagemodel.js';
 import { defaultsOf } from './store.js';
 import { ClipAskBar } from './clipask.jsx';
-import { gatewayBar, gatewayOf } from './group.js';
+import { gatewayBar, gatewayOf, gatewayFirst, gatewayReady } from './group.js';
+// Workstations whose Gateway the window just started: the next begin starts them
+const gatewayUp = new Set();
 import { TransfersPanel } from './transfers.jsx';
 import { xferStep, xferShown, xferNextExpiry } from './xfer.js';
 import { KeysBtn, sendKeysItems } from './keys.jsx';
@@ -115,6 +117,8 @@ function AgentPop({ ctl, onClose }) {
             </View>
           ))}
         </View>
+        {/* a LordOS guest too old for apps mode: the tools can't fix it, updating LordOS in the machine does */}
+        {on && appsBlocker(g, cfg) === 'oldLordos' ? <Text style={{ fontSize: 12, lineHeight: 1.45, color: p.dim, textAlign: 'start' }}>{tr('machines.win.appsOldLordos', { version: APPS_GUEST_LORDOS })}</Text> : null}
         {on ? (
           <View style={{ flexDirection: 'row', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
             <Pill label={g.install === 1 ? tr('machines.agent.installing') : old ? tr('machines.agent.updateTools') : guestWindows(g) ? tr('machines.agent.installTools') : tr('machines.agent.installHelper')}
@@ -603,8 +607,11 @@ export function MachineWindow({ dir, name: name0, loadvm, followed }) {
     sized.current = { last: null, want: null, at: 0, rate: false, thumb: 0, asked: null, askedAt: 0 };
     setErr(''); setSt(null); setSid(id);
   };
-  const begin = (opts) => {
-    if (starting || bridging.has(dir)) return;
+  // again: the second half of a start this window already began (its Gateway first): the render that holds `starting`
+  // may not have caught up with setStarting(false) yet, so that stale flag doesn't stop it (QA 0.8.9.6.2: `machines start`
+  // of a Workstation started its Gateway and then waited forever)
+  const begin = (opts, again) => {
+    if (!again && (starting || bridging.has(dir))) return;
     if (!has()) { setErr(tr('machines.noBackend')); return; }
     const m = lord.vm.list().find((x) => x.dir === dir);
     if (!m) { setErr(tr('machines.win.gone')); return; }
@@ -620,6 +627,31 @@ export function MachineWindow({ dir, name: name0, loadvm, followed }) {
       if (b && !b.ok) { setOver({ b, m, plan: budgetPlan(b, lord.vm.list(), m), waiting: '' }); return; }
     }
     setOver(null);
+    // a Whonix Workstation's ▶ starts its Gateway first and waits for it, as the library and the CLI do (BUG-N: started
+    // alone and its Gateway after, the link came up with no traffic)
+    const gwDone = gatewayUp.delete(dir);
+    const gwFirst = !active && !gwDone ? gatewayFirst(m, lord.vm.list()) : null;
+    if (gwFirst) {
+      setErr('');
+      setStarting(true);
+      startPrep(gwFirst).then(() => {
+        if (!lord.vm.startDetached(gwFirst.dir)) throw new Error(vmRefusal(tr('machines.win.cantStart')));
+        return new Promise((resolve, reject) => {
+          const t0 = Date.now();
+          const look = () => {
+            const gw = lord.vm.list().find((x) => x.dir === gwFirst.dir);
+            const ok = gatewayReady(gw);
+            if (ok === true) { resolve(); return; }
+            if ((ok === 'failed' && Date.now() - t0 > 3000) || (gw?.state === 'stopped' && Date.now() - t0 > 15000)) { reject(new Error(tr('machines.group.gatewayFailed', { name: gw?.name || '', why: gw?.reason || '' }))); return; }
+            if (Date.now() - t0 > 180000) { reject(new Error(tr('machines.group.gatewayFailed', { name: gw?.name || '', why: '' }))); return; }
+            setTimeout(look, 1000);
+          };
+          setTimeout(look, 1000);
+        });
+      }).then(() => { setStarting(false); if (windows.get().some((w) => w.id === winId)) { gatewayUp.add(dir); beginRef.current(opts, true); } },
+        (e) => { setStarting(false); setErr(e.message); });
+      return;
+    }
     // a bridged machine's network first (6.5): Starting meanwhile, then the start, once
     setGpu(m.gpu || '');
     if (!active && needsPrep(m)) {
@@ -768,6 +800,8 @@ export function MachineWindow({ dir, name: name0, loadvm, followed }) {
         // 3D graphics whose QEMU aborted at the guest's restart (QEMU issue 4918; lord-vm says 'reset' only when the
         // guest's tools said it restarts)
         if (restartsAgain(q.state, q.reason)) { setTimeout(() => begin(), 300); return false; }
+        // the person asked for the window to close once the machine stops cleanly (GitHub #267); a failure keeps it open
+        if (closesOnStop(readMeta(dir), q.state, q.reason)) { wm.close(winId, true); return false; }
         if (q.state !== 'stopped' || !['guest-shutdown', 'host-shutdown', 'poweroff', 'installed'].includes(q.reason)) setLog(lord.vm.log(dir, 'vm', 16384));
         return false;
       }
@@ -1414,7 +1448,7 @@ export function MachineWindow({ dir, name: name0, loadvm, followed }) {
     if (!lask) return undefined;
     const check = () => {
       // the guest's tools answered and can't list windows (no apps mode in this guest): no use waiting
-      const cant = st?.agent?.state === 'connected' && appsBlockedRef.current === 'needsTools';
+      const cant = st?.agent?.state === 'connected' && (appsBlockedRef.current === 'needsTools' || appsBlockedRef.current === 'oldLordos');
       const step = cant ? 'timeout' : launchAskStep(lask, appsActive ? gApps?.apps : [], Date.now());
       if (step === 'wait') return;
       dropLaunchAsk(dir);
@@ -1427,7 +1461,9 @@ export function MachineWindow({ dir, name: name0, loadvm, followed }) {
     return () => clearInterval(t2);
   }, [lask, appsActive, gApps?.apps, st?.agent?.state, st?.agent?.caps]);
   // why it can't be on: the agent, or a guest whose helper can't list its windows (it needs LordOS or Windows inside)
-  const appsWhy = appsBlocked === 'needsTools' ? tr('machines.win.appsNeedsTools') : appsBlocked ? tr('machines.apps.needsAgent') : '';
+  const appsWhy = appsBlocked === 'needsTools' ? tr('machines.win.appsNeedsTools')
+    : appsBlocked === 'oldLordos' ? tr('machines.win.appsOldLordos', { version: APPS_GUEST_LORDOS })
+      : appsBlocked ? tr('machines.apps.needsAgent') : '';
   const appsLabel = appsOn ? tr('machines.apps.leave') : appsWhy || tr('machines.apps.enter');
   // the Keys panel: a Windows guest gets the Windows key and its combinations, any other the Super key and Linux's
   const keys = {

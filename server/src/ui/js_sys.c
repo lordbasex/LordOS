@@ -12,12 +12,15 @@
  * not possible to create a .desktop (the only thing lord.apps.launch runs), nor to install apps without
  * lpk.c, nor to overwrite the settings. lord.settings only writes to ~/.config/lordos/settings.json;
  * lord.themes only accepts simple names. */
+#include "../bgsave.h"
 #include "../hw/display.h"
 #include "../hw/hw_admin.h"
 #include "../users/admingroups.h"
 #include "../hw/sleeplock.h"
 #include "../hw/logindlock.h"
 #include "js_sys.h"
+#include "js_theme.h"
+#include "themestore.h"
 #include "js.h"
 #include "../cloud/cloud.h"
 #include "js_err.h"
@@ -48,6 +51,9 @@
 #include "../keyboard.h"
 #include "../fsops.h"
 #include "../fsasync.h"
+#include "../uilangenv.h"
+#include "../doc/wire.h"
+#include "../fswatch.h"
 #include "../remote/mirror.h"
 #include "js_share.h"
 #include "../pkg/crypto.h"
@@ -73,6 +79,7 @@
 #include <locale.h>
 #include <time.h>
 #include <unistd.h>
+static int demo_identity;               /* Hands' QA desktop: a demo identity (js_sys_set_demo_identity) */
 
 #define SETTINGS_MAX (1024 * 1024)
 #define FS_READ_MAX (8 * 1024 * 1024)
@@ -329,7 +336,7 @@ static JSValue f_sys_info(JSContext *c, JSValueConst this_val, int argc, JSValue
     free(txt);
 
     JSValue o = JS_NewObject(c);
-    JS_SetPropertyStr(c, o, "hostname", JS_NewString(c, u.nodename));
+    JS_SetPropertyStr(c, o, "hostname", JS_NewString(c, demo_identity ? "demo-pc" : u.nodename));
     JS_SetPropertyStr(c, o, "kernel", JS_NewString(c, u.release));
     JS_SetPropertyStr(c, o, "arch", JS_NewString(c, u.machine));
     JS_SetPropertyStr(c, o, "os", JS_NewString(c, os));
@@ -347,11 +354,12 @@ static JSValue f_sys_info(JSContext *c, JSValueConst this_val, int argc, JSValue
     JS_SetPropertyStr(c, o, "version", JS_NewString(c, LORD_VERSION));
     JS_SetPropertyStr(c, o, "channel", JS_NewString(c, LORD_CHANNEL));
     JS_SetPropertyStr(c, o, "build", JS_NewString(c, LORD_BUILD));
-    JS_SetPropertyStr(c, o, "user", JS_NewString(c, getenv("USER") ? getenv("USER") : ""));
+    JS_SetPropertyStr(c, o, "user", JS_NewString(c, demo_identity ? "demo" : getenv("USER") ? getenv("USER") : ""));
     /* full name (first GECOS field) and whether they are an administrator (sudo/admin/wheel) */
     struct passwd *pw = getpwuid(getuid());
     char full[128] = "";
     if (pw && pw->pw_gecos) { snprintf(full, sizeof full, "%s", pw->pw_gecos); full[strcspn(full, ",")] = 0; }
+    if (demo_identity) snprintf(full, sizeof full, "Alex Demo");
     JS_SetPropertyStr(c, o, "fullName", JS_NewString(c, full));
     /* by this process's own groups (getgrouplist's are the files', this session's are what it got
      * at login), against the shared list (src/users/admingroups.c) */
@@ -413,6 +421,7 @@ static JSValue f_settings_load(JSContext *c, JSValueConst this_val, int argc, JS
     (void)this_val; (void)argc; (void)argv;
     char path[PATH_MAX + 64];
     settings_path(path, sizeof path, "");
+    bgsave_flush(path);                 /* a save still on the worker (bgsave.c) is read back, not the file before it */
     size_t len;
     char *txt = read_small(path, SETTINGS_MAX, &len);
     if (!txt) return JS_NULL;
@@ -421,6 +430,9 @@ static JSValue f_settings_load(JSContext *c, JSValueConst this_val, int argc, JS
     return s;
 }
 
+/* lord.settings.save(text, durable, queuedDurable): the file is written on bgsave.c's worker (GitHub #250: on a spinning disk the
+ * rename over settings.json waited up to 650 ms for ext4's journal, the desktop frozen meanwhile); true once queued.
+ * durable (session restore's marker): on the disk, synced, before this returns, after any save still queued. */
 static JSValue f_settings_save(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
     (void)this_val;
     size_t len;
@@ -434,16 +446,22 @@ static JSValue f_settings_save(JSContext *c, JSValueConst this_val, int argc, JS
     mkdir(dir, 0700);
     settings_path(tmp, sizeof tmp, ".tmp");
     settings_path(path, sizeof path, "");
-    FILE *f = fopen(tmp, "wb");
-    int ok = f && fwrite(txt, 1, len, f) == len;
     /* second argument true: on the disk before this returns (session restore, sdk/sessionrestore.jsx) */
     int durable = argc > 1 && JS_ToBool(c, argv[1]) == 1;
-    if (f && durable) ok = fflush(f) == 0 && fsync(fileno(f)) == 0 && ok;
-    if (f) ok = (fclose(f) == 0) && ok;
-    if (ok) ok = rename(tmp, path) == 0;
-    if (ok && durable) {
-        int d = open(dir, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
-        if (d >= 0) { fsync(d); close(d); }
+    /* third argument true (session restore's autosave, QA 0.8.9.6.2 BUG-I): as durable, but on the worker */
+    int queued_durable = !durable && argc > 2 && JS_ToBool(c, argv[2]) == 1;
+    int ok;
+    if (queued_durable) {
+        ok = bgsave_put(path, tmp, txt, len, BGS_FSYNC | BGS_SYNCDIR) == 0;
+    } else if (durable) {
+        bgsave_flush(path);             /* an older save still queued must not land after this one */
+        ok = bgsave_write_now(path, tmp, txt, len, BGS_FSYNC) == 0;
+        if (ok) {
+            int d = open(dir, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+            if (d >= 0) { fsync(d); close(d); }
+        }
+    } else {
+        ok = bgsave_put(path, tmp, txt, len, 0) == 0;
     }
     JS_FreeCString(c, txt);
     return JS_NewBool(c, ok);
@@ -457,7 +475,9 @@ static int valid_id(const char *s) {
     return 1;
 }
 
+/* the system's themes folder: main.c's (a community theme's own folder is in the per-user one, js_theme.c) */
 static void themes_root(char *out, size_t size) {
+    if (jst_system_themes()[0]) { snprintf(out, size, "%s", jst_system_themes()); return; }
     char tmp[sizeof ui.theme_dir];
     snprintf(tmp, sizeof tmp, "%s", ui.theme_dir);
     snprintf(out, size, "%s", dirname(tmp));
@@ -505,6 +525,10 @@ static JSValue f_themes_list(JSContext *c, JSValueConst this_val, int argc, JSVa
         free(json);
     }
     closedir(d);
+    /* (0.8.9.6.2) the community themes the person installed from a file (js_theme.c) */
+    char running[sizeof ui.theme_dir + 16];
+    snprintf(running, sizeof running, "%s/theme.js", ui.theme_dir);
+    jst_list(c, arr, &i, running);
     return arr;
 }
 
@@ -517,17 +541,24 @@ static JSValue f_themes_use(JSContext *c, JSValueConst this_val, int argc, JSVal
         char root[PATH_MAX], bundle[PATH_MAX * 2];
         themes_root(root, sizeof root);
         snprintf(bundle, sizeof bundle, "%s/%s/theme.bundle.js", root, id);
-        ok = access(bundle, R_OK) == 0 && strlen(bundle) < sizeof ui.theme_request &&
+        /* not one of LordOS's: a community theme installed from a file (an official one always wins the id) */
+        if (access(bundle, R_OK) && jst_bundle_path(id, bundle, sizeof bundle)) bundle[0] = 0;
+        ok = bundle[0] && access(bundle, R_OK) == 0 && strlen(bundle) < sizeof ui.theme_request &&
              !theme_blocked(bundle);
         /* read and verified now, while this theme still runs (js.c js_theme_prepare): a bundle the verified-code check
          * refuses is answered here with false and the session goes on in this theme, untouched; the switch itself
-         * (main.c switch_theme) runs exactly the bytes checked here */
+         * (main.c switch_theme) runs exactly the bytes checked here. A community theme must be confirmed, not failed,
+         * and its code must still be what LordOS built (its install record's SHA-256). */
+        /* a community theme: one more start in its crash count (cleared when the session ends normally, main.c); one
+         * that ended COMMUNITY_CRASHES sessions in a row is marked failed here and refused just below */
+        char cid[32];
+        if (ok && jst_is_user_bundle(bundle, cid, sizeof cid)) jst_session_starting(cid);
         int r = ok ? js_theme_prepare(bundle) : 0;
         if (r) {
             ok = 0;
             snprintf(ui.theme_failed, sizeof ui.theme_failed, "%s", bundle);
             snprintf(ui.theme_failed_why, sizeof ui.theme_failed_why, "%s", r == JS_REFUSED ? "refused by the verified-code check (sec/codesig.c)"
-                     : "its file could not be read");
+                     : js_init_error()[0] ? js_init_error() : "its file could not be read");
             ui.theme_failed_code = r == JS_REFUSED;
             ui.theme_failed_gen = codesig_generation();
             fprintf(stderr, "lord-server: theme %s not switched to (%s): the session stays in this one\n", bundle, ui.theme_failed_why);
@@ -566,6 +597,23 @@ static JSValue f_fonts_list(JSContext *c, JSValueConst this_val, int argc, JSVal
         JS_SetPropertyUint32(c, arr, (uint32_t)i, o);
     }
     return arr;
+}
+
+/* lord.fonts.useForTheme(family | null): a style pack's font (docs/THEMES-GUIDE.md), drawn where a node asks for
+ * fontFamily: 'theme'. Only a family already installed on the system (the catalog of fonts.c: LordOS's own and the
+ * system's font folders), by name; nothing is read from the theme's folder. True when it was found. */
+static JSValue f_fonts_theme(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
+    (void)this_val;
+    const char *fam = argc > 0 && JS_IsString(argv[0]) ? JS_ToCString(c, argv[0]) : NULL;
+    if (!fam) { text_set_theme_font(NULL, 0, NULL, 0); return JS_FALSE; }
+    size_t n = strlen(fam);
+    int ok = n > 0 && n < 64;
+    for (size_t i = 0; ok && i < n; i++) ok = fam[i] >= 0x20 && fam[i] != 0x7f;
+    const FontEntry *r = ok ? fonts_pick(fam, 0, 0) : NULL, *b = ok ? fonts_pick(fam, 1, 0) : NULL;
+    JS_FreeCString(c, fam);
+    if (!r || r->color) { text_set_theme_font(NULL, 0, NULL, 0); return JS_FALSE; }
+    if (b && b->color) b = NULL;
+    return JS_NewBool(c, text_set_theme_font(r->path, r->index, b ? b->path : NULL, b ? b->index : 0) == 0);
 }
 
 /* ---- lord.admin: privileged helper actions (admin.c) ---- */
@@ -637,6 +685,40 @@ static void apply_locale_conf(void) {
     }
 }
 
+/* The interface language for the Linux apps launched from now on and the Terminal's shells (GitHub #262,
+ * uilangenv.h): LANGUAGE, and LC_MESSAGES only to a generated locale of that language when the session's messages are
+ * in another one. The session's own LC_MESSAGES is kept to go back to (another language, a new region). */
+static char uilang_msgs0[64];
+static int uilang_msgs_saved, uilang_msgs_ours;
+
+static void uilang_rebase(void) {
+    const char *m = getenv("LC_MESSAGES");
+    snprintf(uilang_msgs0, sizeof uilang_msgs0, "%s", m && valid_locale_name(m) ? m : "");
+    uilang_msgs_saved = 1;
+    uilang_msgs_ours = 0;
+}
+
+static void uilang_apply(const char *lang) {
+    char val[32];
+    if (!uilang_language(lang, val, sizeof val)) return;
+    if (!uilang_msgs_saved) uilang_rebase();
+    setenv("LANGUAGE", val, 1);
+    if (uilang_msgs_ours) {
+        if (uilang_msgs0[0]) setenv("LC_MESSAGES", uilang_msgs0, 1); else unsetenv("LC_MESSAGES");
+        uilang_msgs_ours = 0;
+    }
+    char cand[2][32];
+    int n = uilang_candidates(lang, getenv("LANG"), getenv("LC_MESSAGES"), cand, 2);
+    for (int i = 0; i < n; i++) {
+        locale_t l = newlocale(LC_MESSAGES_MASK, cand[i], (locale_t)0);
+        if (!l) continue;
+        freelocale(l);
+        setenv("LC_MESSAGES", cand[i], 1);
+        uilang_msgs_ours = 1;
+        break;
+    }
+}
+
 /* lord.locale.get() → { user: {LANG…}, system: {LANG…} } */
 static JSValue f_locale_get(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
     (void)this_val; (void)argc; (void)argv;
@@ -667,6 +749,9 @@ static JSValue f_locale_set(JSContext *c, JSValueConst this_val, int argc, JSVal
         if (s) JS_FreeCString(c, s);
         JS_FreeValue(c, v);
     }
+    /* the new region is the session's own; the interface language goes over it again */
+    uilang_rebase();
+    if (text_language()[0]) uilang_apply(text_language());
     char dir[PATH_MAX + 16], path[PATH_MAX + 32], tmp[PATH_MAX + 40];
     snprintf(dir, sizeof dir, "%s/.config", home);
     mkdir(dir, 0700);
@@ -762,6 +847,16 @@ static JSValue f_locale_catalog(JSContext *c, JSValueConst this_val, int argc, J
             size_t len;
             char *txt = read_small(path, 1 << 20, &len);
             if (txt) { r = JS_NewStringLen(c, txt, len); free(txt); }
+        }
+        /* (0.8.9.6.2) a community theme's own texts, "theme-<id>": locales/<language>.json in its installed folder */
+        if (JS_IsNull(r) && !strncmp(ns, "theme-", 6) && jst_root()[0]) {
+            char path[PATH_MAX * 2];
+            size_t len;
+            if (ts_valid_id(ns + 6) && (size_t)snprintf(path, sizeof path, "%s/%s/locales/%s.json", jst_root(), ns + 6, lang) < sizeof path) {
+                struct stat st;
+                char *txt = !lstat(path, &st) && S_ISREG(st.st_mode) ? read_small(path, 1 << 20, &len) : NULL;
+                if (txt) { r = JS_NewStringLen(c, txt, len); free(txt); }
+            }
         }
         /* strings of an app installed as a package: locales/<language>.json inside it */
         if (JS_IsNull(r) && lpk_valid_id(ns) && !lpk_reserved(ns)) {
@@ -1020,8 +1115,11 @@ static JSValue f_time_reload(JSContext *c, JSValueConst this_val, int argc, JSVa
 /* ---- miscellaneous ---- */
 
 static JSValue f_quit(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
-    (void)c; (void)this_val; (void)argc; (void)argv;
+    (void)this_val; (void)argc; (void)argv;
     ui.quit_requested = 1;
+    /* a community theme logging out by itself (its code on the stack, or a call made for it): its crash count stays
+     * (main.c clears it only for ends the person caused outside the theme's reach) */
+    if (jst_on_stack(c)) ui.quit_by_theme = 1;
     return JS_UNDEFINED;
 }
 
@@ -1044,7 +1142,7 @@ static JSValue f_text_language(JSContext *c, JSValueConst this_val, int argc, JS
     if (!l) return JS_EXCEPTION;
     int ok = strlen(l) < 16;
     for (const char *p = l; ok && *p; p++) ok = (*p >= 'a' && *p <= 'z') || (*p >= 'A' && *p <= 'Z') || *p == '-' || *p == '_';
-    if (ok) { text_set_language(l); ui.dirty = 1; }
+    if (ok) { text_set_language(l); uilang_apply(l); ui.dirty = 1; }
     JS_FreeCString(c, l);
     return JS_NewBool(c, ok);
 }
@@ -1228,6 +1326,7 @@ static JSValue f_fs_write(JSContext *c, JSValueConst this_val, int argc, JSValue
     }
     const uint8_t *data = bin ? bin : (const uint8_t *)text;
     if (len > FS_WRITE_MAX) { if (text) JS_FreeCString(c, text); return js_throw_code(c, "fs.tooLarge", "max", "32 MB", NULL); }
+    fsasync_wait_write(target);         /* an older writeAsync of this file still on a worker lands first (fsasync.c) */
     struct stat st;
     mode_t mode = 0644;
     if (!lstat(target, &st)) {
@@ -1245,15 +1344,42 @@ static JSValue f_fs_write(JSContext *c, JSValueConst this_val, int argc, JSValue
             if (w < 0 && errno == EINTR) continue;
             if (w <= 0) ok = 0; else off += (size_t)w;
         }
-        if (ok && fsync(fd)) ok = 0;
+        /* no fsync here (QA 0.8.9.6.2: under a 1.4 GB copy to a Raspberry Pi's SD card it held the desktop 5 to 23 s):
+         * the new file is renamed over the old one now, as before (ext4's auto_da_alloc writes a file renamed over
+         * another before the rename commits), and synced with its folder on bgsave's worker right after */
         if (close(fd)) ok = 0;
         if (ok && rename(tmp, target)) ok = 0;
         if (!ok) unlink(tmp);
+        else bgsave_sync_later(target);
     }
     int err = errno;
     if (text) JS_FreeCString(c, text);
     if (!ok) return js_throw_code(c, "sys.errno", "errno", lerr_errno(err), NULL);
     return JS_TRUE;
+}
+
+/* lord.fs.writeAsync(path, data) → req: lord.fs.write on an fsasync.c worker, the same checks (resolved again there),
+ * answered as __lordFsReply(req, { ok } | { error }). For saves made while the person works (Notes): a slow disk never
+ * holds the interface. Writes to one file land in the order they were asked, and lord.fs.write waits for them. */
+static JSValue f_fs_write_async(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
+    (void)this_val;
+    if (argc < 2) return js_throw_code(c, "sys.badArgument", NULL);
+    const char *p = JS_ToCString(c, argv[0]);
+    if (!p) return JS_EXCEPTION;
+    size_t len = 0;
+    const char *text = NULL;
+    uint8_t *bin = JS_IsString(argv[1]) ? NULL : JS_GetArrayBuffer(c, &len, argv[1]);
+    if (!bin) {
+        JS_FreeValue(c, JS_GetException(c));
+        text = JS_ToCStringLen(c, &len, argv[1]);
+        if (!text) { JS_FreeCString(c, p); return JS_EXCEPTION; }
+    }
+    char err[256] = "";
+    int req = fsasync_submit_write(p, bin ? (const char *)bin : text, len, err, sizeof err);   /* FSA_WRITE_MAX: 32 MB */
+    if (text) JS_FreeCString(c, text);
+    JS_FreeCString(c, p);
+    if (req < 0) return js_throw_line(c, err);
+    return JS_NewInt32(c, req);
 }
 
 /* lord.fs.mkdir(path): a new folder (the parent must exist). */
@@ -1449,6 +1575,10 @@ static JSValue f_fs_stat(JSContext *c, JSValueConst this_val, int argc, JSValueC
     JS_SetPropertyStr(c, o, "ctime", JS_NewFloat64(c, s.ctime));
     if (s.has_btime) JS_SetPropertyStr(c, o, "btime", JS_NewFloat64(c, s.btime));
     JS_SetPropertyStr(c, o, "writable", JS_NewBool(c, s.writable));
+    /* (read-only) it is, or lies in, a folder lord.fs never writes (fsops_protected), the links on its way followed: the
+     * desktop shows nothing for a Desktop folder that points at ~/.config/autostart (docs/drafts/DESKTOP-ICONS.md 2.1) */
+    char real[PATH_MAX];
+    JS_SetPropertyStr(c, o, "protected", JS_NewBool(c, r == -2 || fsops_protected(target) || (realpath(target, real) && fsops_protected(real))));
     /* a file a Machines guest sent (6.21): Files says where it came from and never opens a runnable one by itself */
     if (s.quarantine) { JS_SetPropertyStr(c, o, "quarantine", JS_TRUE); JS_SetPropertyStr(c, o, "fromMachine", JS_NewString(c, s.from)); }
     return o;
@@ -1547,6 +1677,46 @@ static JSValue f_fs_recent(JSContext *c, JSValueConst this_val, int argc, JSValu
     return a.arr;
 }
 
+/* lord.fs.recentAsync(limit, days) → req: the same walk on an fsasync.c worker (QA 0.8.9.6.2: on a 37 GB home it held
+ * the interface 250 ms to 1.6 s about every minute, for the Recent widget and the search); the answer comes as
+ * __lordFsReply(req, { recent: [{ path, name, dir, size, mtime }] }) */
+typedef struct { JBuf b; int n; } RecentJson;
+static void recent_json_cb(void *ud, const char *path, int dir, double size, double mtime) {
+    RecentJson *r = ud;
+    const char *base = strrchr(path, '/');
+    jb_raw(&r->b, r->n++ ? ",{\"path\":" : "{\"path\":");
+    jb_str(&r->b, path);
+    jb_raw(&r->b, ",\"name\":");
+    jb_str(&r->b, base ? base + 1 : path);
+    jb_printf(&r->b, ",\"dir\":%s,\"size\":%.0f,\"mtime\":%.3f}", dir ? "true" : "false", size, mtime);
+}
+static char *recent_job(const char *arg) {
+    int limit = 60, days = 30;
+    if (sscanf(arg, "%d %d", &limit, &days) != 2) return NULL;
+    RecentJson r = { .n = 0 };
+    jb_init(&r.b);
+    jb_raw(&r.b, "{\"recent\":[");
+    fs_recent(limit, days, recent_json_cb, &r);
+    jb_raw(&r.b, "]}");
+    if (r.b.oom) { jb_free(&r.b); return NULL; }
+    return r.b.p;
+}
+static JSValue f_fs_recent_async(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
+    (void)this_val;
+    int32_t limit = 60, days = 30;
+    if (argc > 0 && JS_IsNumber(argv[0])) JS_ToInt32(c, &limit, argv[0]);
+    if (argc > 1 && JS_IsNumber(argv[1])) JS_ToInt32(c, &days, argv[1]);
+    if (days < 1) days = 1;
+    if (days > 365) days = 365;
+    if (limit < 1) limit = 1;
+    if (limit > 500) limit = 500;
+    char arg[32], err[256] = "";
+    snprintf(arg, sizeof arg, "%d %d", (int)limit, (int)days);
+    int req = fsasync_submit_fn(recent_job, arg, err, sizeof err);
+    if (req < 0) return js_throw_line(c, err);
+    return JS_NewInt32(c, req);
+}
+
 static void vol_cb(void *ud, const char *path, const char *fstype, double total, double avail) {
     Acc *a = ud;
     JSValue o = JS_NewObject(a->c);
@@ -1630,7 +1800,62 @@ static JSValue f_fs_mounts(JSContext *c, JSValueConst this_val, int argc, JSValu
     return a.arr;
 }
 
+/* lord.fs.watch(folder, fn) → id; lord.fs.unwatch(id) → bool (fswatch.c, docs/drafts/DESKTOP-ICONS.md 5.1): read-only.
+ * fn({ changed: true, overflow, gone }) at most every 150 ms per watch, with no file names: the caller lists the folder
+ * again (listAsync). overflow: list again and resolve the folder again (the kernel's queue overflowed, or the folder
+ * itself was deleted, moved or unmounted); gone: the watch no longer sees the folder. At most 16 per session, refused on
+ * cloud and network folders (fs.watchRemote) and on what lord.fs doesn't read. Every watch ends with this context. */
+static struct { int id; JSValue fn; } watch_fn[FSWATCH_MAX];
+
+static JSValue f_fs_watch(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    if (argc < 2 || !JS_IsFunction(c, argv[1])) return js_throw_code(c, "sys.badArgument", NULL);
+    const char *p = JS_ToCString(c, argv[0]);
+    if (!p) return JS_EXCEPTION;
+    char err[256] = "";
+    int id = fswatch_add(p, err, sizeof err);
+    JS_FreeCString(c, p);
+    if (id < 0) return js_throw_line(c, err);
+    for (int i = 0; i < FSWATCH_MAX; i++) if (!watch_fn[i].id) {
+        watch_fn[i].id = id;
+        watch_fn[i].fn = JS_DupValue(c, argv[1]);
+        return JS_NewInt32(c, id);
+    }
+    fswatch_remove(id);                 /* (can't happen: as many slots as watches) */
+    return js_throw_code(c, "fs.tooManyWatches", "max", "16", NULL);
+}
+
+static JSValue f_fs_unwatch(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc;
+    int id = 0;
+    if (JS_ToInt32(c, &id, argv[0])) return JS_EXCEPTION;
+    if (id <= 0) return JS_FALSE;
+    for (int i = 0; i < FSWATCH_MAX; i++) if (watch_fn[i].id == id) {
+        JSValue fn = watch_fn[i].fn;
+        watch_fn[i].id = 0;
+        watch_fn[i].fn = JS_UNDEFINED;
+        JS_FreeValue(c, fn);
+    }
+    return JS_NewBool(c, fswatch_remove(id) == 0);
+}
+
+JSValue js_sys_fswatch_fn(JSContext *c, int id) {
+    if (id > 0) for (int i = 0; i < FSWATCH_MAX; i++) if (watch_fn[i].id == id) return JS_DupValue(c, watch_fn[i].fn);
+    return JS_UNDEFINED;
+}
+
+void js_sys_fswatch_reset(JSContext *c) {
+    for (int i = 0; i < FSWATCH_MAX; i++) {
+        if (watch_fn[i].id && c) JS_FreeValue(c, watch_fn[i].fn);
+        watch_fn[i].id = 0;
+        watch_fn[i].fn = JS_UNDEFINED;
+    }
+    fswatch_clear();
+}
+
 static const JSCFunctionListEntry fs_funcs[] = {
+    JS_CFUNC_DEF("watch", 2, f_fs_watch),
+    JS_CFUNC_DEF("unwatch", 1, f_fs_unwatch),
     JS_CFUNC_DEF("listAsync", 1, f_fs_list_async),
     JS_CFUNC_DEF("statAsync", 1, f_fs_stat_async),
     JS_CFUNC_DEF("trashAsync", 1, f_fs_trash_async),
@@ -1638,6 +1863,7 @@ static const JSCFunctionListEntry fs_funcs[] = {
     JS_CFUNC_DEF("duAsync", 2, f_fs_du_async),
     JS_CFUNC_DEF("mkdirAsync", 1, f_fs_mkdir_async),
     JS_CFUNC_DEF("renameAsync", 2, f_fs_rename_async),
+    JS_CFUNC_DEF("writeAsync", 2, f_fs_write_async),
     JS_CFUNC_DEF("mounts", 0, f_fs_mounts),
     JS_CFUNC_DEF("home", 0, f_fs_home),
     JS_CFUNC_DEF("list", 1, f_fs_list),
@@ -1659,6 +1885,7 @@ static const JSCFunctionListEntry fs_funcs[] = {
     JS_CFUNC_DEF("free", 1, f_fs_free),
     JS_CFUNC_DEF("search", 3, f_fs_search),
     JS_CFUNC_DEF("recent", 2, f_fs_recent),
+    JS_CFUNC_DEF("recentAsync", 2, f_fs_recent_async),
     JS_CFUNC_DEF("volumes", 0, f_fs_volumes),
 };
 int js_sys_unseen;
@@ -2047,6 +2274,7 @@ static JSValue f_apps_linux(JSContext *c, JSValueConst this_val, int argc, JSVal
         JS_SetPropertyStr(c, o, "id", JS_NewString(c, a->id));
         JS_SetPropertyStr(c, o, "name", JS_NewString(c, a->name));
         JS_SetPropertyStr(c, o, "nameC", JS_NewString(c, a->name_c));
+        JS_SetPropertyStr(c, o, "names", JS_NewString(c, a->names));     /* every Name[xx], one per line */
         JS_SetPropertyStr(c, o, "genericName", JS_NewString(c, a->generic));
         JS_SetPropertyStr(c, o, "comment", JS_NewString(c, a->comment));
         JS_SetPropertyStr(c, o, "commentLocal", JS_NewBool(c, a->comment_l10n));
@@ -2152,6 +2380,9 @@ static JSValue f_apps_last_error(JSContext *c, JSValueConst this_val, int argc, 
 static int lpk_reserved(const char *id) {
     static const char *const fixed[] = { "shell", "apps", "common", "linux", "desktop", "lordos", "sdk", "store", NULL };
     for (int i = 0; fixed[i]; i++) if (!strcmp(id, fixed[i])) return 1;
+    /* (0.8.9.6.2) "theme-<id>" is a theme's own namespace (sdk/thememeta.js themeNamespace): no package supplies its
+     * texts (lord.locale.catalog would otherwise fall back to a package's locales for a theme's option labels) */
+    if (!strncmp(id, "theme-", 6)) return 1;
     char path[PATH_MAX * 2];
     struct stat st;
     snprintf(path, sizeof path, "%s/locales/en/%s.json", assets, id);
@@ -2408,6 +2639,7 @@ static JSValue f_apps_flatpak(JSContext *c, JSValueConst this_val, int argc, JSV
         JS_SetPropertyStr(c, o, "id", JS_NewString(c, a->id));
         JS_SetPropertyStr(c, o, "name", JS_NewString(c, a->name));
         JS_SetPropertyStr(c, o, "nameC", JS_NewString(c, a->name_c));
+        JS_SetPropertyStr(c, o, "names", JS_NewString(c, a->names));     /* every Name[xx], one per line */
         JS_SetPropertyStr(c, o, "comment", JS_NewString(c, a->comment));
         JS_SetPropertyStr(c, o, "commentLocal", JS_NewBool(c, a->comment_l10n));
         JS_SetPropertyStr(c, o, "keywords", JS_NewString(c, a->keywords));
@@ -2574,6 +2806,12 @@ static const JSCFunctionListEntry ssh_funcs[] = {
     JS_CFUNC_DEF("status", 0, f_ssh_status),
 };
 
+/* ---- Hands' QA desktop (lord-server --headless --hands-qa, docs/HANDS.md): a demo identity, never the real account ----
+ * "Alex Demo", login "demo", host "demo-pc" wherever lord.system.info and lord.users show who and where this is. */
+static int demo_identity;
+void js_sys_set_demo_identity(int on) { demo_identity = !!on; }
+int js_sys_demo_identity(void) { return demo_identity; }
+
 /* ---- lord.users: accounts of the people on the machine (Settings → Users; read-only) ---- */
 
 /* an administrator by the shared list (src/users/admingroups.c); an unreadable list is not one */
@@ -2589,6 +2827,21 @@ static JSValue f_users_list(JSContext *c, JSValueConst this_val, int argc, JSVal
     JSValue o = JS_NewObject(c), arr = JS_NewArray(c);
     uint32_t n = 0;
     uid_t me = getuid();
+    if (demo_identity) {                    /* the QA desktop: one demo account, nobody's real one */
+        JSValue u = JS_NewObject(c);
+        JS_SetPropertyStr(c, u, "name", JS_NewString(c, "demo"));
+        JS_SetPropertyStr(c, u, "full", JS_NewString(c, "Alex Demo"));
+        JS_SetPropertyStr(c, u, "uid", JS_NewInt32(c, (int32_t)me));
+        JS_SetPropertyStr(c, u, "admin", JS_FALSE);
+        JS_SetPropertyStr(c, u, "self", JS_TRUE);
+        JS_SetPropertyStr(c, u, "color", JS_NewString(c, ""));
+        JS_SetPropertyStr(c, u, "image", JS_NULL);
+        JS_SetPropertyUint32(c, arr, 0, u);
+        JS_SetPropertyStr(c, o, "users", arr);
+        JS_SetPropertyStr(c, o, "autologin", JS_NewString(c, ""));
+        JS_SetPropertyStr(c, o, "textMode", JS_FALSE);
+        return o;
+    }
     setpwent();
     struct passwd *pw;
     while ((pw = getpwent()) && n < 256) {
@@ -2761,6 +3014,7 @@ static const JSCFunctionListEntry time_funcs[] = {
 };
 static const JSCFunctionListEntry fonts_funcs[] = {
     JS_CFUNC_DEF("list", 1, f_fonts_list),
+    JS_CFUNC_DEF("useForTheme", 1, f_fonts_theme),
 };
 static const JSCFunctionListEntry themes_funcs[] = {
     JS_CFUNC_DEF("list", 0, f_themes_list),
@@ -2785,6 +3039,11 @@ void js_sys_register(JSContext *c, JSValue lord) {
     add_object(c, lord, "system", system_funcs, sizeof system_funcs / sizeof system_funcs[0]);
     add_object(c, lord, "settings", settings_funcs, sizeof settings_funcs / sizeof settings_funcs[0]);
     add_object(c, lord, "themes", themes_funcs, sizeof themes_funcs / sizeof themes_funcs[0]);
+    {
+        JSValue th = JS_GetPropertyStr(c, lord, "themes");
+        if (!greeter_mode) jst_register_themes(c, th);       /* install from a file, confirm, retry, remove (js_theme.c) */
+        JS_FreeValue(c, th);
+    }
     add_object(c, lord, "fonts", fonts_funcs, sizeof fonts_funcs / sizeof fonts_funcs[0]);
     add_object(c, lord, "admin", admin_funcs, sizeof admin_funcs / sizeof admin_funcs[0]);
     add_object(c, lord, "locale", locale_funcs, sizeof locale_funcs / sizeof locale_funcs[0]);

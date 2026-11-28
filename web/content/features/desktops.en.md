@@ -1,19 +1,19 @@
 ## The short version
 
-**Lord Workspaces is new in 0.8.9, released on 18 November 2026.**
+**Workspaces is new in 0.8.9, released on 18 November 2026.**
 
-LordOS doesn't have one desktop: it has three, and you choose. **Lord Flow** has a menu bar on top and a Dock at the bottom. **Lord Classic** puts everything in one taskbar with a start menu. **Lord Workspaces** organizes your work by activities, with a layout for each screen and widgets on the desktop.
+LordOS doesn't have one desktop: it has three, and you choose. **Flow** has a menu bar on top and a Dock at the bottom. **Classic** puts everything in one taskbar with a start menu. **Workspaces** organizes your work by activities, with a layout for each screen and widgets on the desktop.
 
 The three run on the same display server, the same interface engine and the same apps. Files, Settings, Mail, the Terminal and your Linux apps are the same in all of them. What changes is the way you get to them, and you can change it at any time, live, without logging out.
 
-## Lord Flow
+## Flow
 
 **Since 0.8.0, the first release.** A menu bar on top and a Dock at the bottom, with soft glass and rounded corners. It's the desktop many people already know how to use, so nobody has to learn a new way of working just to try a new system.
 
 - **The Dock** magnifies under the pointer, shows which apps are open and gives each app its own actions. It can also sit on the left or the right.
 - **The menu bar** holds the app's menus, the status items and the clock; the **Control Center** gathers network, sound, brightness, Do Not Disturb and the rest.
 - **The app launcher** shows every app, and Search finds apps, settings and files.
-- **Snap windows** by dragging them to the edges: a half, a quarter or the whole screen (in Lord Flow since 0.8.9).
+- **Snap windows** by dragging them to the edges: a half, a quarter or the whole screen (in Flow since 0.8.9).
 - **Always on Top** in the window menu keeps a window over the others while you type in another one (since 0.8.9.5, in every LordOS desktop; X11 apps can ask for it too).
 - **Desktops** with an Overview, since 0.8.7, and an app switcher on ❖Tab.
 
@@ -21,7 +21,7 @@ The three run on the same display server, the same interface engine and the same
 
 [[shot:0]]
 
-## Lord Classic
+## Classic
 
 **Since 0.8.3.** Everything in one bar at the bottom: the start button, search, the pinned and open apps, a tray with quick settings and the clock.
 
@@ -35,9 +35,9 @@ The three run on the same display server, the same interface engine and the same
 
 [[shot:1]]
 
-## Lord Workspaces
+## Workspaces
 
-**New in 0.8.9.** Your work is not a pile of windows: it's a set of things you're doing. Lord Workspaces gives each one its own place.
+**New in 0.8.9.** Your work is not a pile of windows: it's a set of things you're doing. Workspaces gives each one its own place.
 
 - **Activities.** Up to nine, each with its own name, icon, colour, pinned apps and window layout per display. Pills at the top switch between them, and resting the pointer on one shows what it holds before you go there. Groups inside an activity take it up to 36 places to work.
 - **The Context Spine**, a slim rail on the left with the crown, your activities, apps, files and the Control Atlas. It folds to icons on smaller screens.
@@ -51,11 +51,27 @@ The three run on the same display server, the same interface engine and the same
 
 [[shot:2]]
 
+## Luna (since 0.8.9.6.2)
+
+Since 0.8.9.6.2: a tribute to the desktops of 2001, with art drawn by us in that style. Glossy blue title bars with rounded tops, a green start button on a blue taskbar with quick launch and a button for every window, and Files as that era's explorer: big Back, Forward and Up buttons, an address bar with Go, and a task pane with "File and Folder Tasks", "Other Places" and "Details".
+
+It is also the first desktop that brings a **style pack** and **app skins**: its own icons, white pointers, a few short sounds and its own font, and Files' toolbar, sidebar, items and status bar drawn its way. Files still does every action itself, with its usual checks. In **Settings → Appearance → From this style** you can turn each part off, for example to keep its frames and use LordOS's own icons.
+
+## Celeste
+
+A frame around each display with a bar on its thick side and drawers that slide out of its edges: the dashboard, the launcher, the session menu and a sidebar with your notifications. It has five colour schemes and four surfaces, from clear to opaque. It shipped in 0.8.9.5 as a community theme; since 0.8.9.6.2 it is an official one. It is in Settings → Appearance, not in the first-start chooser.
+
+## Names of their own, and their own repository (since 0.8.9.6.2)
+
+Since 0.8.9.6.2, the desktops dropped "Lord" from their names: Lord Flow, Lord Classic, Lord Workspaces and Lord Celeste are now **Flow**, **Classic**, **Workspaces** and **Celeste**, in every language. Nothing changes for you: LordOS keeps your choice, because it was always stored by an id that didn't change. Each desktop now names its author in Settings → Appearance (ours: Federico Pereira, IPERFEX).
+
+The official desktops are now developed in their own repository, **LordOS-themes**, like the wallpapers: one folder per desktop with its source, screenshots, a README, its license and where it came from, and a catalog with the SHA-256 of every file. LordOS builds from a checked copy of one pinned version of it, so building LordOS still needs no network, and every file must match the catalog before it's copied in. To make your own, start with [lordos-theme-kit](https://github.com/lordbasex/lordos-theme-kit).
+
 ## Switching
 
 Go to **Settings → Appearance → Desktop style** and pick another one. The change happens right away, without logging out: your open windows come back, each on its own desktop, and your settings stay.
 
-A few things belong to each desktop. Lord Workspaces starts with a pink accent and its own wallpaper, while Lord Flow and Lord Classic keep blue and Lumo Celestial; once you pick an accent or a wallpaper yourself, it stays yours in every desktop. Desktop widgets work in all three since 0.8.9.
+A few things belong to each desktop. Workspaces starts with a pink accent and its own wallpaper, while Flow and Classic keep blue and Lumo Celestial; once you pick an accent or a wallpaper yourself, it stays yours in every desktop. Desktop widgets work in all three since 0.8.9.
 
 ## First start
 
@@ -69,16 +85,17 @@ It never shows on the live system, on the login screen or to anyone who already 
 
 ## Why we can have many
 
-On LordOS, a desktop is one theme on one engine. The display server, the compositor and the interface engine are LordOS's own, written for it, and a theme is the whole desktop on top: the bars, the panels, the menus and every window frame, written in React and drawn by that engine. That's why Lord Workspaces didn't need a fork of the system, a new toolkit or a chain of plugins, and why it switches live.
+On LordOS, a desktop is one theme on one engine. The display server, the compositor and the interface engine are LordOS's own, written for it, and a theme is the whole desktop on top: the bars, the panels, the menus and every window frame, written in React and drawn by that engine. That's why Workspaces didn't need a fork of the system, a new toolkit or a chain of plugins, and why it switches live.
 
-On other desktops, such as GNOME or KDE, a desktop that works like Lord Workspaces would mean stacking extensions: one for tiling, another for per-monitor workspaces, a third for a taskbar on each screen, each with its own release schedule. Here it is the desktop itself.
+On other desktops, such as GNOME or KDE, a desktop that works like Workspaces would mean stacking extensions: one for tiling, another for per-monitor workspaces, a third for a taskbar on each screen, each with its own release schedule. Here it is the desktop itself.
 
 That is also why there will be more. If you have an idea for the next one, [tell us on GitHub](https://github.com/lordbasex/LordOS/issues/new?template=feature_request.yml).
 
 ## Honest limits
 
-- **Lord Workspaces** was checked with scene tests on three displays and headless screenshots. On real monitors and the GPU path it has only run on the maintainer's own computer, with test builds, and it has not been checked in a right-to-left language yet.
-- **Not in Lord Workspaces yet:** live miniatures of hidden activities (the Overview shows frames with each app's icon), real frosted glass over Linux apps on the GPU path, and a different activity on each monitor.
+- **Workspaces** was checked with scene tests on three displays and headless screenshots. On real monitors and the GPU path it has only run on the maintainer's own computer, with test builds, and it has not been checked in a right-to-left language yet.
+- **Not in Workspaces yet:** live miniatures of hidden activities (the Overview shows frames with each app's icon), real frosted glass over Linux apps on the GPU path, and a different activity on each monitor.
 - **The wallpaper slideshow** was checked on test displays only, not on real monitors or the GPU path.
 - **The first-start chooser** is covered by automated tests in all three desktops, but hasn't been seen yet on a real first start.
 - **A theme you build yourself** runs only on a development build of LordOS for now: a release build loads only code listed in LordOS's signed manifest.
+- **Luna** and app skins were checked with automated tests and headless screenshots, in light and dark; not yet in a real session. Every native app that runs in the desktop's process can be skinned; Mail and Calendar, which run as isolated processes, take only the colours.

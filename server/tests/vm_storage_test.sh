@@ -99,7 +99,10 @@ cp -a "$T/out/e.lordvm" "$T/out/t3.lordvm"; ln -sf /etc/passwd "$T/out/t3.lordvm
 # ---- a plain machine: OVA, and a hostile export whose machine.json asks for everything
 P=$T/lib/p.lordvm
 "$LV" --create "$P" --name P --memory 512 --disk 1 --display none --network isolated >/dev/null || bad "plain create"
-"$LV" --export "$P" --to "$T/out/p.ova" --format ova >/dev/null && tar -tf "$T/out/p.ova" | head -1 | grep -q '\.ovf$' && ok "OVA: the descriptor first" || bad ova
+qemu-io -c "write -P 0x5a 0 64M" "$P/disks/system.qcow2" >/dev/null || bad "plain disk data"
+"$LV" --export "$P" --to "$T/out/p.ova" --format ova >"$T/ova.out" && tar -tf "$T/out/p.ova" | head -1 | grep -q '\.ovf$' && ok "OVA: the descriptor first" || bad ova
+# the disk's conversion reports its progress as it goes, not only at its end (VM 116 QA: "0 %" for minutes)
+grep -Eq '^\{"progress":([1-9]|[1-7][0-9]|8[0-4])\.[0-9]\}$' "$T/ova.out" && ok "OVA: progress during the conversion" || bad "ova progress"
 mkdir -p "$T/out/ova" && tar -xf "$T/out/p.ova" -C "$T/out/ova" && qemu-img info "$T/out/ova/disk1.vmdk" | grep -q streamOptimized &&
     (cd "$T/out/ova" && sed 's/SHA256(\(.*\))= \(.*\)/\2  \1/' machine.mf | sha256sum -c - >/dev/null) && ok "OVA: streamOptimized VMDK, .mf matches" || bad "ova contents"
 "$LV" --export "$P" --to "$T/out/h.lordvm" >/dev/null && python3 -I tests/vm_export_hostile.py "$T/out/h.lordvm" || bad "hostile export made"

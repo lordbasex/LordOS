@@ -14,7 +14,12 @@
 //   studio   the Linux apps reading LordOS Studio's camera device (/dev/video50; server/src/media/mstudio.c, hw event
 //            "studio-use", sdk/studiomodel.js studioUseOf): { apps: [id], camera, effects } | null; each is a camera row
 //            whose via says the real camera behind it and whether effects are on
+//   cameras  what opens a camera itself, not through LordOS or PipeWire: a web app's web process (WebKit opens the
+//            video4linux device in its sandbox), a Linux app using V4L2; lord-server finds them from the kernel
+//            (server/src/hw/camuse.c, hw event "camera-use", cameraUseOf): [id], '' a program LordOS can't name. Shown
+//            only: there is no Turn off for them
 //
+//   cameraUseOf(data)    → [id] from the "camera-use" event ({ apps: [id] }): strings only, each once
 //   captureRows(src, { name, enforceable })  → [{ key, app, name, screen, camera, mic, castIds, share, control, own, linux, media, via, sys, details }]
 //     screen: null | 'screen' | 'window' | 'both' | 'shot' | 'color'; own: the camera/microphone is LordOS's (a native or
 //     .lpk app: Turn off = its permission); linux: a Linux app's (Turn off = its firewall restriction), and only an app
@@ -39,7 +44,12 @@ function widerScreen(a, b) {
 // One key per app, however each source spells it: "lpk:<id>" and the bare id of an .lpk app are one app
 const keyOf = (app) => (typeof app === 'string' && app.startsWith('lpk:') ? app.slice(4) : String(app || ''));
 
-export function captureRows({ share = null, casts = [], shots = [], devices = [], linux = [], studio = null } = {}, { name = (a) => a, enforceable = () => false } = {}) {
+export function cameraUseOf(data) {
+  const d = data && typeof data === 'object' ? data : {};
+  return [...new Set((Array.isArray(d.apps) ? d.apps : []).filter((a) => typeof a === 'string' && a.length < 200))];
+}
+
+export function captureRows({ share = null, casts = [], shots = [], devices = [], linux = [], studio = null, cameras = [] } = {}, { name = (a) => a, enforceable = () => false } = {}) {
   const rows = new Map();
   const row = (app, label, unknownKey) => {
     const key = app ? keyOf(app) : unknownKey;
@@ -101,6 +111,11 @@ export function captureRows({ share = null, casts = [], shots = [], devices = []
     r.camera = true;
     r.via = { camera: typeof studio.camera === 'string' ? studio.camera : '', effects: studio.effects === true };
     if (a && enforceable(a)) r.linux.camera = true;
+  }
+  for (const a of Array.isArray(cameras) ? cameras : []) {
+    if (typeof a !== 'string') continue;
+    const r = row(a, a ? name(a) : '', 'unknown');
+    r.camera = true;
   }
   // the screen first, then the camera, then the microphone; by name within each
   const weight = (r) => (r.screen && r.screen !== 'shot' && r.screen !== 'color' ? 0 : r.camera ? 1 : r.mic ? 2 : 3);

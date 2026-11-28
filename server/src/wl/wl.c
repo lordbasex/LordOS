@@ -23,6 +23,7 @@
  *
  * wp_security_context_manager_v1 (secctx.c): a sandbox's own socket; its clients count as sandboxed and don't
  * see the globals only trusted clients get. */
+#include "../hands/hands.h"
 #include "wl.h"
 #include "keygrab.h"
 #include "secctx.h"
@@ -85,6 +86,7 @@
 #include "xwscale.h"
 #include "framegate.h"
 #include "../outputs.h"
+#include "../nofile.h"
 #include "../cursor.h"
 #include "ptrlock.h"
 #include "outpick.h"
@@ -208,6 +210,7 @@ struct Surf {
     unsigned fs_sig;            /* CPU path: its shape when the fullscreen copy last drew it (blit_tree_r) */
     struct wl_list sent_feedback;   /* presentation: already in a frame, flip pending */
     int fs_saved_w, fs_saved_h;     /* size before fullscreen */
+    int own_w, own_h;               /* an X window's own size when it was attached (before any configure of ours) */
     uint32_t conf_serial, acked_serial;   /* xdg_surface: the last configure sent, the last one acked */
     int parked, fs_resume;          /* on a hidden desktop (wl_set_parked); fullscreen waits for its return */
     int covered;                    /* wholly under an opaque window of its desktop (wl_set_covered) */
@@ -281,6 +284,8 @@ static char socket_name[64];
 static struct wl_list pointers, keyboards, data_devices, outputs;
 
 static Surf *pointer_focus, *key_focus;
+static int prev_focus_id;               /* the window that had the keyboard before key_focus (0: LordOS had it) */
+static void key_focus_gone(Surf *s);
 static int buttons_held;
 static float last_x, last_y, press_x, press_y;     /* where it was pressed: base for move/resize */
 static uint32_t mods_sent[4];
@@ -292,7 +297,9 @@ static int npopups;
 /* GPU path: what is drawn below (layer 0) and above (layer 1) the UI, in order */
 /* sx, sy: a transformed window's scale. media: a media node's GPU picture (wl_paint_media) instead of a surface: the
  * source's id, its size here (mw × mh, logical) and the part of its texture (msx, msy, msw × msh, picture pixels) */
-typedef struct { int sid; float x, y; Rect clip; float op; float sx, sy; int media; float mw, mh, msx, msy, msw, msh; } Draw;
+/* frost: a frosted node over that picture (wl_paint_frost): its box (fx, fy, fw × fh, logical), corner radius and blur */
+typedef struct { int sid; float x, y; Rect clip; float op; float sx, sy; int media; float mw, mh, msx, msy, msw, msh;
+                 int frost; float fx, fy, fw, fh, frad, fblur; } Draw;
 static Draw draws[2][128];
 static int ndraws[2];
 static int need_frame;              /* an app changed its content: must present */
@@ -343,9 +350,15 @@ static int fs_hides(Surf *s) {
 }
 /* The fullscreen window takes the keys instead of s (a window, or NULL for none): fsfocus.h. The keys follow the
  * window chosen, not the pointer: one chosen on another display keeps them when the pointer comes back (issue #175). */
+/* "No window" (a LordOS window or the desktop) was chosen with the pointer on the fullscreen window's display (1), on
+ * another (0), or not since this fullscreen began (-1: the pointer now). Kept from that moment: a LordOS window chosen on
+ * another display kept the keys only while the pointer stayed off the fullscreen display, so the person's pointer
+ * resting there (or taken back there after an agent's click) gave the next key to the fullscreen window (BUG-30 of the
+ * ws170 QA). */
+static int none_on_fs = -1;
 static int fs_takes_keys(Surf *s) {
     if (!fs_surf || !fs_surf->content) return 0;
-    return fsf_take(s == fs_surf, !s, s && fs_hides(s), ptr_on_fs());
+    return fsf_take(s == fs_surf, !s, s && fs_hides(s), fsf_none_ptr(s ? -1 : none_on_fs, ptr_on_fs()));
 }
 
 /* cursor of the app with the pointer: 0 LordOS arrow, 1 app image, 2 hidden */
@@ -2043,7 +2056,7 @@ static void surface_gone(struct wl_resource *r) {
     s->tm = NULL;
     if (s->xw) { xwm_surface_gone(s->xw); s->xw = NULL; }
     if (pointer_focus == s) { pointer_focus = NULL; buttons_held = 0; }
-    if (key_focus == s) { key_focus = NULL; wl_textinput_gone(); }
+    key_focus_gone(s);
     dnd_surface_gone(s);
     unmap_popup(s);
     if (s->role == R_TOPLEVEL && s->mapped) emit(s, "unmap", "{}");
@@ -2960,6 +2973,9 @@ static Source *selection;           /* source of the app owning the selection, o
 /* Bumped whenever the selection changes: an offer is only good for the selection it was made for,
  * and only while its client has the keyboard (an app can't keep an old offer to read later copies). */
 static unsigned clip_offer_gen = 1;
+/* bumped by every new selection (an app's, an X app's, LordOS's own), not when its source goes: a text read still
+ * coming from an app that copied and quit is kept, one from a selection replaced since is dropped (reader_ready) */
+static unsigned clip_sel_gen = 1;
 /* nofiles: an isolated or sandboxed app's selection offered to lord-web, without its file lists (dndg_file_mime) */
 typedef struct { Source *src; unsigned gen; int nofiles; } OfferRef;
 static unsigned clip_seen;          /* LordOS clipboard generation already offered */
@@ -3075,7 +3091,7 @@ static void files_adopt(ClipFiles *f) {
 typedef struct {
     int fd, image, sensitive, primary, html, html_only, files, files_only, full /* cut short */, from /* URIL_FROM_* */;
     pid_t pid;
-    unsigned offer;
+    unsigned offer, sel;
     struct wl_event_source *ev;
     char *buf;
     size_t len, cap;
@@ -3163,6 +3179,11 @@ static int reader_ready(int fd, uint32_t mask, void *data) {
             if (uril_accept(f.src, t, strlen(t), f.list, f.len)) files_adopt(&f);
         } else if (f.list) { free(clip_files_pend.list); clip_files_pend = f; clip_files_pend_offer = rd->offer; f.list = NULL; }
         free(f.list);
+    } else if (rd->sel != clip_sel_gen) {
+        /* an older selection's text or image that came after a newer copy (an X app's, LordOS's own, another Wayland
+         * app's): dropped, as the HTML, files and primary readers are. It overwrote the newer copy, and the X window
+         * manager then took the X CLIPBOARD back from the X app that had just copied: that app pasted "another text"
+         * (the toolkit audit's gtk3-x11 clipboard check, docs/TOOLKIT-AUDIT.md) */
     } else if (rd->len && rd->image) {
         if (rd->len > 8 && !memcmp(rd->buf, "\x89PNG\r\n\x1a\n", 8)) {
             store_png((unsigned char *)rd->buf, rd->len);
@@ -3204,6 +3225,7 @@ static void read_beside(Source *s, const char *mime, int files, const Reader *ma
     rd->from = main->from;
     snprintf(rd->name, sizeof rd->name, "%s", main->name);
     rd->offer = clip_offer_gen;
+    rd->sel = clip_sel_gen;
     rd->ev = wl_event_loop_add_fd(loop, p[0], WL_EVENT_READABLE, reader_ready, rd);
     if (!rd->ev) { close(p[0]); free(rd); }
 }
@@ -3247,6 +3269,7 @@ static void read_selection(Source *s) {
     rd->from = client_from(cl);
     for (int i = 0; i < s->nmimes; i++) if (!strcmp(s->mimes[i], "x-kde-passwordManagerHint")) rd->sensitive = 1;
     rd->offer = clip_offer_gen;
+    rd->sel = clip_sel_gen;
     rd->ev = wl_event_loop_add_fd(loop, p[0], WL_EVENT_READABLE, reader_ready, rd);
     if (!rd->ev) { close(p[0]); free(rd); return; }
     /* rich text and files: their text/html and file list too, beside the text (not for an image, nor a secret) */
@@ -3298,6 +3321,8 @@ static void ofr_receive(struct wl_client *c, struct wl_resource *r, const char *
     OfferRef *ref = wl_resource_get_user_data(r);
     if (!ref || ref->gen != clip_offer_gen || !key_focus || key_focus->client != c) { close(fd); return; }   /* stale, or not focused */
     Source *src = ref->src;
+    /* LordOS's clipboard holding a secret (Passwords' copy) never goes to an app an AI agent's input is driving (Hands) */
+    if (!src && term_clipboard_sensitive() && hands_active()) { close(fd); return; }
     if (ref->nofiles && dndg_file_mime(mime)) { close(fd); return; }
     if (src && src == selection) { wl_data_source_send_send(src->res, mime, fd); close(fd); return; }
     if (!src && clip_is_image && clip_png && !strcmp(mime, "image/png")) { send_bytes(fd, clip_png, clip_png_len); return; }
@@ -3448,6 +3473,7 @@ int wl_clip_use_image(const char *path) {
     if (!buf || got != (size_t)st.st_size) { free(buf); return -1; }
     if (selection) { wl_data_source_send_cancelled(selection->res); selection = NULL; }
     clip_offer_gen++;
+    clip_sel_gen++;
     store_png(buf, got);
     snprintf(clip_img_origin, sizeof clip_img_origin, "lordos");
     clip_img_sensitive = 0;
@@ -3475,6 +3501,7 @@ static void dev_set_selection(struct wl_client *c, struct wl_resource *r, struct
     if (selection && selection != s) wl_data_source_send_cancelled(selection->res);
     selection = s;
     clip_offer_gen++;
+    clip_sel_gen++;
     if (s) read_selection(s);
     offer_to_focus();                   /* the new selection, to the client with the keyboard (the owner, usually) */
 }
@@ -3884,6 +3911,15 @@ void wl_fullscreen_allow(int on) {
     }
 }
 
+/* "fullscreen" to the theme, with the display it covers: the shell keeps a Linux window's own frame (the size it comes
+ * back to), and Hands' windows_context reported that small frame for a window shown over a whole display (BUG-30b of the
+ * ws170 QA). */
+static void emit_fullscreen(Surf *s) {
+    float fx, fy, fw, fh;
+    fs_rect(&fx, &fy, &fw, &fh);
+    emit(s, "fullscreen", "{\"x\":%d,\"y\":%d,\"w\":%d,\"h\":%d}", (int)fx, (int)fy, (int)fw, (int)fh);
+}
+
 static void enter_fullscreen(Surf *s) {
     if (!s || (!s->top && !s->xw) || s == fs_surf) return;
     if (fs_refused) { send_toplevel_configure(s); return; }
@@ -3894,9 +3930,11 @@ static void enter_fullscreen(Surf *s) {
     }
     if (fs_surf) { fs_surf->fullscreen = 0; send_toplevel_configure(fs_surf); }
     fs_surf = s;
+    none_on_fs = -1;
     s->fullscreen = 1;
-    s->fs_saved_w = s->conf_w;
-    s->fs_saved_h = s->conf_h;
+    /* not configured yet (fullscreen asked for before its first frame): an X window's own size, so it comes back to it */
+    s->fs_saved_w = s->conf_w > 0 ? s->conf_w : s->own_w;
+    s->fs_saved_h = s->conf_h > 0 ? s->conf_h : s->own_h;
     Node *fn = s->node ? node_get(s->node) : NULL;
     fs_slot = fn ? slot_for_box(fn->ax, fn->ay, fn->ax + fn->w, fn->ay + fn->h) : out_main;
     if (fs_slot < 0) fs_slot = out_main;
@@ -3905,7 +3943,7 @@ static void enter_fullscreen(Surf *s) {
     s->conf_w = (int)fw;
     s->conf_h = (int)fh;
     send_toplevel_configure(s);
-    if (s->mapped) emit(s, "fullscreen", "{}");
+    if (s->mapped) emit_fullscreen(s);
     /* the keys: its own, unless they are with a window on another display (fsfocus.h) */
     if (s->mapped && key_focus != s && (!key_focus || fs_hides(key_focus))) wl_set_focus(s->id);
     damage_add((Box){ 0, 0, ui.width, ui.height });
@@ -3961,7 +3999,7 @@ static void top_gone(struct wl_resource *r) {
     s->mapped = 0;
     s->top = NULL;
     orphan_dialogs(s);
-    if (key_focus == s) { key_focus = NULL; wl_textinput_gone(); }
+    key_focus_gone(s);
 }
 
 /* ---- xdg_popup ---- */
@@ -4361,10 +4399,10 @@ static void emit_map(Surf *s, int w, int h) {
     if (s->xw) {                    /* X11: WM_CLASS class, and its instance for the .desktop match */
         char alt[260];
         json_str(alt, sizeof alt, s->app_alt);
-        emit(s, "map", "{\"title\":\"%s\",\"appId\":\"%s\",\"appAlt\":\"%s\",\"x11\":true,\"width\":%d,\"height\":%d,\"csd\":%s,\"dialog\":%s,\"fixed\":%s,\"parent\":%d,\"modal\":%s,\"skipTaskbar\":%s,\"skipPager\":%s,\"layer\":%d}",
+        emit(s, "map", "{\"title\":\"%s\",\"appId\":\"%s\",\"appAlt\":\"%s\",\"x11\":true,\"width\":%d,\"height\":%d,\"csd\":%s,\"dialog\":%s,\"fixed\":%s,\"parent\":%d,\"modal\":%s,\"skipTaskbar\":%s,\"skipPager\":%s,\"layer\":%d,\"fullscreen\":%s}",
              t, a, alt, w, h, s->csd ? "true" : "false", xwm_is_dialog(s->xw) ? "true" : "false", xwm_is_fixed(s->xw) ? "true" : "false",
              s->owner ? s->owner->id : 0, s->modal ? "true" : "false", xwm_skip_taskbar(s->xw) ? "true" : "false",
-             xwm_skip_pager(s->xw) ? "true" : "false", xwm_layer(s->xw));
+             xwm_skip_pager(s->xw) ? "true" : "false", xwm_layer(s->xw), s == fs_surf ? "true" : "false");
     } else {
         int fixed = s->min_w > 0 && s->min_w == s->max_w && s->min_h > 0 && s->min_h == s->max_h;
         /* a Flatpak app's window: the app lord-server knows from the client's root-owned scope (or its security context),
@@ -4372,9 +4410,9 @@ static void emit_map(Surf *s, int w, int h) {
         const char *who = client_identity(s->client);
         char fp[KBI_ID_MAX + 8] = "";
         if (!strncmp(who, "flatpak:", 8)) json_str(fp, sizeof fp, who + 8);
-        emit(s, "map", "{\"title\":\"%s\",\"appId\":\"%s\",\"flatpak\":\"%s\",\"width\":%d,\"height\":%d,\"csd\":%s,\"dialog\":%s,\"fixed\":%s,\"parent\":%d,\"modal\":%s,\"layer\":%d}",
+        emit(s, "map", "{\"title\":\"%s\",\"appId\":\"%s\",\"flatpak\":\"%s\",\"width\":%d,\"height\":%d,\"csd\":%s,\"dialog\":%s,\"fixed\":%s,\"parent\":%d,\"modal\":%s,\"layer\":%d,\"fullscreen\":%s}",
              t, a, fp, w, h, s->csd ? "true" : "false", s->owner || s->dlg ? "true" : "false", fixed ? "true" : "false",
-             s->owner ? s->owner->id : 0, s->modal ? "true" : "false", s->layer);
+             s->owner ? s->owner->id : 0, s->modal ? "true" : "false", s->layer, s == fs_surf ? "true" : "false");
     }
     wlshell_mapped(s->id);              /* its tag, a drag it follows (wlshell.h) */
 }
@@ -4389,9 +4427,25 @@ void wl_remap_all(void) {
         int w, h;
         geometry(s, &w, &h);
         s->node = 0;
-        emit_map(s, w, h);
+        emit_map(s, s == fs_surf && s->fs_saved_w > 16 ? s->fs_saved_w : w, s == fs_surf && s->fs_saved_h > 16 ? s->fs_saved_h : h);
         if (s->maximized) emit(s, "maximize", "{}");
+        if (s == fs_surf) emit_fullscreen(s);
     }
+}
+
+/* The first frame of a window that asked for fullscreen before it (an X window with _NET_WM_STATE_FULLSCREEN set
+ * before its map, an xdg_toplevel.set_fullscreen before its first commit): its size stays the display's, never the one
+ * that frame has (X's own size on the way out, which x_configure would then send back to X: the window stayed small
+ * while presented fullscreen). The theme gets the window at its normal size, the one it comes back to, and then
+ * "fullscreen", as when a mapped window goes fullscreen. */
+static void map_fullscreen(Surf *s, int w, int h) {
+    if (s->fs_saved_w <= 16 || s->fs_saved_h <= 16) { s->fs_saved_w = w; s->fs_saved_h = h; }
+    emit_map(s, s->fs_saved_w, s->fs_saved_h);
+    emit_fullscreen(s);
+    if (w != s->conf_w || h != s->conf_h) send_toplevel_configure(s);
+    if (key_focus != s && (!key_focus || fs_hides(key_focus))) wl_set_focus(s->id);
+    damage_add((Box){ 0, 0, ui.width, ui.height });
+    ui.dirty = 1;
 }
 
 static void surface_commit_role(Surf *s) {
@@ -4411,13 +4465,16 @@ static void surface_commit_role(Surf *s) {
         geometry(s, &w, &h);
         if (s->content && !s->mapped) {
             s->mapped = 1;
-            emit_map(s, w, h);
-            s->conf_w = w;
-            s->conf_h = h;
+            if (s == fs_surf) map_fullscreen(s, w, h);
+            else {
+                emit_map(s, w, h);
+                s->conf_w = w;
+                s->conf_h = h;
+            }
         } else if (!s->content && s->mapped) {
             s->mapped = 0;
             emit(s, "unmap", "{}");
-        } else if (s->mapped && s->acked_serial == s->conf_serial && (w != s->conf_w || h != s->conf_h)) {
+        } else if (s->mapped && s != fs_surf && s->acked_serial == s->conf_serial && (w != s->conf_w || h != s->conf_h)) {
             /* a commit made before the app read our last configure is its old size on the way out, not a
              * resize of its own: taken as one, the window kept the size of a maximize just undone */
             emit(s, "geometry", "{\"width\":%d,\"height\":%d}", w, h);
@@ -4487,6 +4544,10 @@ static int node_protected(int node) {
 static Surf *toplevel_of(Surf *s) {
     while (s && s->parent) s = s->parent;
     return s;
+}
+static int node_hands_black(int node) {
+    for (Node *n = node ? node_get(node) : NULL; n; n = n->parent) if (n->hands_black) return 1;
+    return 0;
 }
 
 static int holes_off;                   /* wl_paint_holes(0): only note it (the ui/paint.c layer already has the hole) */
@@ -4694,6 +4755,12 @@ void wl_paint_popups(Canvas *c) {
         float x, y;
         if (!origin(popups[i], &x, &y)) continue;
         Surf *top = toplevel_of(popups[i]);
+        /* an AI agent's screenshot (paint_hands_capture, docs/HANDS.md): the menu of a window it must not see (another app's
+         * under an allowlist, a person-only app's) is black like the window */
+        if (paint_capture_mode && paint_hands_capture && top && node_hands_black(top->node)) {
+            canvas_rrect(c, floorf(PVX(x)), floorf(PVY(y)), ceilf(popups[i]->lw * paint_view.k) + 1, ceilf(popups[i]->lh * paint_view.k) + 1, 0, 0xff000000u);
+            continue;
+        }
         if (paint_capture_mode && top && node_protected(top->node)) {   /* menu of a protected window */
             static const float r0[4] = { 0, 0, 0, 0 };
             paint_protected_fill(c, PVX(x), PVY(y), popups[i]->lw * paint_view.k, popups[i]->lh * paint_view.k, r0);
@@ -4823,6 +4890,36 @@ int wl_paint_media(Canvas *c, int src, int node, float bx, float by, float bw, f
     return 1;
 }
 
+/* A frosted node (a backdrop blur) whose only backdrop is a GPU picture already noted for layer 0 on this display (ui/paint.c
+ * decides that): noted after it, so the GPU blurs that picture into the node's box with each frame (gpu_draw_frosted)
+ * and the CPU neither copies the picture's rows nor blurs them. Logical box, radius and blur. 0: not noted (no such
+ * picture here, inside a transform, the list full): the caller blurs on the CPU. */
+int wl_paint_frost(int src, int node, float x, float y, float w, float h, float rad, float blur) {
+    if (!gpu_active() || paint_capture_mode || tfv.on || src <= 0 || w <= 0 || h <= 0 || ndraws[0] >= 128) return 0;
+    const Draw *v = NULL;
+    for (int i = ndraws[0] - 1; i >= 0 && !v; i--)
+        if (draws[0][i].media == src && !draws[0][i].frost && draws[0][i].sx == 1 && draws[0][i].sy == 1) v = &draws[0][i];
+    if (!v || x < v->x - 0.5f || y < v->y - 0.5f || x + w > v->x + v->mw + 0.5f || y + h > v->y + v->mh + 0.5f) return 0;
+    Draw d = *v;
+    d.frost = 1;
+    d.fx = x; d.fy = y; d.fw = w; d.fh = h; d.frad = rad; d.fblur = blur;
+    Rect box = { (int)floorf(x), (int)floorf(y), (int)ceilf(x + w), (int)ceilf(y + h) };
+    d.clip = rect_and(rect_and(v->clip, node_clip(node)), box);
+    draws[0][ndraws[0]++] = d;
+    return 1;
+}
+
+static void draw_frost(const Draw *d) {
+    int flip = 0;
+    GpuTex *t = media_gpu_tex(d->media, &flip);
+    if (!t) return;
+    float sy = d->msy, sh = d->msh;
+    if (flip) { sy = d->msy + d->msh; sh = -d->msh; }
+    float k = paint_view.k;
+    gpu_draw_frosted(t, PVX(d->x), PVY(d->y), d->mw * k, d->mh * k, d->msx, sy, d->msw, sh,
+                     PVX(d->fx), PVY(d->fy), d->fw * k, d->fh * k, d->frad * k, (int)(d->fblur * k + 0.5f), phys_rect(d->clip));
+}
+
 int wl_gpu_layers_empty(void) { float x, y; return !ndraws[0] && !ndraws[1] && !fs_surf && !npopups && !dnd_icon_at(&x, &y); }
 
 void wl_gpu_draw_layer(int layer) {
@@ -4830,7 +4927,7 @@ void wl_gpu_draw_layer(int layer) {
     if (layer == 0) {
         for (int i = 0; i < ndraws[0]; i++) {
             Draw *d = &draws[0][i];
-            if (d->media) { draw_media(d); continue; }
+            if (d->media) { if (d->frost) draw_frost(d); else draw_media(d); continue; }
             Surf *s = find(d->sid);
             if (!s || !s->content) continue;
             if (d->sx == 1 && d->sy == 1) { draw_surface(s, d->x, d->y, (float)s->lw, (float)s->lh, d->clip, d->op * surf_alpha(s)); continue; }
@@ -4909,6 +5006,11 @@ void wl_paint_fullscreen(Canvas *out) {
 }
 
 int wl_fullscreen_active(void) { return fs_surf && fs_surf->content; }
+int wl_fullscreen_box(float *x, float *y, float *w, float *h) {
+    if (!fs_surf || !fs_surf->content) return 0;
+    fs_rect(x, y, w, h);
+    return 1;
+}
 static int timing_due(void);
 static int waits_frame(Surf *s);
 static void timing_refreshed(Surf *s);
@@ -5203,6 +5305,18 @@ static void pointer_enter(Surf *s, float lx, float ly) {
 
 static void dismiss_popups(void) {
     for (int i = npopups - 1; i >= 0; i--) if (popups[i]->popup) xdg_popup_send_popup_done(popups[i]->popup);
+}
+/* The window a popup belongs to: the first of its parents that isn't a popup (a dialog's menu is the dialog's) */
+static Surf *popup_owner(Surf *p) {
+    while (p && p->role == R_POPUP) p = p->parent;
+    return p;
+}
+/* The keyboard moved to keep: every menu goes but keep's own. A popup the window opened just before the keyboard
+ * reached it (the focus comes back a few frames after a dialog or another app's window closes) stays open: Qt's
+ * combo box list was closed at once on a real desktop (docs/TOOLKIT-AUDIT.md). */
+static void dismiss_popups_but(Surf *keep) {
+    for (int i = npopups - 1; i >= 0; i--)
+        if (popups[i]->popup && (!keep || popup_owner(popups[i]) != keep)) xdg_popup_send_popup_done(popups[i]->popup);
 }
 
 /* The surface under the pointer, a button held or not: menus first, then fullscreen, then the window the UI's
@@ -6102,7 +6216,7 @@ static int system_meta_key(int code, const KeyInfo *k) {
     }
 }
 
-/* Keys the shell keeps (keygrab.c) and the ❖ → Ctrl of Lord Flow. grabbed[code]: its press went to
+/* Keys the shell keeps (keygrab.c) and the ❖ → Ctrl of Flow. grabbed[code]: its press went to
  * the shell, so its release does too. remapped[code]: its press went to the app as Ctrl+key.
  * grab_hold: the modifier of a switcher in progress; until it is released every key is the shell's,
  * while modifiers still reach the app too, so it never keeps one stuck. */
@@ -7212,20 +7326,45 @@ static void text_field_report(int on, int x, int y, int w, int h) {
     emit(key_focus, "textinput", "{\"on\":%s,\"x\":%d,\"y\":%d,\"w\":%d,\"h\":%d}", on ? "true" : "false", x, y, w, h);
 }
 
+/* The window with the keyboard went away (closed, or its role or Xwayland window gone): the keyboard goes back at once
+ * to the window that had it just before, as the theme will decide a frame or more later (sdk/wayland.js sync, after
+ * the "unmap" event). In that gap an app whose dialog or second window had just closed opened a menu or a tooltip,
+ * and the keyboard arriving then made Qt close it: Qt 6's tooltip and Qt 5's combo box list on the toolkit audit
+ * (docs/TOOLKIT-AUDIT.md). Only when the keyboard came from that window: from LordOS (a LordOS window, the shell) it
+ * stays with nobody until the theme says, so keys typed into a LordOS window never reach another app meanwhile.
+ * The theme still decides: its focus call that follows is the same window (nothing changes) or another one. */
+static void focus_back(void *data) {
+    (void)data;
+    int id = prev_focus_id;
+    prev_focus_id = 0;
+    Surf *p = id ? find(id) : NULL;
+    if (key_focus || !p || !p->mapped || p->parked || p->xmin || (!p->top && !p->xw)) return;
+    wl_set_focus(id);
+}
+static void key_focus_gone(Surf *s) {
+    if (s->id == prev_focus_id) prev_focus_id = 0;
+    if (key_focus != s) return;
+    key_focus = NULL;
+    wl_textinput_gone();
+    if (prev_focus_id && loop) wl_event_loop_add_idle(loop, focus_back, NULL);   /* after this surface is gone */
+}
+
 void wl_set_focus(int id) {
     if (!dpy) return;
+    if (!id) none_on_fs = fs_surf && fs_surf->content ? ptr_on_fs() : -1;   /* where "no window" was chosen (fsfocus.h) */
     Surf *s = id ? find(id) : NULL;
     if (s && s->role != R_TOPLEVEL) s = NULL;
     if (s && s->parked) s = NULL;                      /* a window on a hidden desktop never has the keyboard */
     if (s && modal_over(s)) s = modal_over(s);         /* under a modal dialog: the keys are the dialog's */
     if (fs_takes_keys(s)) s = fs_surf;     /* a window under a fullscreen one never has the keys (fsfocus.h) */
     if (s == key_focus) return;
+    prev_focus_id = key_focus ? key_focus->id : 0;
     struct wl_resource *kb;
     if (key_focus) {
         FOR_CLIENT(&keyboards, key_focus->client, kb) wl_keyboard_send_leave(kb, wl_display_next_serial(dpy), key_focus->res);
         key_focus->activated = 0;
         send_toplevel_configure(key_focus);
-        dismiss_popups();
+        dismiss_popups_but(s);
     }
     wl_textinput_focus(NULL, NULL);                    /* the field's "off" goes to the window that had it */
     key_focus = s;
@@ -7310,7 +7449,7 @@ const char *wl_kill(int id) {
     return NULL;
 }
 
-/* Locked by the theme (Lord Workspaces' padlock): the app is told it can't maximize or minimize (xdg-shell 5's
+/* Locked by the theme (Workspaces' padlock): the app is told it can't maximize or minimize (xdg-shell 5's
  * wm_capabilities, which Chromium and GTK 4 read to hide those buttons; a new list takes effect with the next
  * configure), and its requests to do so are answered with the state as it is. Its own close button stays: closing is
  * the app's. */
@@ -7468,6 +7607,7 @@ int wl_start(void) {
         if (access(dir, W_OK)) { fprintf(stderr, "wayland: no XDG_RUNTIME_DIR\n"); return -1; }
         setenv("XDG_RUNTIME_DIR", dir, 1);
     }
+    wl_log_set_handler_server(nofile_wl_log);   /* as before, plus the open files when an app's file was lost (#251) */
     dpy = wl_display_create();
     if (!dpy) return -1;
     const char *name = wl_display_add_socket_auto(dpy);
@@ -7570,6 +7710,7 @@ void wl_flush(void) {
         clip_is_image = 0;
         if (selection) { wl_data_source_send_cancelled(selection->res); selection = NULL; }
         clip_offer_gen++;
+        clip_sel_gen++;
         offer_to_focus();
     }
     xwm_tick();                         /* X11: clipboard changes, pending requests */
@@ -7791,6 +7932,8 @@ static int xattach(Surf *s, XWin *w, const XWinInfo *in) {
     snprintf(s->app_id, sizeof s->app_id, "%s", in->app_id ? in->app_id : "");
     snprintf(s->app_alt, sizeof s->app_alt, "%s", in->app_alt ? in->app_alt : "");
     s->csd = in->csd;
+    s->own_w = in->width;
+    s->own_h = in->height;
     if (in->popup) { s->role = R_POPUP; s->xpop = 1; s->xx = in->x; s->xy = in->y; }
     else s->role = R_TOPLEVEL;
     if (s->content) surface_commit_role(s);                 /* it already had a buffer */
@@ -7802,7 +7945,7 @@ void wlx_detach(int sid) {
     if (!s) return;
     if (s->role == R_TOPLEVEL && s->mapped) emit(s, "unmap", "{}");
     if (s->role == R_POPUP) unmap_popup(s);
-    if (key_focus == s) { key_focus = NULL; wl_textinput_gone(); }
+    key_focus_gone(s);
     if (pointer_focus == s) { pointer_focus = NULL; buttons_held = 0; }
     if (fs_surf == s) { fs_surf = NULL; damage_add((Box){ 0, 0, ui.width, ui.height }); }
     if (s->node) damage_node(s);
@@ -8010,6 +8153,7 @@ void wlx_clip_png(const unsigned char *png, size_t n, const char *origin) {
     if (n < 8 || memcmp(png, "\x89PNG\r\n\x1a\n", 8)) return;
     if (selection) { wl_data_source_send_cancelled(selection->res); selection = NULL; }
     clip_offer_gen++;
+    clip_sel_gen++;
     store_png(png, n);
     snprintf(clip_img_origin, sizeof clip_img_origin, "%s", origin && origin[0] ? origin : "x11");
     clip_img_sensitive = 0;

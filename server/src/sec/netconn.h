@@ -33,6 +33,17 @@ const char *netconn_name(NcComponent c);
  * Thread-safe. */
 int netconn_socket(NcComponent comp, int fam, int type, const struct sockaddr *to, socklen_t tolen);
 
+/* The memory.max of each connector's scope, in MB. The connector itself only makes sockets: 64 MB. The
+ * flathub scope is shared with the Flatpak management commands (fpakrun.c runs /usr/bin/flatpak in
+ * lordos-net-flathub.scope, docs/FLATPAK.md E3), and an OSTree pull of a large runtime (org.freedesktop.Sdk,
+ * GNOME, KDE) applies static deltas that need far more than 64 MB: it was OOM-killed there (QA, 0.8.9.6.2).
+ * Both sides write the same bound, whichever enters the scope last, so neither undoes the other. Still a bound:
+ * a runaway flatpak is killed in its scope, not the session. */
+#define NC_MEM_MAX_MB 64
+#define NC_FLATHUB_MEM_MAX_MB 4096
+/* The memory.max (MB) of lordos-net-<name>.scope; NC_MEM_MAX_MB for an unknown name. */
+long netconn_scope_mem_max_mb(const char *name);
+
 /* `lord-server --net-connector <component>`: the connector process (main.c). Never returns
  * normally. */
 int netconn_main(int argc, char **argv);

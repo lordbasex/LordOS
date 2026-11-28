@@ -234,6 +234,7 @@
   "fs.moveRemoveFailed": "已复制，但无法移除原始项目：{errno}",
   "fs.noTrash": "该位置没有废纸篓",
   "fs.notFile": "它不是文件",
+  "fs.notFolder": "这不是文件夹",
   "fs.notInTrash": "它不在废纸篓中",
   "fs.notRegular": "它不是普通文件（是链接吗？）",
   "fs.openFailed": "无法打开文件：{errno}",
@@ -243,11 +244,13 @@
   "fs.systemFolder": "“文件”不显示系统的内部文件夹（/proc、/sys、/dev 和 /run）",
   "fs.tooLarge": "文件太大（最大 {max}）",
   "fs.tooManyCopies": "进行中的复制太多；请在其中一个完成后再试",
+  "fs.tooManyWatches": "正在监视的文件夹过多(最多 {max} 个)",
   "fs.trashBadOrigin": "原始位置无效",
   "fs.trashEntryFailed": "无法创建废纸篓条目",
   "fs.trashOriginGone": "原始文件夹已不存在",
   "fs.trashOtherDisk": "它与其废纸篓位于不同的磁盘上",
   "fs.trashRestoreExists": "原始位置已有同名文件",
+  "fs.watchRemote": "无法跟踪云端和网络文件夹中的更改;将改为重新列出该文件夹",
   "fw.bpfConfig": "无法配置 BPF：{errno}",
   "fw.bpfMaps": "无法创建 BPF 映射：{errno}",
   "fw.bpfMissing": "缺少 {program} 程序",
@@ -962,5 +965,9 @@
   "sentinela.notBlocked": "该程序不在拦截列表中。",
   "sentinela.noAppNetwork": "这个进程没有可以阻止联网的独立应用。",
   "sys.failed": "出了点问题。",
-  "sys.unsupported": "此版本的 LordOS 无法做到这一点。"
+  "sys.unsupported": "此版本的 LordOS 无法做到这一点。",
+  "theme.notAllowed": "社区主题无法使用 {call}",
+  "theme.noHost": "缺少桌面风格的 LordOS 部分",
+  "hands.refused": "只有你本人可以执行此操作：AI 代理的输入永远不行",
+  "install.diskTooManyParts": "此磁盘的分区过多，安装程序无法列出"
 }

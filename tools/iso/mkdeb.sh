@@ -24,10 +24,20 @@
 #                                         /usr/lib/lordos/bin/machines, which runs the lord-vm next to it; its bash completion
 #                                         in /usr/share/bash-completion/completions/machines
 #   /usr/bin/lordvm                       the same program (docs/VIRTUALIZATION.md 6.15: lordvm exec, cp, logs, mcp, apply)
+#   /usr/bin/lumo                         ✨ AI Writing from the terminal (docs/AI.md "Writing from the terminal"; awaiting the
+#                                         maintainer's approval): a link to /usr/lib/lordos/bin/lumo, which asks the
+#                                         session's lord-server over the session bus (org.lordos.Writing1)
+#   /usr/bin/lordos-mcp                   Hands (docs/HANDS.md; approved by the maintainer on 2026-11-26): the MCP server that lets
+#                                         an AI agent (Claude Code, Lumo) use the desktop through org.lordos.Hands1; a link to
+#                                         /usr/lib/lordos/bin/lordos-mcp, next to lord-server for its --headless QA desktop
 #   /usr/bin/lordos-issue                 what a bug report needs, ready to paste (CONTRIBUTING.md)
 #   /usr/lib/lordos/lordos-dm-check       another display manager enabled next to lordos.service (#187): postinst warns
 #   /usr/bin/lordos-testbench             the visual test bench (a Wayland client; docs/PAPER-VALIDATION.md), and
 #   /usr/share/applications/lordos-testbench.desktop   its launcher entry
+#   /usr/share/applications/lordos-toolkit-audit.desktop   lordos-testbench --toolkits in a Terminal window
+#   /usr/lib/lordos/toolkit-audit/        the harnesses of `lordos-testbench --toolkits` (tools/toolkit-audit/*.py, not
+#                                         the *_test.py: small Python 3 windows per toolkit; each runs only if that
+#                                         toolkit's bindings are already installed, so no GTK, Qt or binding is a dependency)
 #   /usr/lib/lordos/themes/<theme>/       theme.json, theme.bundle.js and their resources (greeter: the
 #                                         login screen)
 #   /usr/lib/lordos/firmware/lordos-gvt-gop.rom  the GVT-g GOP option ROM Machines gives a vGPU (amd64; firmware/gvt-gop)
@@ -108,6 +118,8 @@ fi
 [ -x server/build/lordos-lid-wake ] || { echo "missing server/build/lordos-lid-wake (make -C server)" >&2; exit 1; }
 [ -x server/build/lordos-sysreport ] || { echo "missing server/build/lordos-sysreport (make -C server)" >&2; exit 1; }
 [ -x server/build/machines ] || { echo "missing server/build/machines (make -C server)" >&2; exit 1; }
+[ -x server/build/lumo ] || { echo "missing server/build/lumo (make -C server)" >&2; exit 1; }
+[ -x server/build/lordos-mcp ] || { echo "missing server/build/lordos-mcp (make -C server)" >&2; exit 1; }
 [ -x server/build/lord-sessiond ] || { echo "missing server/build/lord-sessiond (make -C server, with libssl-dev, libsrtp2-dev and libusrsctp-dev)" >&2; exit 1; }
 # The helpers make builds only when their -dev packages are installed (docs/VM-SETUP.md). A package without one of
 # them loses a feature with no error anywhere (0.8.8.6 shipped without lord-media: Screenshots saved and copied
@@ -117,14 +129,27 @@ for h in lord-media:"libavcodec-dev libavformat-dev libavutil-dev libswscale-dev
          lord-stream:"libavcodec-dev libavformat-dev" lord-studio:"libavcodec-dev libavformat-dev" \
          lord-doc:"libpoppler-glib-dev libarchive-dev" lord-ocr:"libtesseract-dev" lord-tts:"tools/tts/fetch-audiocpp.sh" \
          lord-screencast:"libpipewire-0.3-dev" \
-         lord-vmdisplay:"libsystemd-dev" lord-vault:"" lord-maild:"" lord-bench:"" lord-clean:"" lord-lan:"" lord-fetch:"" lord-hidpp:"" lord-nvgpu:"" lord-appstream:"" \
-         lord-tls:"" lord-sql:"" lord-sftp:"" lord-vm:"" lord-vmunpack:"" lord-pgpv:"" lord-llm:"" lordos-guest:""; do
+         lord-vmdisplay:"libsystemd-dev" lord-vault:"" lord-maild:"" lord-bench:"" lord-clean:"" lord-lan:"" lord-fetch:"" lord-hidpp:"" lord-nvgpu:"" lord-spell:"" lord-appstream:"" \
+         lord-tls:"" lord-sql:"" lord-sftp:"" lord-vm:"" lord-vmunpack:"" lord-pgpv:"" lord-llm:"" lordos-guest:"" lord-themec:""; do
     b=${h%%:*}; need=${h#*:}
     [ -x "server/build/$b" ] && continue
     case " ${ALLOW_MISSING:-} " in *" $b "*) echo "mkdeb: leaving out $b (ALLOW_MISSING)" >&2; continue ;; esac
     missing="$missing\n  server/build/$b${need:+  (needs $need)}"
 done
 [ -z "$missing" ] || { printf "missing helpers, the package would ship without them:$missing\nmake -C server after installing what they need, or ALLOW_MISSING=\"name …\" to leave one out on purpose\n" >&2; exit 1; }
+# Every program server/Makefile and server/mk/*.mk build must be installed below or named here as not shipped (tests,
+# development tools, lord-web in its own package): 0.8.9.6.2's ws171 left lord-themec out, and Settings → Appearance →
+# Install from a file failed on every installed system. A new helper fails the package until it has a line.
+NOT_SHIPPED=" bpf2c clip-offers gpu-contention lan-list lan-scan lbcorpus lock-seat lord-llm-abi5 lord-llm-norule lord-media-encfail
+ lord-media-hwfall lordos-fetch lordos-guest-asan lordvm-dev lord-web mkguestiso seat-cycle softfido vm-link-tool
+ vm-net-cli-dummy wl-globals moddrag-x11 xpopup-x11 "
+unlisted=""
+for b in $(grep -ohE '^build/[A-Za-z0-9_.-]+:' server/Makefile server/mk/*.mk | sed 's|^build/||; s|:$||' |
+           grep -vE 'test|check|bench$|cli$|fuzz|harness|dump|demo|probe|fake|scene|walk|e2e|-client$|\.o$' | sort -u); do
+    case " $(echo $NOT_SHIPPED) " in *" $b "*) continue ;; esac
+    grep -q "server/build/$b\b\|for b in .*\b$b\b" "$ROOT/tools/iso/mkdeb.sh" || unlisted="$unlisted $b"
+done
+[ -z "$unlisted" ] || { echo "mkdeb: built by server/ but neither packaged nor listed as not shipped:$unlisted" >&2; exit 1; }
 [ -f themes/greeter/theme.bundle.js ] || { echo "missing the login screen (npm run build)" >&2; exit 1; }
 for t in themes/*/theme.bundle.js; do [ -f "$t" ] || { echo "built themes missing (npm run build)" >&2; exit 1; }; done
 
@@ -179,12 +204,23 @@ ln -s ../lib/lordos/bin/machines "$PKG/usr/bin/lordvm"
 install -d "$PKG/usr/share/bash-completion/completions"
 install -m 644 packaging/bash-completion/machines "$PKG/usr/share/bash-completion/completions/machines"
 ln -s machines "$PKG/usr/share/bash-completion/completions/lordvm"
+# ✨ AI Writing from the terminal: in the LordOS folder because it reads its texts from ../assets (lumo.json)
+install -m 755 server/build/lumo "$L/bin/lumo"
+"$STRIP" --strip-unneeded "$L/bin/lumo" 2>/dev/null || true
+ln -s ../lib/lordos/bin/lumo "$PKG/usr/bin/lumo"
+# Hands: next to lord-server, which its --headless QA desktop starts (with ../themes and ../assets)
+install -m 755 server/build/lordos-mcp "$L/bin/lordos-mcp"
+"$STRIP" --strip-unneeded "$L/bin/lordos-mcp" 2>/dev/null || true
+ln -s ../lib/lordos/bin/lordos-mcp "$PKG/usr/bin/lordos-mcp"
 # the visual test bench: a plain Wayland client, launched like any Linux app
 [ -x server/build/lordos-testbench ] && {
     install -m 755 server/build/lordos-testbench "$PKG/usr/bin/lordos-testbench"
     "$STRIP" --strip-unneeded "$PKG/usr/bin/lordos-testbench" 2>/dev/null || true
     install -d "$PKG/usr/share/applications"
     install -m 644 packaging/desktop/lordos-testbench.desktop "$PKG/usr/share/applications/lordos-testbench.desktop"
+    # lordos-testbench --toolkits in a Terminal window (docs/TOOLKIT-AUDIT.md): System Information's hardware report
+    # opens it when "Include framework compatibility" is ticked and the saved result is older than a day
+    install -m 644 packaging/desktop/lordos-toolkit-audit.desktop "$PKG/usr/share/applications/lordos-toolkit-audit.desktop"
 }
 # isolated PDF and archive helper (optional: make skips it without libpoppler-glib-dev/libarchive-dev);
 # lord-server only launches the lord-doc in its own folder
@@ -258,6 +294,10 @@ fi
 # lord-appstream (Flatpak phase 1, E7): reads Flathub's catalog in its sandbox; only the C library (docs/FLATPAK.md)
 [ -x server/build/lord-appstream ] && install -m 755 server/build/lord-appstream "$L/bin/lord-appstream"
 [ -x "$L/bin/lord-appstream" ] && { "$STRIP" --strip-unneeded "$L/bin/lord-appstream" 2>/dev/null || true; }
+# lord-themec (0.8.9.6.2): a community theme's .zip checked and built in the helpers' sandbox; lord-server starts only the
+# one next to it (ui/js_theme.c helper_path; AGENTS.md "lord-themec")
+install -m 755 server/build/lord-themec "$L/bin/lord-themec"
+"$STRIP" --strip-unneeded "$L/bin/lord-themec" 2>/dev/null || true
 # lord-rdesk (0.8.7): one RDP or VNC connection, sandboxed (docs/FILES.md, "Remote desktop")
 install -m 755 server/build/lord-rdesk "$L/bin/lord-rdesk"
 "$STRIP" --strip-unneeded "$L/bin/lord-rdesk" 2>/dev/null || true
@@ -339,6 +379,10 @@ fi
 # lord-server starts it next to itself only while the GPU view is on screen (docs/MONITOR.md, "NVIDIA")
 [ -x server/build/lord-nvgpu ] && install -m 755 server/build/lord-nvgpu "$L/bin/lord-nvgpu"
 [ -x "$L/bin/lord-nvgpu" ] && { "$STRIP" --strip-unneeded "$L/bin/lord-nvgpu" 2>/dev/null || true; }
+# lord-spell (approved 2026-11-26): the spell checker, the only program that loads Hunspell (dlopen'd from the system's
+# library folders), sandboxed; lord-server starts it next to itself with the dictionaries as descriptors (docs/SPELLING.md)
+[ -x server/build/lord-spell ] && install -m 755 server/build/lord-spell "$L/bin/lord-spell"
+[ -x "$L/bin/lord-spell" ] && { "$STRIP" --strip-unneeded "$L/bin/lord-spell" 2>/dev/null || true; }
 # lord-vmunpack (0.8.9, approved 2026-11-23): unpacks a machine group's verified archive (Whonix's KVM disks) in its
 # sandbox, from descriptors lord-vm hands it (docs/VIRTUALIZATION.md 19.6); next to lord-vm, which starts it
 [ -x server/build/lord-vmunpack ] && install -m 755 server/build/lord-vmunpack "$L/bin/lord-vmunpack"
@@ -371,7 +415,7 @@ for d in themes/*/; do
     install -m 644 "$d/theme.json" "$d/theme.bundle.js" "$L/themes/$n/"
     [ -d "$d/assets" ] && cp -r "$d/assets" "$L/themes/$n/"
 done
-cp -r assets/fonts assets/locales assets/shell assets/icons assets/mascot assets/monitor assets/help assets/fw assets/cleaner assets/machines assets/webapps assets/geo assets/desktops assets/cloud assets/flatpak assets/studio "$L/assets/"
+cp -r assets/fonts assets/locales assets/shell assets/icons assets/mascot assets/monitor assets/help assets/fw assets/cleaner assets/machines assets/webapps assets/geo assets/desktops assets/cloud assets/flatpak assets/studio assets/ai "$L/assets/"
 # the makers' keys Machines' download catalog pins (assets/machines/systems.json "keys"; docs/VIRTUALIZATION.md 3.9):
 # the admin helper checks each checksum list's signature with them before it trusts a hash
 install -d "$L/assets/machines/keys"
@@ -388,6 +432,10 @@ ln -s /usr/share/backgrounds/lordos "$L/assets/wallpapers"
 # each isolated app's process (lord-server --app) loads its runtime from here
 [ -f assets/app-host.bundle.js ] || { echo "missing assets/app-host.bundle.js (npm run build)" >&2; exit 1; }
 install -m 644 assets/app-host.bundle.js "$L/assets/app-host.bundle.js"
+# (0.8.9.6.2) the host of a community theme (runtime/theme-host.js, in the code manifest): LordOS's code that runs a
+# community theme's restricted realm; without it the code check refuses the package
+[ -f assets/theme-host.bundle.js ] || { echo "missing assets/theme-host.bundle.js (npm run build)" >&2; exit 1; }
+install -m 644 assets/theme-host.bundle.js "$L/assets/theme-host.bundle.js"
 # system apps that run as their own sandboxed process (manifest "process": "isolated"; e.g. Passwords)
 [ -d assets/sysapps ] && cp -r assets/sysapps "$L/assets/"
 # verified system code (docs/SIGNING.md): the manifest of every bundle above and, for a release, its
@@ -410,6 +458,14 @@ if [ "${REQUIRE_SIGNED_CODE:-0}" = 1 ] && [ -d .git ]; then node tools/app-versi
     tail -20 "$PKG/code-check.log" >&2; echo "the staged system code does not match code-manifest.json" >&2; exit 1; }
 tail -1 "$PKG/code-check.log"; rm -f "$PKG/code-check.log"
 install -m 755 tools/iso/rootfs/usr/lib/lordos/lordos-live-prep "$L/lordos-live-prep"
+# lordos-testbench --toolkits: one small Python 3 harness per GUI toolkit (docs/TOOLKIT-AUDIT.md). x11.py needs only
+# the standard library; the GTK and Qt ones use only bindings that are already installed (python3-gi, PyQt5, PyQt6)
+# and report "not installed" otherwise: no Depends, nothing pulled in. New files, no migration.
+install -d "$L/toolkit-audit"
+for f in tools/toolkit-audit/*.py; do
+    case "$f" in *_test.py) continue ;; esac
+    install -m 644 "$f" "$L/toolkit-audit/${f##*/}"
+done
 # updates in place (docs/UPDATES.md): the repository, its key, the migrations and the restart notice
 install -D -m 644 packaging/apt/lordos.sources "$L/apt/lordos.sources"
 install -D -m 644 packaging/keys/lordos-archive-keyring.gpg "$PKG/usr/share/keyrings/lordos-archive-keyring.gpg"
@@ -601,6 +657,8 @@ if [ -x "$L/bin/lord-doc" ]; then DOCDEPS=", libpoppler-glib8t64, libarchive13t6
 # (the "fast" data, ~2 MB each) are Recommends
 OCRDEPS=""; OCRRECS=""
 if [ -x "$L/bin/lord-ocr" ]; then OCRDEPS=", libtesseract5, tesseract-ocr-eng"; OCRRECS=", tesseract-ocr-spa, tesseract-ocr-por, tesseract-ocr-fra, tesseract-ocr-ita"; fi
+# the spell checker (docs/SPELLING.md): Hunspell's library for lord-spell and the images' three dictionaries
+[ -x "$L/bin/lord-spell" ] && OCRRECS="$OCRRECS, libhunspell-1.7-0, hunspell-en-us, hunspell-es, hunspell-pt-br"
 # lord-tts: Vulkan's loader (the GPU is optional, the CPU always works), OpenMP and the C++ runtime
 TTSDEPS=""
 if [ -x "$L/bin/lord-tts" ]; then TTSDEPS=", libvulkan1, libgomp1, libstdc++6"; fi
@@ -628,6 +686,10 @@ RCLONEDEPS=", lordos-rclone (>= 1.75.2)"
 # Recommends (non-free-firmware, like the microcode above): the Store's update
 # brings the Recommends a new version adds, and one the sources don't have doesn't stop it (server/src/pkg/resolve.c)
 FIRMWARERECS=", firmware-mediatek"
+# The toolkit audit's bindings (lordos-testbench --toolkits, docs/TOOLKIT-AUDIT.md) and Qt's platform theme
+# (QT_QPA_PLATFORMTHEME=gnome, server/src/wl/toolkitenv.h), the same as the images' PKGS_TOOLKITS: an installed
+# system gets them with the Store's update, which installs the Recommends a new version adds
+TOOLKITRECS=", python3-gi, gir1.2-gtk-3.0, gir1.2-gtk-4.0, python3-pyqt5, python3-pyqt6, qtwayland5, qt6-wayland, qgnomeplatform-qt5, qgnomeplatform-qt6"
 # Intel graphics firmware (i915/xe DMC, GuC, HuC), split out of firmware-misc-nonfree the same way: amd64 only
 [ "${DEB_ARCH:-$(dpkg --print-architecture)}" = amd64 ] && FIRMWARERECS="$FIRMWARERECS, firmware-intel-graphics"
 SIZE=$(du -sk "$PKG/usr" | awk '{s += $1} END {print s}')
@@ -639,7 +701,7 @@ Maintainer: LordOS <lord.basex@gmail.com>
 Installed-Size: $SIZE
 Depends: libc6 (>= 2.38), libwayland-server0 (>= 1.22), libwayland-client0 (>= 1.22), libxkbcommon0 (>= 1.5), libcrypt1, libssl3t64 | libssl3, ca-certificates, passwd, procps, xkb-data, libfreerdp3-3, libfreerdp-client3-3, libwinpr3-3, fuse3, openssh-client, openssl, polkitd, pkexec$HWDATADEPS$RCLONEDEPS$GPUDEPS$DOCDEPS$OCRDEPS$TTSDEPS$MEDIADEPS$CASTDEPS$RTCDEPS
 Breaks: lordos-web (<< $VERSION)
-Recommends: qemu-guest-agent, pipewire-pulse, wireplumber, logrotate, wpasupplicant, openvpn, fonts-noto-core, fonts-noto-color-emoji, fonts-dejavu-core, locales, tzdata, sudo, cups, cups-client, avahi-daemon, libnss-mdns, mesa-va-drivers, bluez, libspa-0.2-bluetooth, power-profiles-daemon, systemd-timesyncd, shared-mime-info, gsettings-desktop-schemas, xwayland, pci.ids, usb.ids, curl, wget, rsync, screen, htop, vim, mc, tcpdump, net-tools, fdisk, rfkill, jq, whiptail, zstd$OCRRECS$MICROCODERECS$FIRMWARERECS
+Recommends: qemu-guest-agent, pipewire-pulse, wireplumber, logrotate, wpasupplicant, openvpn, fonts-noto-core, fonts-noto-color-emoji, fonts-dejavu-core, locales, tzdata, sudo, cups, cups-client, avahi-daemon, libnss-mdns, mesa-va-drivers, bluez, libspa-0.2-bluetooth, power-profiles-daemon, systemd-timesyncd, shared-mime-info, gsettings-desktop-schemas, xwayland, pci.ids, usb.ids, curl, wget, rsync, screen, htop, vim, mc, tcpdump, bind9-dnsutils, net-tools, fdisk, rfkill, jq, whiptail, zstd$OCRRECS$MICROCODERECS$FIRMWARERECS$TOOLKITRECS
 Section: x11
 Priority: optional
 Protected: yes
@@ -709,7 +771,9 @@ fi
 # (the Debian convention /run/reboot-required; never on a new install or in an image build)
 if [ "$1" = configure ] && [ -n "${2:-}" ] && [ -d /run/systemd/system ] &&
    [ "$2" != "$(dpkg-query -W -f '${Version}' lordos 2>/dev/null || true)" ]; then
-    touch /run/reboot-required 2>/dev/null && echo lordos >> /run/reboot-required.pkgs 2>/dev/null || true
+    if touch /run/reboot-required 2>/dev/null; then
+        grep -qsx lordos /run/reboot-required.pkgs || echo lordos >> /run/reboot-required.pkgs 2>/dev/null || true
+    fi
 fi
 # the boot splash lives in the initramfs: when it is the selected theme, rebuild it with the new images
 # (initramfs-tools' trigger; the theme is selected by the ISO, the Pi image or install.sh, never here)

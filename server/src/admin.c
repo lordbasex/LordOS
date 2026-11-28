@@ -28,6 +28,7 @@
  * marked A_ANYONE (connecting to a network, as in NetworkManager). It exits when lord-server
  * closes the connection, and with it the resident processes (wpa_supplicant, VPN, DHCP). */
 #include "admin.h"
+#include "adminline.h"
 #include "lordlog.h"
 #include "pkg/pkg.h"
 #include "net/net.h"
@@ -97,20 +98,22 @@ static void out_write(int id, const char *line, size_t n) {
     else write_fd_all(out_fd, line, n);
 }
 
-static void put_line(int id, const char *kind, const char *msg) {
-    char line[1200];
-    int n = snprintf(line, sizeof line, "%d %s %s\n", id, kind, msg);
-    if (n < 0) return;
-    if ((size_t)n >= sizeof line) { n = sizeof line - 1; line[n - 1] = '\n'; }
-    out_write(id, line, (size_t)n);
-}
+static char out_line[ADMIN_LINE_MAX];    /* the helper is one thread; its children have their own copy */
 
 static void vput(int id, const char *kind, const char *fmt, va_list ap) {
-    char msg[1024];
-    vsnprintf(msg, sizeof msg, fmt, ap);
-    for (char *p = msg; *p; p++) if (*p == '\n' || *p == '\r') *p = ' ';
-    put_line(id, kind, msg);
+    size_t n = adminline_vbuild(out_line, sizeof out_line, id, kind, fmt, ap);
+    if (n) out_write(id, out_line, n);
 }
+
+__attribute__((format(printf, 3, 4)))
+static void put_fmt(int id, const char *kind, const char *fmt, ...) {
+    va_list ap;
+    va_start(ap, fmt);
+    vput(id, kind, fmt, ap);
+    va_end(ap);
+}
+
+static void put_line(int id, const char *kind, const char *msg) { put_fmt(id, kind, "%s", msg); }
 
 void admin_say(const char *kind, const char *fmt, ...) {
     va_list ap;
@@ -122,19 +125,16 @@ void admin_say(const char *kind, const char *fmt, ...) {
 /* a line with one descriptor (admin_ok_fd): sendmsg on the socket to lord-server, the descriptor on the line's first
  * byte; what sendmsg didn't take goes as plain bytes. Only where the line goes straight to lord-server */
 void admin_say_fd(int fd, const char *kind, const char *fmt, ...) {
-    char msg[1024], line[1200];
+    char *line = out_line;
     va_list ap;
     va_start(ap, fmt);
-    vsnprintf(msg, sizeof msg, fmt, ap);
+    size_t n = adminline_vbuild(line, sizeof out_line, cur_id, kind, fmt, ap);
     va_end(ap);
-    for (char *p = msg; *p; p++) if (*p == '\n' || *p == '\r') *p = ' ';
-    int n = snprintf(line, sizeof line, "%d %s %s\n", cur_id, kind, msg);
-    if (n < 0) return;
-    if ((size_t)n >= sizeof line) { n = sizeof line - 1; line[n - 1] = '\n'; }
-    if (fd < 0 || netd_main) { out_write(cur_id, line, (size_t)n); return; }
+    if (!n) return;
+    if (fd < 0 || netd_main) { out_write(cur_id, line, n); return; }
     union { struct cmsghdr h; char b[CMSG_SPACE(sizeof(int))]; } cm;
     memset(&cm, 0, sizeof cm);
-    struct iovec io = { line, (size_t)n };
+    struct iovec io = { line, n };
     struct msghdr mh = { .msg_iov = &io, .msg_iovlen = 1, .msg_control = cm.b, .msg_controllen = sizeof cm.b };
     struct cmsghdr *c = CMSG_FIRSTHDR(&mh);
     c->cmsg_level = SOL_SOCKET;
@@ -143,7 +143,7 @@ void admin_say_fd(int fd, const char *kind, const char *fmt, ...) {
     memcpy(CMSG_DATA(c), &fd, sizeof fd);
     ssize_t w;
     do w = sendmsg(out_fd, &mh, MSG_NOSIGNAL); while (w < 0 && errno == EINTR);
-    if (w > 0 && w < n) write_fd_all(out_fd, line + w, (size_t)(n - w));
+    if (w > 0 && (size_t)w < n) write_fd_all(out_fd, line + w, n - (size_t)w);
 }
 
 void admin_event(const char *fmt, ...) {
@@ -271,8 +271,9 @@ typedef struct {
     int raw;                            /* external program: each line is wrapped in an EVENT */
     char name[32];                      /* resident */
     int client;                         /* lord-netd: client that requested the action (-1: none) */
-    char buf[2048];
+    char buf[ADMIN_LINE_MAX];           /* its lines (adminline.h) */
     size_t len;
+    int skip;
 } Kid;
 
 static Kid kids[MAX_KIDS];
@@ -359,24 +360,20 @@ static void kid_line(Kid *k, char *line) {
     line[n] = 0;
 }
 
+static void kid_one(char *line, size_t n, void *arg) {
+    Kid *k = arg;
+    (void)n;
+    if (k->raw) put_fmt(0, "EVENT", "daemon %s %s", k->name, line);
+    else kid_line(k, line);
+}
+
 static void kid_read(Kid *k) {
     ssize_t r = read(k->fd, k->buf + k->len, sizeof k->buf - 1 - k->len);
     if (r > 0) {
-        k->len += (size_t)r;
-        char *nl;
-        while ((nl = memchr(k->buf, '\n', k->len))) {
-            *nl = 0;
-            if (k->raw) {
-                char msg[1100];
-                snprintf(msg, sizeof msg, "daemon %s %s", k->name, k->buf);
-                for (char *p = msg; *p; p++) if (*p == '\r') *p = ' ';
-                put_line(0, "EVENT", msg);
-            } else kid_line(k, k->buf);
-            size_t used = (size_t)(nl - k->buf) + 1;
-            memmove(k->buf, nl + 1, k->len - used);
-            k->len -= used;
-        }
-        if (k->len >= sizeof k->buf - 1) k->len = 0;       /* line too long */
+        AdminLineRd rd = { k->buf, sizeof k->buf, k->len + (size_t)r, k->skip };
+        adminline_scan(&rd, kid_one, k);
+        k->len = rd.len;
+        k->skip = rd.skip;
         return;
     }
     if (r < 0 && (errno == EINTR || errno == EAGAIN)) return;
@@ -706,8 +703,9 @@ static size_t find_action(const char *name) {
 /* session helper side */
 static int netd_fd = -1;
 static char netd_user[64];
-static char netd_buf[8192];
+static char netd_buf[ADMIN_LINE_MAX];   /* lord-netd's lines (adminline.h) */
 static size_t netd_len;
+static int netd_skip;
 static int netd_pending[64];
 static int netd_npending;
 
@@ -728,6 +726,7 @@ static int netd_connect(void) {
     write_fd_all(fd, hello, (size_t)n);
     netd_fd = fd;
     netd_len = 0;
+    netd_skip = 0;
     return 0;
 }
 
@@ -739,26 +738,26 @@ static void netd_lost(void) {
 }
 
 /* What lord-netd sends goes to lord-server unchanged (the ids are this session's). */
+static void netd_one(char *line, size_t n, void *arg) {
+    (void)arg;
+    int id = atoi(line);
+    char *sp = strchr(line, ' ');
+    if (id > 0 && sp && (!strncmp(sp + 1, "OK", 2) || !strncmp(sp + 1, "ERR", 3)))
+        for (int i = 0; i < netd_npending; i++)
+            if (netd_pending[i] == id) { netd_pending[i] = netd_pending[--netd_npending]; break; }
+    line[n] = '\n';
+    write_fd_all(out_fd, line, n + 1);
+    line[n] = 0;
+}
+
 static void netd_read(void) {
     ssize_t r = read(netd_fd, netd_buf + netd_len, sizeof netd_buf - 1 - netd_len);
     if (r < 0 && (errno == EINTR || errno == EAGAIN)) return;
     if (r <= 0) { netd_lost(); return; }
-    netd_len += (size_t)r;
-    char *nl;
-    while ((nl = memchr(netd_buf, '\n', netd_len))) {
-        size_t used = (size_t)(nl - netd_buf) + 1;
-        *nl = 0;
-        int id = atoi(netd_buf);
-        char *sp = strchr(netd_buf, ' ');
-        if (id > 0 && sp && (!strncmp(sp + 1, "OK", 2) || !strncmp(sp + 1, "ERR", 3)))
-            for (int i = 0; i < netd_npending; i++)
-                if (netd_pending[i] == id) { netd_pending[i] = netd_pending[--netd_npending]; break; }
-        *nl = '\n';
-        write_fd_all(out_fd, netd_buf, used);
-        memmove(netd_buf, netd_buf + used, netd_len - used);
-        netd_len -= used;
-    }
-    if (netd_len >= sizeof netd_buf - 1) netd_len = 0;
+    AdminLineRd rd = { netd_buf, sizeof netd_buf, netd_len + (size_t)r, netd_skip };
+    adminline_scan(&rd, netd_one, NULL);
+    netd_len = rd.len;
+    netd_skip = rd.skip;
 }
 
 /* 1: no lord-netd (the session runs the network); 0: forwarded; -1: it should be there and isn't. */
@@ -1056,8 +1055,9 @@ int admin_netd_serve(void) {
 
 static int sock = -1;
 static int next_id = 1;
-static char rbuf[8192];
+static char rbuf[ADMIN_LINE_MAX];       /* the helper's lines (adminline.h) */
 static size_t rlen;
+static int rskip;
 
 int admin_start(const char *user) {
     if (geteuid() != 0 || !user) return -1;
@@ -1122,6 +1122,27 @@ int admin_take_fd(int id) {
     return fd;
 }
 
+typedef void (*AdminFn)(int id, const char *kind, const char *text);
+
+static void dispatch_one(char *line, size_t n, void *arg) {
+    AdminFn fn = *(AdminFn *)arg;
+    (void)n;
+    int id = atoi(line);
+    char *kind = strchr(line, ' ');
+    if (!kind) return;
+    kind++;
+    char *sp = strchr(kind, ' ');
+    /* the line a descriptor came with: vm-usb-allow's answer, the oldest one waiting */
+    if (sp && !strncmp(kind, "OK ", 3) && !strncmp(sp + 1, "vm.usbReady", 11) && fdq_n > 0) {
+        line_fd = fdq[0];
+        line_id = id;
+        memmove(fdq, fdq + 1, (size_t)(--fdq_n) * sizeof *fdq);
+    }
+    if (sp) { *sp = 0; fn(id, kind, sp + 1); } else fn(id, kind, "");
+    if (line_fd >= 0) { close(line_fd); line_fd = -1; }
+    line_id = 0;
+}
+
 void admin_dispatch(void (*fn)(int id, const char *kind, const char *text)) {
     for (;;) {
         union { struct cmsghdr h; char b[CMSG_SPACE(4 * sizeof(int))]; } cm;
@@ -1138,30 +1159,10 @@ void admin_dispatch(void (*fn)(int id, const char *kind, const char *text)) {
             }
         }
         if (r <= 0) { if (r == 0) { close(sock); sock = -1; } break; }
-        rlen += (size_t)r;
-        char *nl;
-        while ((nl = memchr(rbuf, '\n', rlen))) {
-            *nl = 0;
-            int id = atoi(rbuf);
-            char *kind = strchr(rbuf, ' ');
-            if (kind) {
-                kind++;
-                char *sp = strchr(kind, ' ');
-                /* the line a descriptor came with: vm-usb-allow's answer, the oldest one waiting */
-                if (sp && !strncmp(kind, "OK ", 3) && !strncmp(sp + 1, "vm.usbReady", 11) && fdq_n > 0) {
-                    line_fd = fdq[0];
-                    line_id = id;
-                    memmove(fdq, fdq + 1, (size_t)(--fdq_n) * sizeof *fdq);
-                }
-                if (sp) { *sp = 0; fn(id, kind, sp + 1); } else fn(id, kind, "");
-                if (line_fd >= 0) { close(line_fd); line_fd = -1; }
-                line_id = 0;
-            }
-            size_t used = (size_t)(nl - rbuf) + 1;
-            memmove(rbuf, nl + 1, rlen - used);
-            rlen -= used;
-        }
-        if (rlen >= sizeof rbuf - 1) rlen = 0;
+        AdminLineRd rd = { rbuf, sizeof rbuf, rlen + (size_t)r, rskip };
+        adminline_scan(&rd, dispatch_one, &fn);
+        rlen = rd.len;
+        rskip = rd.skip;
         if (sock < 0) break;
     }
 }

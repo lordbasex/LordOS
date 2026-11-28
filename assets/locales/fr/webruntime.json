@@ -12,5 +12,9 @@
   "inspect.title": "Outils de développement activés",
   "inspect.body": "Ils se sont ouverts dans votre navigateur et restent actifs jusqu'à la fermeture de cette fenêtre.",
   "inspect.open": "Ouvrir dans le navigateur",
-  "inspect.failed": "Les outils de développement n'ont pas pu démarrer"
+  "inspect.failed": "Les outils de développement n'ont pas pu démarrer",
+  "save.image": "Enregistrer l'image",
+  "save.video": "Enregistrer la vidéo",
+  "save.audio": "Enregistrer l'audio",
+  "hang.reloaded": "La page ne répondait plus et a été rechargée"
 }

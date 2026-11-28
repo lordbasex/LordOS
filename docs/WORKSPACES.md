@@ -1,7 +1,7 @@
-# Lord Workspaces
+# Workspaces
 
-**Released in 0.8.9** (approved by the maintainer on 2026-11-15, built after 0.8.8.9 Beta). Lord Workspaces (`themes/workspaces`)
-is LordOS's third desktop theme, next to Lord Flow (`themes/default`) and Lord Classic (`themes/classic`), and it
+**Released in 0.8.9** (approved by the maintainer on 2026-11-15, built after 0.8.8.9 Beta). Workspaces (`themes/workspaces`)
+is LordOS's third desktop theme, next to Flow (`themes/default`) and Classic (`themes/classic`), and it
 changes neither of them. It organizes the desktop by **activities**: each activity is a desktop with a name, an icon,
 a colour, the apps pinned to it and a tiling layout for every display, and its windows sit in a group frame. It came
 from a proposal called "Origin Flow"; this document says what was built, what changed from the proposal, how it
@@ -20,7 +20,7 @@ performs against the other two themes and what is left for the compositor.
 | **Control Center (the Control Atlas)** | A live drawn preview of the desktop with the current choices, then a section each: **Appearance** (dark mode, Reduce motion, High contrast, the effects style, the accent, the wallpaper), **Window tiling** (the layout of the activity in view on this display, its padlock), **Activities** (each with its window count, New activity, Edit), **Displays** (Night Light, brightness, the displays connected, the spine on every display), **Sound** (Do Not Disturb, the volume), **Network** (Wi-Fi, Bluetooth), **Energy** (the power mode) and **Security** (the firewall's mode, Lock Screen). Each section's title opens its page in Settings; nothing duplicates a device's settings. It unfolds from its button. | `components/ControlCenter.jsx` |
 | **Onboarding** | On the only activity, while nothing was set up and nothing is open: 1. its name, icon and colour; 2. its apps and the layout. "Start activity" opens the apps, which the layout places. It can be skipped; the same two steps edit an activity later. | `components/ActivityEditor.jsx` |
 
-The menus and the notification panel are Lord Classic's own components (`themes/classic/components/Menu.jsx`,
+The menus and the notification panel are Classic's own components (`themes/classic/components/Menu.jsx`,
 `NotificationCenter.jsx`), restyled by this theme's tokens; the window glyphs are Classic's too. The Overview, the app
 switcher, the power dialog, the level HUD and the SDK's own surfaces (notifications, prompts, the file chooser…) are the
 SDK's, as in every theme.
@@ -94,20 +94,20 @@ displays do. Nothing runs per frame, nothing polls.
   display it gets a slot of its own there and leaves its old one. Dropped on a free slot (a minimized window's place)
   it takes that slot and its own goes, so a half stays one half (`dropSlot`); the minimized window waits behind it and
   comes back by swapping. Dropped on a display in Free, it floats there.
-- **Where a window will land** (`components/SnapTargets.jsx`, Lord Workspaces only). While a window is dragged over a
+- **Where a window will land** (`components/SnapTargets.jsx`, Workspaces only). While a window is dragged over a
   tiled display, a glass rectangle shows the slot it will take (`slotPreview`, read from the SDK's `moveGrab` a few
   times a second, one render per change of slot); the drop takes that slot whatever the window's centre (`dropHint`).
   Over a free display the SDK's snap preview shows in the same glass. The glass is the Crystal material's blur over
   LordOS's own surfaces, a tint over Linux apps (the renderer doesn't blur their pixels on the GPU yet), a 1 px inner
   light and the accent edge; it grows from the pointer in 150 ms, still under Reduce motion.
 - **Snap thirds**: resting on the left or right edge for 0.5 s turns the half into a third (`configureWindows({
-  snapThirds: true })`, `sdk/snap.js` `dwellZone`; off in Lord Flow and Lord Classic).
+  snapThirds: true })`, `sdk/snap.js` `dwellZone`; off in Flow and Classic).
 - **The layout flyout**: resting 0.45 s on a window's maximize button opens halves, thirds, main and side, and quarters
   under it. A click puts the window in that zone: on a free display the SDK's snap zone (a half also wakes the magnet),
   on a tiled display that layout is set there and the window takes that slot (`placeInSlot`). Not on locked windows,
   and not on the buttons Linux apps draw themselves (Chrome): for those, **Snap window…** in the window menu (a right
   click on Chrome's tab strip, or on any title bar) opens the same flyout at the pointer.
-- **Widgets** (`sdk/deskwidgets.jsx`, `sdk/widgetgrid.js`, `sdk/widgetpicker.jsx`; since 0.8.8.10 also in Lord Flow and Lord Classic, from the wallpaper's right-click menu). Each
+- **Widgets** (`sdk/deskwidgets.jsx`, `sdk/widgetgrid.js`, `sdk/widgetpicker.jsx`; since 0.8.8.10 also in Flow and Classic, from the wallpaper's right-click menu). Each
   display's work area holds a grid of 170 px cells with 16 px gaps, anchored to its top right (TangoOS's grid). A widget
   takes a block of cells by its size: small 1×1, medium 2×1, large 2×2, wide 4×1, extra large 4×2; no other widget can be placed
   or dropped over it. Widgets belong to an activity and a display (its connector): another activity shows its own, or
@@ -183,8 +183,8 @@ displays do. Nothing runs per frame, nothing polls.
 - **Pinned widgets** (`opts.pin`, `widgetgrid.js` `PINS` and `pinnedRect`): any widget's right-click menu has **Center
   at the bottom**, which keeps it centred along the bottom of its display's work area, off the grid (it holds no cells
   and may sit over another widget). Dragging it puts it back on the grid. A new sound wave starts pinned there.
-- **Apps with their own frame** (Cleaner) draw no lights in Lord Workspaces: the theme's buttons at the end are the
-  only ones, as in Lord Classic.
+- **Apps with their own frame** (Cleaner) draw no lights in Workspaces: the theme's buttons at the end are the
+  only ones, as in Classic.
 - **A window resized by hand** (or maximized) leaves its tile and floats until **Tile this window** from its title
   bar's menu, or until a layout is chosen again for the display it is on now (a floating window belongs to the display
   it is on, wherever it was tiled before). Dialogs, notices and the theme's own panels never tile.
@@ -337,7 +337,7 @@ Gradients have two stops (what the renderer draws). The colours are the brand's 
 gradient `#B46CFF → #4F46E5` on the onboarding's primary button) with violet-biased neutrals, and the shared accent
 names (azul, violeta, rosa, naranja, verde, grafito) so the person's accent survives a theme switch; in light mode each
 accent is one step deeper. A person who never chose an accent (`settings.accent` null, since 0.8.9) gets rosa, which
-goes with the default wallpaper (`DEFAULT_ACCENT`; Lord Flow and Lord Classic keep azul). Contrast is checked in the model test: text on windows, panels and title bars ≥ 7:1, dim
+goes with the default wallpaper (`DEFAULT_ACCENT`; Flow and Classic keep azul). Contrast is checked in the model test: text on windows, panels and title bars ≥ 7:1, dim
 text ≥ 4.5:1, white on every accent ≥ 3:1 (large text and controls) in both modes. The crown is the brand's
 full-colour render, never recoloured, with no glow.
 
@@ -364,13 +364,13 @@ jumps to its end, and the SDK's own desktop slide is off too.
 LordOS; `assets/wallpapers/README.md`). Since 0.8.9 `settings.wallpaper` is `null` until the person chooses one, and
 `null` means the theme's default: theme.json says `"wallpaper": { "default": "cyberpunk-panorama" }` for Settings
 (`sdk/thememeta.js`) and the theme's tokens say the same to the SDK (`defaultWallpaper`; `wallpaperIdFor(s, d, def)`
-and `findWallpaper(list, id, def)` take it). Lord Flow and Lord Classic pass none and keep Lumo Celestial.
+and `findWallpaper(list, id, def)` take it). Flow and Classic pass none and keep Lumo Celestial.
 
 - **Migration 5** (`sdk/settings.js`): until 0.8.8 everyone's settings file held `"wallpaper": "lumo-celestial"` (the
   default was saved with the other settings), so a user who never chose cannot be told from one who chose Celestial.
   The migration turns that one value into `null`; any other picture, a picture of the person's own and the
-  per-display pictures stay. In Lord Flow and Lord Classic nothing changes on screen (their default is Celestial). The
-  only case it gets wrong: someone who picked Celestial on purpose sees the panorama the first time they switch to Lord
+  per-display pictures stay. In Flow and Classic nothing changes on screen (their default is Celestial). The
+  only case it gets wrong: someone who picked Celestial on purpose sees the panorama the first time they switch to
   Workspaces, a theme no release had, and picking Celestial again keeps it for good (the migration runs once).
 
 **The slideshow** (Settings → Wallpaper, only while this theme is in use: theme.json `"slideshow": true`; off by
@@ -422,12 +422,12 @@ in place of the still pictures).
 
 The theme's table (`index.jsx`) on top of the SDK's base: ❖Space and Ctrl+Space open Search (the theme's entries win
 over the base's), ❖ alone opens it with every app; ❖⌥D collapses or expands the spine; the app switcher (❖Tab by
-default), ❖\` the app's next window, ❖M minimize, ❖H hide, ❖⌥H hide others, ❖, the app's settings, and Lord Flow's
+default), ❖\` the app's next window, ❖M minimize, ❖H hide, ❖⌥H hide others, ❖, the app's settings, and Flow's
 Desktops keys (❖⌃← ❖⌃→ switch activities; with Settings' Ctrl arrows on, off by default, also ⌃↑ the Overview, ⌃← ⌃→ and ⌃↓ the app's windows), and its own: ❖1…❖9 show
 activity 1 to 9; ❖Tab and ❖⇧Tab, the next and the previous activity, when Settings → Keyboard puts the app switcher on
 ⌥Tab (the proposal's ❖Tab for activities, by choice); ⌃F2 moves the keyboard to the bars (below). Over a Linux app the
-compositor keeps a fixed list for this theme (`workspaces` and `workspaces-desktops` in `server/src/wl/keygrab.c`: Lord
-Flow's two tables plus ⌃F2, ❖/ and ❖1…❖9, and ❖Tab when the switcher is on ⌥Tab only). Lord Flow's own tables are unchanged.
+compositor keeps a fixed list for this theme (`workspaces` and `workspaces-desktops` in `server/src/wl/keygrab.c`:
+Flow's two tables plus ⌃F2, ❖/ and ❖1…❖9, and ❖Tab when the switcher is on ⌥Tab only). Flow's own tables are unchanged.
 
 **The shortcuts' help** (`components/ShortcutsHelp.jsx`): the lifebuoy on the spine, ❖/ or the crown's "Keyboard
 Shortcuts…" open a sheet with every shortcut that works now, from `shortcutList()` (so it never disagrees with the keys):
@@ -452,17 +452,17 @@ anything else dropped):
 
 - `sketch` (`rail`, `pills`, `frame`, `menubar`, `dock`, `taskbar`): the drawn picture in Appearance → Desktop style.
 - `options`: the theme's own choices, under Desktop style and on Desktop & Dock while it is the current theme, stored in
-  `settings.themeOptions[<theme id>]` (one key for every theme, so a theme's id can't reach another setting). Lord
+  `settings.themeOptions[<theme id>]` (one key for every theme, so a theme's id can't reach another setting).
   Workspaces declares Effects style, Context Spine (Automatic, With labels, Icons only), Show the spine on every
   display and High contrast.
-- `desktopArrows`: the Desktops section shows Settings → Keyboard's ⌃-arrows switch, as for Lord Flow.
+- `desktopArrows`: the Desktops section shows Settings → Keyboard's ⌃-arrows switch, as for Flow.
 - `wallpaper`: `{ "default": <id>, "slideshow": true }`, the picture of a user who never chose one and the slideshow's
   controls in Settings → Wallpaper ("Wallpaper and slideshow" above).
 - `displayApps` (0.8.9.5): `true` when the theme uses the apps of each display (`sdk/displayapps.js`); with its options,
   Settings shows "Remember the apps used on each display" and "Forget the apps of every display" (Clear).
 
 On Desktop & Dock, such a theme gets the desktops (here: activities), its options and the title bars' buttons, with no
-Dock or taskbar section. Lord Flow and Lord Classic declare none of the four and see exactly what they did.
+Dock or taskbar section. Flow and Classic declare none of the four and see exactly what they did.
 
 ## Widget data
 
@@ -497,13 +497,13 @@ Measured on the development machine (Intel Core i9-10900, AMD Radeon RX 580; CPU
 1920×1080 `lord-server --profile` with a private home and runtime folder, the same scenario in each theme: three
 windows (Text Editor, Files, Terminal), then 20 focus changes, 20 title changes and 10 activity (desktop) switches
 between one with the windows and an empty one, then 10 s idle. A headless session paints only while someone watches,
-so a screen recording (10 fps) was kept running during the scenario; paint times are `--profile`'s own. Lord
+so a screen recording (10 fps) was kept running during the scenario; paint times are `--profile`'s own.
 Workspaces in its default layout (Free), dark mode.
 
 Medians of three runs each (2026-11-15); "paint" is the sum of `--profile`'s paint times over the phase, "screen" the
 average share of the screen repainted per frame:
 
-| Phase | Lord Flow | Lord Classic | Workspaces, Crystal | Workspaces, Opaque |
+| Phase | Flow | Classic | Workspaces, Crystal | Workspaces, Opaque |
 |---|---|---|---|---|
 | First full frame after the recording starts | 63 ms | 61 ms | 63 ms | 59 ms |
 | 20 focus changes: paint (frames), screen | 84.6 ms (23), 71 % | 94.5 ms (23), 77 % | **57.3 ms** (23), **28 %** | **56.7 ms** (21), **31 %** |
@@ -512,14 +512,14 @@ average share of the screen repainted per frame:
 | 3 s idle with the recording on: frames | 4 | 4 | 4 | 4 |
 | 10 s idle without a viewer: CPU ticks of `lord-server` | 16 | 16 | 16 | 14 |
 
-The switches spread widely from run to run (Lord Flow 262–352 ms, Workspaces Crystal 217–397 ms): within that spread
+The switches spread widely from run to run (Flow 262–352 ms, Workspaces Crystal 217–397 ms): within that spread
 the three themes cost the same. Workspaces draws more frames there (the windows' slide, then the pills' glide), each of
 them smaller.
 
 What a change costs in native calls (`server/tests/theme_cost_scene.mjs`, the stub `lord`, one display, three
 windows; numbers, not checks):
 
-| Change | Lord Flow | Lord Classic | Lord Workspaces |
+| Change | Flow | Classic | Workspaces |
 |---|---|---|---|
 | A window's title, ×10 | 10 | 10 | 10 |
 | The window in front, ×10 | 160 | 290 | 210 |
@@ -536,7 +536,7 @@ What these say:
   because nothing else on screen depends on the window in front (Flow's menu bar and Classic's taskbar change with it).
 - **Idle:** no timer every second (the clock wakes at each minute's turn), and the only interval left is the SDK's own.
   At rest nothing is painted.
-- **Activity switches** cost about the same as a desktop switch in Lord Flow and Lord Classic (within their run-to-run
+- **Activity switches** cost about the same as a desktop switch in Flow and Classic (within their run-to-run
   spread), with the glide added after the windows' slide; they don't beat them yet. Earlier drafts were several times as costly (scaling the display-sized group frame, a scrim
   over the work area, changes inside the spine's blur margin); each of those was measured and removed.
 - **In native calls** a switch costs more than in Flow and Classic: the spine, the strip and the frame header show the
@@ -572,7 +572,7 @@ What these say:
   displays (three different pictures decoded at the displays' size, one picture with the option off) and the still
   pictures back when it is off; `keyboard_default_test.mjs` migration 5; `build/engine-test` a 4K picture decoded by
   the workers at 3840 and 2560 px, and `build/engine-test bench-slideshow` times the transition.
-- `tests/launchplace_headless.sh` (in `make test`, left to right and right to left): Lord Workspaces in a headless
+- `tests/launchplace_headless.sh` (in `make test`, left to right and right to left): Workspaces in a headless
   `lord-server-test` with the real launcher and `build/launchplace-client` (a fake Chrome: a profile picker, then the
   browser window, then a dialog that names its parent late): the picker takes the free half of the display it was
   launched from, the browser window that opens while another activity is in view goes to the launch's activity and the
@@ -594,7 +594,7 @@ What these say:
 - **Real frosted glass over Linux apps on the GPU path:** the theme's UI is painted on the CPU and the GPU only
   composites; over a Linux app's window a blur only tints. A GPU blur pass is compositor work.
 - **Alt+Space** (and other keys over Linux apps): the compositor's key lists are fixed C tables
-  (`server/src/wl/keygrab.c`); Workspaces reuses Lord Flow's. A table of its own is a reviewed change.
+  (`server/src/wl/keygrab.c`); Workspaces reuses Flow's. A table of its own is a reviewed change.
 - **Weather**: a widget waiting for a reviewed network path (docs/ROADMAP.md).
 - **A different activity per monitor** and **the Overview per display** (above): SDK and compositor changes.
 - **Damage in several rectangles** (`LORD_DAMAGE=multi`, off by default): with it, a small change far from the spine

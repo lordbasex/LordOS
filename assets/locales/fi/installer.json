@@ -128,5 +128,6 @@
   "user.user": "Käyttäjänimi",
   "user.userHint": "Pieniä kirjaimia, numeroita, - ja _. Käyttäjästä tulee ylläpitäjä (sudo).",
   "welcome.text": "Tämä avustaja asentaa LordOS:n tämän tietokoneen levylle. Valitset kielen, näppäimistön, levyn ja käyttäjäsi. Asennus tyhjentää valitun levyn, ellet asenna nykyisen rinnalle tai valitse osioita itse.",
-  "welcome.title": "Tervetuloa LordOS:ään"
+  "welcome.title": "Tervetuloa LordOS:ään",
+  "disk.unreadable": "Levyn kuvausta ei voitu lukea, joten sitä ei näy luettelossa. Hae uudelleen; jos se puuttuu yhä, ilmoita siitä."
 }

@@ -1,0 +1,22 @@
+{
+  "menu.looking": "Təkliflər axtarılır…",
+  "menu.none": "Təklif yoxdur",
+  "menu.add": "“{word}” sözünü lüğətə əlavə et",
+  "menu.ignore": "Nəzərə alma",
+  "settings.title": "Orfoqrafiya",
+  "settings.hint": "Səhv yazılmış sözlərin altı LordOS mətn sahələrində qırmızı dalğalı xəttlə çəkilir; təkliflər üçün birinin üzərinə sağ klikləyin. Yoxlama bu kompüterdə aparılır, heç vaxt onlayn deyil. Parol, axtarış və ünvan sahələri yoxlanılmır.",
+  "settings.check": "Yazarkən orfoqrafiyanı yoxla",
+  "settings.languages": "Orfoqrafiya: dillər",
+  "settings.defaultHint": "Heç biri seçilməyib: interfeys diliniz və ingilis dili, lüğətləri quraşdırılıbsa. Veb tətbiqlər də eynilərini istifadə edir.",
+  "settings.chosenHint": "Seçdiyiniz dillərdən hər hansı biri sözü tanıyırsa, söz düzgündür (ən çox 4). Veb tətbiqlər interfeys dilinizi və ingilis dilini istifadə edir.",
+  "settings.none": "Heç bir lüğət quraşdırılmayıb. Aşağıdan birini quraşdırın.",
+  "settings.useDefault": "Defoltları istifadə et",
+  "settings.more": "Daha çox dil",
+  "settings.moreHint": "Debian lüğətləri. Quraşdırmaq üçün administrator parolu lazımdır.",
+  "settings.installing": "Quraşdırılır…",
+  "settings.install": "Quraşdır",
+  "settings.words": "Lüğətiniz",
+  "settings.wordsHint": "“Lüğətə əlavə et” ilə burada və ya veb tətbiqdə əlavə etdiyiniz sözlər.",
+  "settings.remove": "Sil",
+  "settings.noWords": "Hələ söz yoxdur."
+}

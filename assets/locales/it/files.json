@@ -95,7 +95,7 @@
   "menu.emptyTrash": "Svuota il Cestino",
   "menu.file": "File",
   "menu.forward": "Avanti",
-  "menu.getInfo": "Ottieni informazioni",
+  "menu.getInfo": "Proprietà",
   "menu.go": "Vai",
   "menu.groupBy": "Raggruppa per",
   "menu.newFolder": "Nuova cartella",
@@ -342,5 +342,9 @@
   "readOnly.denied": "Questa cartella è di sola lettura: i suoi permessi non ti consentono di modificarla. Per modificarla, usa il Terminale o un'altra app.",
   "fromMachineNoRun": "«{name}» proviene dalla macchina {machine}. File non apre programmi o installer di una macchina: usa Apri con se ti fidi.",
   "info.from": "Provenienza",
-  "info.fromMachine": "La macchina {machine}"
+  "info.fromMachine": "La macchina {machine}",
+  "skin.address": "Indirizzo",
+  "skin.tasks": "Operazioni su file e cartelle",
+  "skin.otherPlaces": "Altre risorse",
+  "skin.details": "Dettagli"
 }

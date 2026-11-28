@@ -97,6 +97,7 @@ O resto do desktop recebeu o mesmo cuidado: os Ajustes, a Loja, o Arquivos e o M
 - **Capturar o mouse** para jogos e programas 3D; ❖Esc ou Ctrl+Alt o soltam.
 - **Uma placa de vídeo real para uma máquina**: uma parte de uma iGPU Intel (de Broadwell a Comet Lake) com GVT-g, com um driver de inicialização próprio do LordOS para ela, escrito a partir de fontes públicas.
 - **`machines` no Terminal**: listar, iniciar, parar, tirar snapshots, clonar e mudar máquinas a partir de um terminal. Desde a 0.8.9.6: executar um programa numa máquina Linux, copiar arquivos para ela e dela, ler seus registros, criar uma máquina a partir de um arquivo curto guardado com um projeto, e um servidor MCP local para agentes de programação, só numa máquina que você permitiu no Configurar dela.
+- **Fechar a janela quando a máquina parar** (desde a 0.8.9.6.2, Configurar → Inicialização e desligamento, desligado por padrão): depois de um desligamento ou de Desligar, a janela da máquina fecha; se a máquina parar por causa de um problema, a janela fica aberta com o erro.
 
 ## Novo na 0.8.9.6
 

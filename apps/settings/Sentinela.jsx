@@ -160,7 +160,7 @@ function BlocklistSection({ list }) {
           hint={[x.kind === 'script' ? tr('sentinela.block.script', { interp: x.interp || '' }) : tr('sentinela.block.binary'), x.path,
             x.pkg ? tr('sentinela.block.pkg', { pkg: x.pkg }) : null, `SHA-256 ${String(x.id).slice(0, 16)}…`,
             x.at ? tr('sentinela.block.added', { date: formatDate(new Date(x.at)) }) : null].filter(Boolean).join(' · ')}>
-          <Button small label={tr('sentinela.block.remove')} disabled={busy === x.id} onClick={() => remove(x)} />
+          <Button small handsDeny label={tr('sentinela.block.remove')} disabled={busy === x.id} onClick={() => remove(x)} />
         </SettingRow>
       )) : <SettingRow label={tr('sentinela.block.empty')} />}
       {err ? <Note tone="error">{err}</Note> : null}

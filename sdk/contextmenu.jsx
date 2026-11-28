@@ -20,6 +20,11 @@ const ITEM_H = 24;
 // a note: a few lines of dim text that say why something isn't there (Files' Open with for a program no machine opens
 // yet); it wraps, so a menu with one is as wide as menus get
 const MENU_MAX_W = 320, NOTE_PAD = 14, NOTE_LINE = 16;
+// a menu of rows is as wide as its longest row, up to this; a row longer still ends in "…" (a page's text in a row is
+// shortened by its maker first, so the words around it always show: webappsmodel.js fitQuoted)
+export const MENU_ROW_MAX_W = 420;
+// the width a row asks for (the same sum the menu makes)
+export const rowWidth = (it, measure = (s, size) => lord.measureText(s, size, 400)) => 46 + measure(it.label, 13) + (it.hint ? 16 + measure(it.hint, 11) : 0) + (it.submenu ? 12 : 0);
 const noteLines = (s) => {
   const w = typeof lord !== 'undefined' && lord.measureText ? lord.measureText(s, 12, 400) : String(s).length * 6;
   return Math.max(1, Math.ceil((w * 1.1) / (MENU_MAX_W - 2 * NOTE_PAD)));
@@ -27,10 +32,11 @@ const noteLines = (s) => {
 const rowH = (it) => (it === '-' ? 9 : it.header ? 20 : it.note ? 8 + NOTE_LINE * noteLines(it.note) : it.swatches ? ITEM_H + 4 : ITEM_H);
 const heightOf = (items) => items.reduce((s, it) => s + rowH(it), 10);
 const rowTop = (items, i) => 5 + items.slice(0, i).reduce((s, q) => s + rowH(q), 0);
-// where a box of this size goes, inside the bounds
-const boxAt = (items, x, y, width, bounds) => ({
-  left: Math.max(4, Math.min(x, bounds.w - width - 4)),
-  top: Math.max(4, Math.min(y, bounds.h - heightOf(items) - 4)),
+// where a box of this size goes, inside the bounds (bounds.left and bounds.top: how far it may go to the start and up,
+// 0 when not given; negative when x, y are relative to a box inside the area, as a text field's menu)
+export const boxAt = (items, x, y, width, bounds) => ({
+  left: Math.max((bounds.left || 0) + 4, Math.min(x, bounds.w - width - 4)),
+  top: Math.max((bounds.top || 0) + 4, Math.min(y, bounds.h - heightOf(items) - 4)),
 });
 
 function MenuBox({ items, left, top, width, active, onRow, onPick, onMove, onEnter, onDown, boxRef }) {
@@ -54,12 +60,12 @@ function MenuBox({ items, left, top, width, active, onRow, onPick, onMove, onEnt
         }
         const on = active === i && !it.disabled;
         return (
-          <View key={i} onMouseEnter={() => onRow(i)}
+          <View key={i} onMouseEnter={() => onRow(i)} accessibilityRole="menuitem" accessibilityState={{ disabled: !!it.disabled, checked: !!it.checked }}
             onClick={() => { if (!it.disabled) onPick(i); }}
             style={{ height: ITEM_H, marginHorizontal: 5, paddingHorizontal: 9, borderRadius: 5, flexDirection: 'row', alignItems: 'center', backgroundColor: on ? t.accent : 'transparent' }}>
             <Text style={{ width: 16, fontSize: 11, color: on ? '#fff' : t.text }}>{it.checked ? '✓' : ''}</Text>
             {it.dot ? <View style={{ width: 14, alignItems: 'center' }}><View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: it.dot }} /></View> : null}
-            <Text style={{ flex: 1, fontSize: 13, color: on ? '#fff' : it.disabled ? t.textDim : it.danger ? '#ff453a' : t.text, whiteSpace: 'nowrap', overflow: 'hidden' }}>{it.label}</Text>
+            <Text style={{ flex: 1, fontSize: 13, color: on ? '#fff' : it.disabled ? t.textDim : it.danger ? '#ff453a' : t.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{it.label}</Text>
             {it.hint ? <Text style={{ fontSize: 11, color: on ? '#fff' : t.textDim, marginHorizontal: 4 }}>{it.hint}</Text> : null}
             {it.submenu ? <Text style={{ fontSize: 12, color: on ? '#fff' : t.textDim }}>›</Text> : null}
           </View>
@@ -76,7 +82,7 @@ export function ContextMenu({ x, y, items, onClose, bounds = { w: 4000, h: 4000 
   const [active, setActive] = useState(-1);
   const [subActive, setSubActive] = useState(-1);
   items = items.filter(Boolean);
-  const width = (list) => (list.some((i) => i && i.note) ? MENU_MAX_W : 0) || Math.min(MENU_MAX_W, Math.max(190, ...list.filter((i) => i && i.label).map((i) => 46 + lord.measureText(i.label, 13, 400) + (i.hint ? 16 + lord.measureText(i.hint, 11, 400) : 0))));
+  const width = (list) => (list.some((i) => i && i.note) ? MENU_MAX_W : 0) || Math.min(MENU_ROW_MAX_W, Math.max(190, ...list.filter((i) => i && i.label).map((i) => rowWidth(i))));
   const w = width(items);
   const { left, top } = boxAt(items, x, y, w, bounds);
   const st = useRef({});

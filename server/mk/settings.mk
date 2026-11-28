@@ -2,7 +2,7 @@
 # Bluetooth (BlueZ over our own D-Bus client), battery and power, date and time, default apps.
 # Objects are added to lord-server as extra prerequisites ($^ in its link rule takes them).
 HW_SRC := src/hw/tabletpower.c src/hw/edid.c src/hw/modes.c src/hw/night.c src/hw/mimeapps.c src/hw/power.c src/hw/jbuf.c src/hw/display.c src/hw/accel.c \
-          src/hw/uevent.c src/hw/sysbus.c src/hw/bt.c src/hw/ppd.c src/hw/hw.c src/hw/hw_admin.c src/hw/battery_admin.c src/hw/batthist.c src/bench/boottest.c src/hw/defaults.c src/hw/notifyd.c src/hw/mpris.c src/hw/mprismeta.c src/hw/hwscan.c src/hw/brframe.c src/hw/pkagent.c src/hw/pkfield.c src/hw/sleeplock.c src/hw/lockstate.c src/hw/logindlock.c src/hw/lid.c src/ui/js_hw.c \
+          src/hw/uevent.c src/hw/sysbus.c src/hw/bt.c src/hw/ppd.c src/hw/hw.c src/hw/hw_admin.c src/hw/battery_admin.c src/hw/batthist.c src/bench/boottest.c src/hw/defaults.c src/hw/notifyd.c src/hw/mpris.c src/hw/mprismeta.c src/hw/hwscan.c src/hw/brframe.c src/hw/pkagent.c src/hw/pkfield.c src/hw/sleeplock.c src/hw/lockstate.c src/hw/logindlock.c src/hw/lid.c src/hw/camuse.c src/ui/js_hw.c \
           src/sysreport/sysreport.c src/sysreport/sysreport_out.c src/sysreport/periph.c src/sysreport/ids.c src/sysreport/smbios.c src/sysreport/facts.c src/sysreport/hwsnap.c src/sysreport/gpureport.c src/hw/rpifw.c \
           src/ui/js_fan.c src/fan/fancurve.c
 HW_HDR := $(wildcard src/hw/*.h) src/apps.h $(wildcard src/sysreport/*.h) $(wildcard src/fan/*.h) src/ui/js_hw.h src/ui/js_fan.h src/kms.h src/vault/dbus.h
@@ -95,6 +95,7 @@ all: build/lord-pkexec
 build/lord-pkexec: src/hw/lord_pkexec.c
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ src/hw/lord_pkexec.c
+	chmod g-w $@
 # automatic rotation (accel.c, issue #60): the mount matrix, the orientation with hysteresis, the
 # debounce, and finding the screen's accelerometer in a fake sysfs/udev tree; `build/accel-test --live`
 # reads this machine's

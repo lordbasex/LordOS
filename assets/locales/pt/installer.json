@@ -128,5 +128,6 @@
   "user.user": "Nome de usuário",
   "user.userHint": "Minúsculas, números, - e _. Será administrador (sudo).",
   "welcome.text": "Este assistente instala o LordOS no disco deste computador. Você vai escolher o idioma, o teclado, o disco e seu usuário. Instalar apaga o disco escolhido, a menos que você instale ao lado do que já existe ou escolha as partições você mesmo.",
-  "welcome.title": "Bem-vindo ao LordOS"
+  "welcome.title": "Bem-vindo ao LordOS",
+  "disk.unreadable": "Não foi possível ler a descrição de um disco, por isso ele não aparece na lista. Procure de novo; se continuar faltando, avise-nos."
 }

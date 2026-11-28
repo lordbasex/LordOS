@@ -712,6 +712,7 @@
   "agent.toolsAutoFailed": "De automatische update is niet gelukt ({have} → {want}).",
   "agent.toolsUpdateBtn": "Bijwerken",
   "agent.st.needsTools": "Hulpmiddelen nodig",
+  "agent.st.oldLordos": "Werk LordOS erin bij",
   "agent.st.needsXclip": "Heeft xclip nodig",
   "agent.toolsInstalled": "De LordOS-hulpmiddelen zijn geïnstalleerd en draaien in de machine; ze starten opnieuw bij elke aanmelding.",
   "agent.timesync": "Zet de klok gelijk",
@@ -880,6 +881,8 @@
   "un.how.preseed": "De antwoorden gaan in de eigen startbestanden van het installatieprogramma, je wachtwoord alleen als hash, en ze worden verwijderd zodra het systeem is geïnstalleerd.",
   "un.how.autoinstall": "De antwoorden komen op een kleine schijf die het installatieprogramma leest, je wachtwoord alleen als hash, en de schijf wordt verwijderd zodra het systeem is geïnstalleerd.",
   "un.how.kickstart": "De antwoorden komen op een kleine schijf die het installatieprogramma leest, je wachtwoord alleen als hash, en de schijf wordt verwijderd zodra het systeem is geïnstalleerd.",
+  "un.how.kali": "De antwoorden gaan in de eigen startbestanden van het installatieprogramma, je wachtwoord alleen als hash, en ze worden verwijderd zodra het systeem is geïnstalleerd.",
+  "un.how.lordos": "De antwoorden komen op een kleine schijf die het installatieprogramma leest, je wachtwoord alleen als hash, en de schijf wordt verwijderd zodra het systeem is geïnstalleerd.",
   "un.image": "Installeert vanaf {file}, ook gecontroleerd met de ondertekende lijst van de maker",
   "un.review": "Zonder vragen: account {user} op {host}",
   "un.reviewOff": "Jij beantwoordt de vragen van het installatieprogramma",
@@ -1100,6 +1103,7 @@
   "apps.menu": "Programma's",
   "apps.needsAgent": "Appmodus heeft de verbonden agent van de machine nodig",
   "win.appsNeedsTools": "Appmodus heeft LordOS of Windows in de machine nodig, met de LordOS-hulpmiddelen",
+  "win.appsOldLordos": "Appmodus heeft LordOS {version} of nieuwer in de machine nodig. Werk LordOS in de machine bij; de LordOS-hulpmiddelen alleen zijn niet genoeg.",
   "apps.noApps": "De machine heeft zijn apps nog niet opgegeven",
   "apps.gone": "Dit venster is in de machine gesloten",
   "apps.dropTitle": "Laat los om deze bestanden aan dit venster in de machine te geven",
@@ -2027,5 +2031,7 @@
   "req.row.answers": "Installatieantwoorden",
   "req.use.answers": "Door Machines zelf gemaakt: niets te installeren",
   "req.st.download": "Bij maken",
-  "req.st.builtin": "Ingebouwd"
+  "req.st.builtin": "Ingebouwd",
+  "cfg.closeOnStop": "Venster sluiten als de machine stopt",
+  "cfg.closeOnStopNote": "Na afsluiten of Uitzetten. Stopt ze door een probleem, dan blijft het venster open om te tonen wat er gebeurde."
 }

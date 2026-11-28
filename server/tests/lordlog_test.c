@@ -440,6 +440,62 @@ static void test_app(void) {
           "capped while it writes: %lld, .old %lld", (long long)size_of(log), (long long)size_of(old));
 }
 
+/* lord-web's log (lordlog_stamp_start): its own lines and WebKit's, stamped, each with its subsystem; a line longer
+ * than the stamper's buffer is cut, not lost with the rest */
+static void test_stamp(void) {
+    char home[PATH_MAX], log[PATH_MAX * 2];
+    snprintf(home, sizeof home, "%s/web-home", T);
+    mkdir(home, 0700);
+    snprintf(log, sizeof log, "%s/.cache/lordos/web/whatsapp-personal.log", home);
+    fflush(stdout);
+    pid_t pid = fork();
+    if (pid == 0) {
+        setenv("HOME", home, 1);
+        char root[PATH_MAX];
+        snprintf(root, sizeof root, "%s/no-such-root", T);
+        lordlog_root = root;
+        char p[PATH_MAX];
+        if (lordlog_path("web", "whatsapp-personal", p, sizeof p)) _exit(2);
+        if (!lordlog_stamp_start("web", "whatsapp-personal", "webkit")) _exit(3);   /* stderr is not that file */
+        int fd = lordlog_open(p);
+        if (fd < 0 || dup2(fd, 2) < 0) _exit(4);
+        close(fd);
+        lordlog_write(2, "INFO", "webapps", "starting lord-web --app whatsapp --profile personal");   /* webmgr's */
+        if (!lordlog_stamp_start("web", "whatsapp-personal", "bad name/")) _exit(5);
+        if (lordlog_stamp_start("web", "whatsapp-personal", "webkit")) _exit(6);
+        struct stat a;
+        if (fstat(2, &a) || S_ISREG(a.st_mode)) _exit(7);
+        fprintf(stderr, "lord-web: WebKit says the page stopped responding\n");
+        fprintf(stderr, "** (WPEWebProcess:2): WARNING **: 18:22:03.713: something odd\n");
+        fprintf(stderr, "[OpenH264] this = 0x0, Info:CWelsDecoder::init_decoder\n");
+        static char big[20000];
+        memset(big, 'z', sizeof big - 2);
+        big[sizeof big - 2] = '\n';
+        if (write(2, big, sizeof big - 1) < 0) _exit(8);
+        fprintf(stderr, "lord-web: the page responds again after 4.2 s\n");
+        _exit(0);
+    }
+    int st = 0;
+    waitpid(pid, &st, 0);
+    CHECK(WIFEXITED(st) && !WEXITSTATUS(st), "stamp child: %d", WEXITSTATUS(st));
+    CHECK(wait_for(log, "lord-web: the page responds again after 4.2 s\n"), "the last line came");
+    char *t = slurp_tail(log);
+    CHECK(t && strstr(t, " INFO  webapps: starting lord-web"), "webmgr's start line kept");
+    CHECK(t && strstr(t, " WARN  lord-web: WebKit says the page stopped responding\n"), "lord-web's own line stamped, a warning");
+    CHECK(t && strstr(t, " WARN  webkit: ** (WPEWebProcess:2): WARNING **: 18:22:03.713: something odd\n"), "WebKit's line, as webkit");
+    CHECK(t && strstr(t, " INFO  webkit: [OpenH264] this = 0x0"), "GStreamer's line, as webkit");
+    int stamped = 0, unstamped = 0;
+    for (char *l = t; l && *l;) {
+        char *e = strchr(l, '\n');
+        if (!e) break;
+        if (e - l > 30 && l[4] == '-' && l[10] == 'T' && l[19] == '.') stamped++;
+        else unstamped++;
+        CHECK(e - l < 8192 + 200, "a line cut to the buffer: %ld", (long)(e - l));
+        l = e + 1;
+    }
+    CHECK(stamped >= 7 && !unstamped, "every line stamped: %d, %d not", stamped, unstamped);
+}
+
 int main(void) {
     snprintf(T, sizeof T, "%s/lordlog-test.XXXXXX", getenv("TMPDIR") ? getenv("TMPDIR") : "/tmp");
     if (!mkdtemp(T)) { perror("mkdtemp"); return 1; }
@@ -449,6 +505,7 @@ int main(void) {
     test_user_dir();
     test_cap_rotate();
     test_app();
+    test_stamp();
     test_format();
     test_session();
     if (!getenv("LORDLOG_TEST_KEEP")) sh("rm -rf '%s'", T);

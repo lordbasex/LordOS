@@ -1,14 +1,16 @@
-// deskwidgets.jsx — the desktop widgets of Lord Workspaces (0.8.8.10): a catalog, a grid per display, sizes and each
+// deskwidgets.jsx — the desktop widgets of Workspaces (0.8.8.10): a catalog, a grid per display, sizes and each
 // widget's body. widgets.js draws the layer; widgetgrid.js has the grid's rules.
 //
 //   registerWidgetKind({ type, nameKey, descKey, sizes?, add?(x, y) })   an entry of the catalog. Built-in kinds have
 //                          sizes (s 1×1, m 2×1, l 2×2, w 4×1, xl 4×2); an app's kind without sizes adds its own widget
-//                          (the Notes app's sticky note, which it keeps itself)
+//                          (the Notes app's sticky note, which it keeps itself). Such a kind may also give a Chooser
+//                          component, shown in the catalog after its card is clicked (sdk/widgetpicker.jsx): Notes
+//                          offers a new note or one already made there
 //   widgetKinds()          the catalog, in order (a kind may say it isn't available here: Battery with no battery)
 //   addDeskWidget(type, size, display)   a widget on the first free block of that display's grid, in the activity in
 //                          view; null when there is no room
 //   removeDeskWidget(id) / setDeskWidget(id, patch)
-//   startDeskWidgets()     Lord Workspaces publishes them (the other themes never show them)
+//   startDeskWidgets()     Workspaces publishes them (the other themes never show them)
 //
 // A widget belongs to one activity (desktop) and one display (its connector): it shows only there, on a block of cells
 // of that display's grid that no other widget may take. Kept in settings.deskWidgets as
@@ -22,7 +24,7 @@
 // node, the only one that changes each second); otherwise clocks move once a minute. System, Network, Temperatures and
 // Claude Code read only while shown.
 import { memo, useEffect, useRef, useState } from 'react';
-import { View, Text, SoundWave, addListener, screen, onScreenChange, displays as screenDisplays, mainDisplay } from '@lordos/runtime';
+import { View, Text, SoundWave, addListener, screen, onScreenChange, displays as screenDisplays, mainDisplay, displayAt } from '@lordos/runtime';
 import { createStore, useStore } from './store.js';
 import { settings } from './settings.js';
 import { registerWidgetType, setWidgets } from './widgets.js';
@@ -45,7 +47,7 @@ import { fractionOf, toneOf as deviceTone } from './devicesmodel.js';
 import { useDevices, deviceShort, deviceValue, deviceVia } from './devices.js';
 import { clipboard, clipboardHistory } from './clipboard.js';
 import { wifiBars, monthWeeks, weekStartFor } from './menubarmodel.js';
-import { gridOf, rectOf, firstFree, nearestFree, cellAt, fits, occupancy, SIZE_ORDER, PINS, pinnedRect } from './widgetgrid.js';
+import { gridOf, rectOf, firstFree, nearestFree, cellAt, fits, occupancy, SIZE_ORDER, PINS, pinnedRect, pinBlocks } from './widgetgrid.js';
 import { useSound, useSpectrumSource } from './sound.js';
 import { sourceOf, appsPlaying, colorsOf, gainOf, PALETTE_ORDER } from './soundwavemodel.js';
 import { kindOf, unitFor, temp as tempIn, skyOf, cityOk, widgetCity, placeOf } from './weathermodel.js';
@@ -54,10 +56,10 @@ import { configDirs, accountOf, leftText, alertOf, summarize } from './claudewid
 import { admin } from './admin.js';
 import { clockTimer, timerStart, timerPause, timerResume, timerReset, timerLeft, stopwatch, swStart, swStop, swReset, swElapsed } from './alarms.js';
 import { timerLayout, idleSeconds, PRESETS, PRESET_DROP } from './timerwidgetmodel.js';
-import { recent as fsRecent, basename } from './fs.js';
+import { recentCached as fsRecent, recentFiles, basename } from './fs.js';
 import { openFileWithApps } from './sysopen.js';
 import { lordosUpdate, restartNeeded } from './updates.js';
-import { storeUpdates } from './appcontrol.js';
+import { storeUpdatesCount } from './appcontrol.js';
 import { useLauncherApps, launchApp } from './apps.js';
 import { VideoBody, videoSetup } from './videowidget.jsx';
 import { dock, dockIdOf } from './dock.js';
@@ -120,7 +122,8 @@ export function addDeskWidget(type, size, display) {
   // a new weather widget starts on the last city chosen and keeps it (#193: each widget has its own)
   if (type === 'weather') opts.city = cityOk(settings.get().weather?.city);
   // a pinned one needs no free block; it still gets one to go back to when it is dragged
-  const spot = firstFree(gridFor(d), placed(desk, d), sz) || (opts.pin ? { col: 0, row: 0 } : null);
+  // never under a pinned one either (the sound wave along the bottom): its cells count as taken
+  const spot = firstFree(gridFor(d), [...placed(desk, d), ...pinBlocks(gridFor(d), workAreaOf(d), pinnedOn(desk, d))], sz) || (opts.pin ? { col: 0, row: 0 } : null);
   if (!spot) return null;
   const id = `${type}-${Date.now().toString(36)}-${Math.floor(Math.random() * 1e4)}`;
   settings.set({ deskWidgets: [...all(), { id, type, size: sz, desk, dk: dkOf(d), ...spot, opts }].slice(-MAX_WIDGETS) });
@@ -134,7 +137,7 @@ export function resizeDeskWidget(id, size) {
   const d = shown().find((x) => dkOf(x) === w?.dk) || mainDisplay();
   if (!w || !d) return false;
   if (pinOf(w)) { setDeskWidget(id, { size }); return true; }
-  const g = gridFor(d), others = placed(deskOf(w), d).filter((x) => x.id !== id);
+  const g = gridFor(d), others = [...placed(deskOf(w), d).filter((x) => x.id !== id), ...pinBlocks(g, workAreaOf(d), pinnedOn(deskOf(w), d))];
   const spot = fits(g, occupancy(others), w.col, w.row, size) ? { col: w.col, row: w.row } : nearestFree(g, others, size, w.col, w.row);
   if (!spot) return false;
   setDeskWidget(id, { size, ...spot });
@@ -1294,7 +1297,7 @@ function WxGlyph({ code, day = 1, size = 40 }) {
   return <View style={{ width: size, height: size, direction: 'ltr' }}>{parts}</View>;
 }
 // Weather → Change city…: a search over the offline list of cities (lord.weather.cities: nothing asked of the network),
-// or back to the time zone's, for the widget that asked (w). Centred on the main display, in the person's theme.
+// or back to the time zone's, for the widget that asked (w). Centred on the widget's display, in the person's theme.
 const foldQuery = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9 '.-]/g, '').slice(0, 40);
 function CityPicker({ w, onClose }) {
   const th = useTheme() || {};
@@ -1305,7 +1308,9 @@ function CityPicker({ w, onClose }) {
   const cur = wxCity(w);
   const pick = (c) => { wxSetCity(w, c); onClose(); };
   useEffect(() => addListener('keydown', (e) => { if (e.key === 'Escape') onClose(); }), []);
-  const d = mainDisplay() || { x: 0, y: 0, w: 1280, h: 800 };
+  // on the widget's display (it opened on the main one; BUG-27 of the ws170 QA)
+  const on = Number.isFinite(w.x) && Number.isFinite(w.y) ? displayAt(w.x + (w.w || 0) / 2, w.y + (w.h || 0) / 2) : null;
+  const d = on || mainDisplay() || { x: 0, y: 0, w: 1280, h: 800 };
   const W = 420, H = 460;
   const row = (key, label, sub, on, onClick) => (
     <View key={key} onClick={onClick} style={{ paddingVertical: 8, paddingHorizontal: 12, borderRadius: 10, backgroundColor: on ? th.hover : 'transparent' }}>
@@ -1665,7 +1670,10 @@ function TimerBody({ w, L }) {
 const extOf = (n) => { const m = /\.([A-Za-z0-9]{1,5})$/.exec(String(n || '')); return m ? m[1].toUpperCase() : ''; };
 function RecentBody({ w, L }) {
   const n = w.size === 'l' ? 8 : 3;
-  const list = useEvery(() => { try { return fsRecent(n, 30) || []; } catch (e) { return []; } }, 60000, [n]) || [];
+  useStore(recentFiles);                            // a new walk's answer (it runs on lord-server's workers) draws again
+  useEvery(() => { fsRecent(n, 30); return 0; }, 60000, [n]);   // a new walk asked for each minute
+  let list = [];
+  try { list = fsRecent(n, 30) || []; } catch (e) { list = []; }
   return (
     <View style={{ flex: 1, gap: 6 }}>
       <Head L={L} title={t('shell.widgets.recent.name')} />
@@ -1686,13 +1694,14 @@ function RecentBody({ w, L }) {
 
 // ---- updates: LordOS's own package and the apps' (the signed lists' last check; nothing is fetched here) ----
 function UpdatesBody({ w, L }) {
-  const st = useEvery(() => {
-    let os = null, apps = 0, restart = null;
+  const apps = useStore(storeUpdatesCount);          // read off the first render, drawn again when it changes
+  const st0 = useEvery(() => {
+    let os = null, restart = null;
     try { os = lordosUpdate(); } catch (e) { os = null; }
-    try { apps = storeUpdates(); } catch (e) { apps = 0; }
     try { restart = restartNeeded(); } catch (e) { restart = null; }
-    return { os, apps, restart };
+    return { os, restart };
   }, 600000) || {};
+  const st = { ...st0, apps };
   const ok = !st.os?.available && !st.apps && !st.restart;
   const open = () => wm.open('store', { args: { page: 'updates' } });
   return (

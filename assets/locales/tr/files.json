@@ -95,7 +95,7 @@
   "menu.emptyTrash": "Çöp Kutusunu Boşalt",
   "menu.file": "Dosya",
   "menu.forward": "İleri",
-  "menu.getInfo": "Bilgi Al",
+  "menu.getInfo": "Özellikler",
   "menu.go": "Git",
   "menu.groupBy": "Grupla",
   "menu.newFolder": "Yeni Klasör",
@@ -342,5 +342,9 @@
   "readOnly.denied": "Bu klasör salt okunur: izinleri onu değiştirmenize izin vermiyor. Değiştirmek için Terminal'i veya başka bir uygulamayı kullanın.",
   "fromMachineNoRun": "“{name}” {machine} makinesinden geldi. Dosyalar bir makineden gelen programları veya yükleyicileri açmaz: güveniyorsanız Birlikte Aç'ı kullanın.",
   "info.from": "Kaynak",
-  "info.fromMachine": "{machine} makinesi"
+  "info.fromMachine": "{machine} makinesi",
+  "skin.address": "Adres",
+  "skin.tasks": "Dosya ve Klasör Görevleri",
+  "skin.otherPlaces": "Diğer Yerler",
+  "skin.details": "Ayrıntılar"
 }

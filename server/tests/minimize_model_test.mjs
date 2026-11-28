@@ -1,4 +1,4 @@
-// minimize_model_test.mjs — which windows start Lord Flow's minimize effect (themes/default/minimize.js, GitHub #112).
+// minimize_model_test.mjs — which windows start Flow's minimize effect (themes/default/minimize.js, GitHub #112).
 import { minimizeStarts } from '../../themes/default/minimize.js';
 
 let ok = 0, bad = 0;

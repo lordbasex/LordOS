@@ -206,6 +206,7 @@
   "power.healthNormal": "صحة البطارية: {pct}% (طبيعية)",
   "power.healthService": "صحة البطارية: {pct}% (يُنصح بالصيانة)",
   "power.healthUnknown": "صحة البطارية: غير معروفة",
+  "power.h": "{h} س",
   "power.hm": "{h} س {m} د",
   "power.immediately": "فورًا",
   "power.left": "متبقٍّ {time}",

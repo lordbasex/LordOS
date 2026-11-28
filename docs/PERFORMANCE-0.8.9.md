@@ -11,12 +11,12 @@ this report gives the runs and the comparisons, and doesn't repeat that method.
 
 | What | Result |
 |---|---|
-| 0.8.9, the maintainer's PC, Lord Workspaces with the wallpaper slideshow on, 2 h | `lord-server` 559 MB RSS (median), **19.0 % of one core** |
+| 0.8.9, the maintainer's PC, Workspaces with the wallpaper slideshow on, 2 h | `lord-server` 559 MB RSS (median), **19.0 % of one core** |
 | The same session with the slideshow turned off | 491 MB, **2.0 %** of one core |
 | 0.8.9, the desktop just after login (the floor), 10 min | 177 MB, 0.2 % of one core |
 | 0.8.9.1 memory work: 7 widgets and a Terminal running Claude Code at rest | **269 → 183 MB** (−86 MB, −32 %), 2.4 % of one core |
 | Raspberry Pi 5, headless session at rest, 1 h: 0.8.8.9 → 0.8.9 | 116 → 113 MB; **3.4 → 6.1 %** of one core |
-| Raspberry Pi 5 with 0.8.9.1, no monitor | Lord Flow 113 MB and 6.2 % of one core (as 0.8.9); Lord Workspaces **99 MB** and **0.06 %** |
+| Raspberry Pi 5 with 0.8.9.1, no monitor | Flow 113 MB and 6.2 % of one core (as 0.8.9); Workspaces **99 MB** and **0.06 %** |
 
 The slideshow is the biggest cost found at rest: about 17 points of one core on three 1080p displays. The memory
 work took the session with a Terminal below the same desktop *without* one before the work (183 against 185 MB).
@@ -27,8 +27,8 @@ rest is still being looked for (roadmap, 0.8.9.1).
 
 | Name | Hardware | System | Session |
 |---|---|---|---|
-| **PC** (the maintainer's) | Intel Core i9-10900, 128 GB, AMD Radeon RX 580 (Mesa radeonsi, GPU composition), 3 displays at 1920×1080 (DP-2, DP-3, HDMI-A-1) | Debian 13, kernel 6.12.117, transparent huge pages `always` | Lord Workspaces |
-| **Pi** | Raspberry Pi 5, 16 GB | LordOS's kernel 6.18.57-lordos.3-rpi-2712, aarch64 | the autologin session, **headless** (no display connected), Lord Flow |
+| **PC** (the maintainer's) | Intel Core i9-10900, 128 GB, AMD Radeon RX 580 (Mesa radeonsi, GPU composition), 3 displays at 1920×1080 (DP-2, DP-3, HDMI-A-1) | Debian 13, kernel 6.12.117, transparent huge pages `always` | Workspaces |
+| **Pi** | Raspberry Pi 5, 16 GB | LordOS's kernel 6.18.57-lordos.3-rpi-2712, aarch64 | the autologin session, **headless** (no display connected), Flow |
 
 The Pi has no display, so its session paints nothing unless someone watches it through the remote desktop
 (nobody did). Its numbers measure what a session does at rest besides drawing.
@@ -67,7 +67,7 @@ sampler started.
   build at 543 MB, not 0.8.9). The sampler now waits for a *new* session's pid; the CSV is not kept.
 - **Opening a window "to check".** Opening About to see which build ran added about 20 MB that stayed. The 0.8.9.1
   runs checked the build with `strings /proc/<pid>/exe` instead.
-- **The slideshow.** Lord Workspaces' wallpaper slideshow was on in the 2-hour 0.8.9 run. It costs 17 points of
+- **The slideshow.** Workspaces' wallpaper slideshow was on in the 2-hour 0.8.9 run. It costs 17 points of
   one core (below), so runs meant to measure something else must have it off.
 - **The scene being set up.** The first minutes of the 2-hour session, while its windows were placed
   (`*-setup.csv`, 20–24 % of one core), are not part of the run. A first slideshow-off run
@@ -78,7 +78,7 @@ sampler started.
 
 ## The PC with 0.8.9
 
-### Lord Workspaces in daily use, slideshow on (2 hours)
+### Workspaces in daily use, slideshow on (2 hours)
 
 `pc-0.8.9-workspaces.csv`: the 0.8.9 package, a session started after a reboot, sampled for 120 minutes once its
 windows were in place. The slideshow was on; what else was open on the desktop was not recorded the way the later
@@ -193,7 +193,7 @@ memory goes.
 Three runs of 60 minutes, each after a reboot into the autologin session (`pi-*.csv` in
 [`perf/0.8.9/`](perf/0.8.9/)).
 
-| | 0.8.8.9, Lord Flow | 0.8.9, Lord Flow | 0.8.9, second run |
+| | 0.8.8.9, Flow | 0.8.9, Flow | 0.8.9, second run |
 |---|---:|---:|---:|
 | RSS @1 min | 108.4 MB | 110.0 MB | 111.6 MB |
 | RSS @20 min | 115.6 MB | 112.5 MB | 112.7 MB |
@@ -208,11 +208,11 @@ Three runs of 60 minutes, each after a reboot into the autologin session (`pi-*.
 - **Processor:** 0.8.9 uses almost twice as much at rest, **6.1 % against 3.4 %** of one core, steady in every
   10-minute window, so it is something that runs all the time, not a burst at login. Nothing is painted (no
   display). Finding it is on the roadmap for 0.8.9.1.
-- **The "workspaces" run is a second Lord Flow run.** It was meant to measure Lord Workspaces
+- **The "workspaces" run is a second Flow run.** It was meant to measure Workspaces
   (`pi-0.8.9-workspaces.csv`), but its header says `theme default`: the sampler reads the theme from the user's
   `settings.json` when the session starts, and the change written before the reboot was not there any more. Its
-  numbers match the Lord Flow run within 0.2 MB and 0.02 points, so it is reported as a second 0.8.9 Lord Flow run.
-  Lord Workspaces has not been measured on the Pi yet.
+  numbers match the Flow run within 0.2 MB and 0.02 points, so it is reported as a second 0.8.9 Flow run.
+  Workspaces has not been measured on the Pi yet.
 
 ## Raspberry Pi with 0.8.9.1
 
@@ -221,7 +221,7 @@ the installed 0.8.9 package, so the themes are 0.8.9's (`pi-0.8.9.1-*.csv` in [`
 header's `lordos 0.8.9` is the package's version). The theme is now written with the session stopped and checked after
 the reboot (`theme workspaces` in the second file's header and in the session's command line).
 
-| | 0.8.9.1, Lord Flow | 0.8.9.1, Lord Workspaces |
+| | 0.8.9.1, Flow | 0.8.9.1, Workspaces |
 |---|---:|---:|
 | RSS @1 min | 109.5 MB | 99.2 MB |
 | RSS @20 min | 112.5 MB | 99.4 MB |
@@ -231,11 +231,11 @@ the reboot (`theme workspaces` in the second file's header and in the session's 
 | File-backed, median | 40.4 MB | 39.9 MB |
 | CPU, % of one core | **6.2** (6.0–6.2) | **0.06** (0.05–0.06) |
 
-- **Lord Flow: the same as 0.8.9**, to 0.1 MB and 0.1 points. The memory work freed the cached rasters of
+- **Flow: the same as 0.8.9**, to 0.1 MB and 0.1 points. The memory work freed the cached rasters of
   animated windows, the Terminal's history and the huge pages of `.bss` on x86-64; a session with no monitor, no
   window and no Terminal has none of them.
-- **Lord Workspaces: 99 MB and 0.06 % of one core**, 13 MB and 6 points below Lord Flow on the same server. So the
-  processor Lord Flow uses at rest on the Pi comes from its theme (what its JavaScript keeps doing with nothing on
+- **Workspaces: 99 MB and 0.06 % of one core**, 13 MB and 6 points below Flow on the same server. So the
+  processor Flow uses at rest on the Pi comes from its theme (what its JavaScript keeps doing with nothing on
   screen), not from `lord-server`; it is still on the roadmap.
 
 ## Repeating it
@@ -251,7 +251,7 @@ the reboot (`theme workspaces` in the second file's header and in the session's 
 
 | Folder | Runs |
 |---|---|
-| [`perf/0.8.9/`](perf/0.8.9/) | `pc-0.8.9-workspaces.csv`, `pc-0.8.9-workspaces-slideshow-off-2018.csv`, `pc-0.8.9-floor-base.csv`, `pc-ws01-floor.csv`, `pc-ws01-floor-b.csv`, `pc-ws02-floor.csv`, `pc-ws02-widgets.csv`, `pi-0.8.8.9-flow.csv`, `pi-0.8.9-flow.csv`, `pi-0.8.9-workspaces.csv` (the second Lord Flow run) |
+| [`perf/0.8.9/`](perf/0.8.9/) | `pc-0.8.9-workspaces.csv`, `pc-0.8.9-workspaces-slideshow-off-2018.csv`, `pc-0.8.9-floor-base.csv`, `pc-ws01-floor.csv`, `pc-ws01-floor-b.csv`, `pc-ws02-floor.csv`, `pc-ws02-widgets.csv`, `pi-0.8.8.9-flow.csv`, `pi-0.8.9-flow.csv`, `pi-0.8.9-workspaces.csv` (the second Flow run) |
 | [`perf/0.8.9.1/`](perf/0.8.9.1/) | `pc-ws02-widgets-terminal.csv` … `pc-ws08-widgets-terminal.csv`, `pc-ws03-widgets.csv`, `heaptrack-ws06-live.txt`, `pi-0.8.9.1-flow.csv`, `pi-0.8.9.1-workspaces.csv` |
 
 The `ws01`–`ws08` builds report themselves as `0.8.9` in the CSV header (the package's version); their build label

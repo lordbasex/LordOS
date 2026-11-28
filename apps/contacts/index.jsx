@@ -33,7 +33,7 @@ export function Icon({ size: s }) {
 }
 
 const ROW = 30, HEAD = 24;
-// a small window (a Lord Workspaces tile): below SIDE_AT the books and groups hide behind a toolbar button, below
+// a small window (a Workspaces tile): below SIDE_AT the books and groups hide behind a toolbar button, below
 // ONE_AT the list and the card take turns (the card with a back button)
 const SIDE_AT = 800, ONE_AT = 640;
 

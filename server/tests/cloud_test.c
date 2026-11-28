@@ -987,6 +987,27 @@ static void t_pause(void) {
     CHECK(!cloud_poll_body("cc4ed54b5", 0, b, sizeof b) && !strcmp(b, "{\"fs\":\"cc4ed54b5:\",\"interval\":\"60s\"}"));
     CHECK(cloud_poll_body("c\",\"x", 1, b, sizeof b) == -1 && cloud_poll_body("", 1, b, sizeof b) == -1 && cloud_poll_body(NULL, 1, b, sizeof b) == -1);
     CHECK(cloud_poll_body("cc4ed54b5", 1, b, 10) == -1);
+    /* QA 0.8.9.6.2 (BUG-C): Pause stops an upload already running, once */
+    CHECK(cloud_cancel_due(1, 1, 0, 5000) && cloud_cancel_due(1, 1, 1000, 1000 + CLOUD_CANCEL_AGAIN_MS));
+    CHECK(!cloud_cancel_due(0, 1, 0, 5000) && !cloud_cancel_due(1, 0, 0, 5000) && !cloud_cancel_due(1, 1, 1000, 2000));
+    /* its write leaves the content as it was, and follows no link */
+    char dir[] = "/tmp/cloud-cancel.XXXXXX", f[64], l[64], e[64];
+    CHECK(mkdtemp(dir) != NULL);
+    snprintf(f, sizeof f, "%s/f", dir);
+    snprintf(l, sizeof l, "%s/l", dir);
+    snprintf(e, sizeof e, "%s/e", dir);
+    FILE *w = fopen(f, "w");
+    if (w) { fputs("hello cloud", w); fclose(w); }
+    w = fopen(e, "w");
+    if (w) fclose(w);
+    CHECK(!symlink(f, l));
+    CHECK(cloud_rewrite_first_byte(f) == 1);
+    char got[32] = "";
+    FILE *r = fopen(f, "r");
+    if (r) { if (!fgets(got, sizeof got, r)) got[0] = 0; fclose(r); }
+    CHECK(!strcmp(got, "hello cloud"));
+    CHECK(cloud_rewrite_first_byte(l) == 0 && cloud_rewrite_first_byte(e) == 0 && cloud_rewrite_first_byte(dir) == 0);
+    unlink(f); unlink(l); unlink(e); rmdir(dir);
 }
 
 int main(void) {

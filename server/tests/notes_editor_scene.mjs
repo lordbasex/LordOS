@@ -95,4 +95,18 @@ check('the right-click menu has Copy', !!item('notes.cmd.copy') && !!item('notes
 clip.text = '';
 await click(item('notes.cmd.copy'));
 check('Copy from the right-click menu', clip.text === '**pasted**' && !item('notes.cmd.copy'), clip.text);
+
+// Read → Edit (QA ws168): the editor's area is not laid out on its first frame (lord.getLayout answers 0 × 0); it used to
+// wrap at that width, every line broken every few characters for a frame. It starts at the size it opens in and keeps it
+const long = '# QA ws168 important note that must stay one row';      // 48 characters, 480 px in this stub
+const getLayout = globalThis.lord.getLayout;
+globalThis.lord.getLayout = () => [0, 0, 0, 0];
+rt.render(h(rt.View, { style: { width: 600, height: 400 } },
+  h(NoteEditor, { value: long, onChange: () => {}, colors, initialSize: { w: 600, h: 400 } })));
+await flush();
+await new Promise((res) => setTimeout(res, 60));
+await flush();
+const rowsNow = () => [...texts].filter(([id, s]) => inTree(id) && long.includes(s) && s.length > 1).map(([, s]) => s);
+check('Read → Edit: the first frame wraps at the real width, not at 0', rowsNow().includes(long), JSON.stringify(rowsNow()));
+globalThis.lord.getLayout = getLayout;
 process.exit(0);

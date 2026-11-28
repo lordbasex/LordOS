@@ -1,6 +1,6 @@
-// minimize.js — which windows start Lord Flow's minimize effect (index.jsx useMinimizing; tests:
+// minimize.js — which windows start Flow's minimize effect (index.jsx useMinimizing; tests:
 // server/tests/minimize_model_test.mjs). One that has just been minimized, not fullscreen and not picture in picture.
-// With Reduce motion (Settings → Appearance) none starts and the window goes at once, as in Lord Classic (GitHub #112).
+// With Reduce motion (Settings → Appearance) none starts and the window goes at once, as in Classic (GitHub #112).
 // prev (Map id → minimized) is what the last render saw, and it is updated here.
 export function minimizeStarts(windows, prev, { reduce = false, now = Date.now() } = {}) {
   const started = [];

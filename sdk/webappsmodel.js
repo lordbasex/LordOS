@@ -315,6 +315,12 @@ export function webIconPathOk(path, app, home, profile = null) {
 // Whether the Store or a launch should fetch the site's icon now: lord-web there, not fetched yet and not tried
 // this session (a failure is not retried until the next session or "Refresh icon").
 export const wantsSiteIcon = ({ available, cached, tried }) => !!available && !cached && !tried;
+// Why the site's icon was not kept, as a closed code for the message and the log: lord-server's own (webapps.…, the
+// probe's web.probe.…), else webapps.probeFailed. Never text from the page.
+export function siteIconError(x) {
+  const code = x && typeof x === 'object' ? x.code || x.error : x;
+  return typeof code === 'string' && /^(webapps|web\.probe)\.[A-Za-z]{1,40}$/.test(code) ? code : 'webapps.probeFailed';
+}
 
 // ---- unread counts on the Dock (org.lordos.WebApps1.SetBadge → the "webapps-badge" event) ----
 
@@ -359,10 +365,9 @@ export const appOfNotifyKey = (key) => {
 // What the app's pages are told about light and dark (prefers-color-scheme): auto follows LordOS's mode.
 export const COLOR_SCHEMES = ['auto', 'light', 'dark'];
 export const colorSchemeOf = (entry) => (entry && COLOR_SCHEMES.includes(entry.colorScheme) ? entry.colorScheme : 'auto');
-// Light and dark per app wait for the WPEPlatform engine (docs/ROADMAP.md, "Before 1.0"): WPE 2.48 can't tell a
-// page's CSS, so they only half worked. Until then only auto can be chosen and a stored light or dark shows (and acts,
-// lord-server's webscheme.c) as auto; the registry keeps the value. Add 'light' and 'dark' back here to bring them back.
-export const COLOR_SCHEMES_AVAILABLE = ['auto'];
+// Light and dark per app since 0.8.9.6.2: lord-web on WPEPlatform tells the pages' CSS too (WPE_SETTING_DARK_MODE;
+// lord-server's webscheme.h, WEBSCHEME_PER_APP).
+export const COLOR_SCHEMES_AVAILABLE = ['auto', 'light', 'dark'];
 export const shownColorScheme = (entry) => {
   const v = colorSchemeOf(entry);
   return COLOR_SCHEMES_AVAILABLE.includes(v) ? v : 'auto';
@@ -461,30 +466,144 @@ export function webEditItems(label, run) {
   return WEB_EDIT_ROWS.map((r) => (r === '-' ? '-' : { label: label(r[0]), hint: r[1], onClick: () => run(r[0]) }));
 }
 
-// The items a page's context menu may have (server/src/web/webedit.c's closed list, in its order); the editing
-// ones come first, then the link's, then the image's, with a separator between the groups.
-export const WEB_MENU_ITEMS = ['cut', 'copy', 'paste', 'selectAll', 'copyLink', 'openLink', 'copyImage'];
-const MENU_GROUP = { cut: 0, copy: 0, paste: 0, selectAll: 0, copyLink: 1, openLink: 1, copyImage: 2 };
+// The items a page's context menu may have (server/src/web/webedit.c's closed list, in its order). lord-web sends the
+// ones for what is under the pointer, in a browser's order; the shell groups them with separators between groups.
+export const WEB_MENU_ITEMS = [
+  'spell1', 'spell2', 'spell3', 'spell4', 'spell5', 'ignoreSpelling', 'learnSpelling',
+  'undo', 'redo', 'cut', 'copy', 'paste', 'pastePlain', 'selectAll', 'emoji',
+  'copyHighlight', 'search', 'speech',
+  'openLink', 'copyLink',
+  'openImage', 'saveImage', 'copyImage', 'copyImageAddress',
+  'play', 'pause', 'mute', 'unmute', 'loop', 'controls', 'saveVideo', 'saveAudio',
+  'back', 'forward', 'reload',
+  'inspect',
+];
+const SPELL = ['spell1', 'spell2', 'spell3', 'spell4', 'spell5'];
+const MENU_GROUP = {
+  spell1: 0, spell2: 0, spell3: 0, spell4: 0, spell5: 0, ignoreSpelling: 1, learnSpelling: 1, undo: 2, redo: 2,
+  cut: 3, copy: 3, paste: 3, pastePlain: 3, selectAll: 3, copyHighlight: 3, search: 3, emoji: 4, speech: 5,
+  openLink: 6, copyLink: 6, openImage: 7, saveImage: 7, copyImage: 7, copyImageAddress: 7,
+  play: 8, pause: 8, mute: 8, unmute: 8, loop: 8, controls: 8, saveVideo: 8, saveAudio: 8, back: 9, forward: 9, reload: 9, inspect: 10,
+};
+// the keys that do the same in a web app's window (lord-web's own, server/src/web/webwin.c, or WebKit's)
+export const WEB_MENU_KEYS = {
+  undo: 'Ctrl+Z', redo: 'Ctrl+Shift+Z', cut: 'Ctrl+X', copy: 'Ctrl+C', paste: 'Ctrl+V', pastePlain: 'Ctrl+Shift+V', selectAll: 'Ctrl+A',
+  emoji: '❖.', back: 'Alt+←', forward: 'Alt+→', reload: 'Ctrl+R',
+};
+// Items the shell runs itself, never lord-web (webmenu_shell_only): LordOS's emoji picker, its Speech submenu, and
+// Inspect (developer tools), which shows only while developer mode is on.
+export const WEB_MENU_SHELL = ['emoji', 'speech', 'inspect'];
 
-// The "webapps-menu" event's items → ContextMenu items. Unknown names and repeats are left out (lord-server sends
-// only known ones, once); pick(name) is what a click does.
-export function webMenuItems(names, label, pick) {
+// A page's text in a menu row, in its own direction whatever the menu's (first strong isolate … pop isolate):
+// lord-server already removed control and bidi characters from it.
+export const isolate = (s) => `⁨${String(s ?? '')}⁩`;
+
+// The "webapps-menu" event → ContextMenu items. menu: { items, checked, text, guesses } (or just the items' names).
+// label(name, vars) is a row's words; pick(name) answers lord-web; shell: { developer, speech() → a submenu item or
+// null, emoji(), inspect() } for the shell's own items (a pick of one answers lord-web "" first). Unknown names,
+// repeats, a spelling suggestion without its word and a search without its text are left out.
+export function webMenuItems(menu, label, pick, shell = {}) {
+  const m = Array.isArray(menu) ? { items: menu } : menu || {};
+  const checked = new Set(Array.isArray(m.checked) ? m.checked : []);
+  const guesses = Array.isArray(m.guesses) ? m.guesses : [];
   const out = [];
   let group = -1;
-  for (const n of Array.isArray(names) ? names : []) {
+  let guess = 0;
+  const own = (fn) => () => { pick(''); fn?.(); };
+  for (const n of Array.isArray(m.items) ? m.items : []) {
     if (!WEB_MENU_ITEMS.includes(n) || out.some((i) => i !== '-' && i.id === n)) continue;
+    let it;
+    if (SPELL.includes(n)) {
+      const word = guesses[guess++];
+      if (typeof word !== 'string' || !word) continue;
+      it = { id: n, label: isolate(word), onClick: () => pick(n) };
+    } else if (n === 'search') {
+      if (typeof m.text !== 'string' || !m.text) continue;
+      // the quoted words shortened inside the label, so all of it ("… on Google") fits the menu's widest row
+      const make = (s) => label(n, { text: isolate(s) });
+      const text = shell.measure ? fitQuoted(m.text, make, shell.measure, shell.maxWidth || 420) : m.text;
+      it = { id: n, label: make(text), onClick: () => pick(n) };
+    } else if (n === 'speech') {
+      const sp = shell.speech?.();
+      if (!sp) continue;
+      it = { ...sp, id: n };
+    } else if (n === 'inspect') {
+      if (shell.developer !== true) continue;
+      it = { id: n, label: label(n), onClick: own(shell.inspect) };
+    } else if (n === 'emoji') {
+      if (!shell.emoji) continue;
+      it = { id: n, label: label(n), hint: WEB_MENU_KEYS[n], onClick: own(shell.emoji) };
+    } else it = { id: n, label: label(n), hint: WEB_MENU_KEYS[n], checked: checked.has(n) || undefined, onClick: () => pick(n) };
     if (group >= 0 && MENU_GROUP[n] !== group) out.push('-');
     group = MENU_GROUP[n];
-    out.push({ id: n, label: label(n), onClick: () => pick(n) });
+    out.push(it);
+  }
+  // ✨ AI (docs/AI.md "Writing"): the shell's own row, with the selection lord-web sent and lord-server cleaned; the
+  // shell answers lord-web "" and runs it in its own panel (shell.writing(text, editable) → the row, or null)
+  const ai = webAiText(m);
+  const row = ai && shell.writing ? shell.writing(ai, m.aiEdit === true) : null;
+  if (row) {
+    const at = out.findIndex((i) => i !== '-' && i.id === 'inspect');
+    const add = ['-', { ...row, id: 'ai' }];
+    if (at > 0) out.splice(out[at - 1] === '-' ? at - 1 : at, 0, ...add); else out.push(...add);
   }
   return out;
 }
+
+// The longest start of text (whole characters, then "…") whose row make(text) fits max px: 46 px of the row's own room
+// plus the label at 13 px (contextmenu.jsx rowWidth). measure(s, size) → px. Never shorter than one character and "…".
+export function fitQuoted(text, make, measure, max = 420) {
+  const fits = (s) => 46 + measure(make(s), 13) <= max;
+  const cps = [...String(text || '')];
+  if (fits(cps.join(''))) return cps.join('');
+  let lo = 1, hi = cps.length - 1, best = 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (fits(`${cps.slice(0, mid).join('').trimEnd()}…`)) { best = mid; lo = mid + 1; } else hi = mid - 1;
+  }
+  return `${cps.slice(0, best).join('').trimEnd()}…`;
+}
+
+// The selection a page's menu carries (for ✨ AI, which takes at most 4,000 characters of it, and Speech): a string of
+// 1..16,384 characters (lord-server's webai_clean already made it plain), else ''
+export const WEB_AI_CHARS = 16384;
+// Speech's text from a page's menu: the selection it carried (a text field's or contenteditable's too; never a password
+// field's, which reports none), so reading it aloud doesn't depend on the session's primary selection
+export const webSpeechText = (menu) => webAiText(menu);
+export function webAiText(menu) {
+  const s = menu && typeof menu.ai === 'string' ? menu.ai : '';
+  if (!s.trim() || [...s].length > WEB_AI_CHARS) return '';
+  return /[\u0000-\u0008\u000b-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/.test(s) ? '' : s;
+}
+
+// ---- Search the web (Settings → Web apps; server/src/web/websearch.h) ----
+
+// The engines the context menu's "Search the web" may use, a closed list; Google is the default, as in Chrome.
+export const SEARCH_ENGINES = ['google', 'duckduckgo', 'bing', 'startpage'];
+export const searchEngineOf = (v) => (SEARCH_ENGINES.includes(v) ? v : 'google');
 
 // ---- developer tools (docs/WEBAPPS.md, "Developer tools") ----
 
 // The Window menu's Inspect (developer tools) for a web app's window (web: { app, profile } of a lord-web we started),
 // only while developer mode is on; checked and unavailable while that window already has them (they end when it
 // closes). running: lord.webapps.running(); ask({ app, profile }) shows the question before anything starts.
+// The Window menu's Restart and Force Quit for a web app's window (docs/WEBAPPS.md, "When a web app stops answering"):
+// both ask first (ask({ app, profile, kind: 'restart' | 'quit' })); nothing when the window isn't a web app's or its
+// process isn't running. labels: { restart, quit }.
+export function restartItems(web, running, labels, ask) {
+  if (!web || !web.app || !web.profile || typeof ask !== 'function') return [];
+  const on = (Array.isArray(running) ? running : []).some((r) => r && r.app === web.app && r.profile === web.profile);
+  if (!on) return [];
+  return ['restart', 'quit'].map((kind) => ({ label: labels?.[kind] || kind, onClick: () => ask({ app: web.app, profile: web.profile, kind }) }));
+}
+
+// The name a notification or a question gives a web app's profile: the app's, with the profile's when it has several.
+export function appProfileName(entry, profileId, tr) {
+  if (!entry) return String(profileId || '');
+  const l = windowLabel(entry, profileId);
+  return l.profile && typeof tr === 'function' ? tr('webapps.windowName', { app: l.name, profile: l.profile }) : l.name;
+}
+
 export function inspectItem(web, developer, running, label, ask) {
   if (!web || !web.app || !web.profile || developer !== true) return null;
   const on = (Array.isArray(running) ? running : []).some((r) => r && r.app === web.app && r.profile === web.profile && r.inspect === true);

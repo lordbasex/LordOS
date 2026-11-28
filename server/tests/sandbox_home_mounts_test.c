@@ -36,6 +36,11 @@ static int writable(const char *dir) {
 int main(void) {
     char base[4096];                                      /* not under /tmp: the view mounts its own there */
     if (!getcwd(base, sizeof base - 32)) return 1;
+    /* the view puts its own empty /tmp, /var/tmp and /dev/shm over the real ones: a tree there can't be checked */
+    if (!strncmp(base, "/tmp/", 5) || !strcmp(base, "/tmp") || !strncmp(base, "/var/tmp/", 9) || !strncmp(base, "/dev/shm/", 9)) {
+        printf("sandbox-home-mounts-test: skipped: the tree is under %s, which the sandbox's view replaces (build it elsewhere)\n", base);
+        return 77;
+    }
     strcat(base, "/build/sbx-home-test.XXXXXX");
     if (!mkdtemp(base)) { perror("mkdtemp"); return 1; }
     char home[4200], a[4300], ab[4400], c[4300];

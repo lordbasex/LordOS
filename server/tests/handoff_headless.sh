@@ -16,7 +16,7 @@
 #      attention: the desktop in view stays;
 #   4. windowless-maps: a copy that closed its last window and keeps running maps a new one when launched again, and it
 #      is in front.
-# Run once per theme whose bundle is built (Lord Flow, Lord Workspaces). Run from server/ (tests/run_suites.sh does).
+# Run once per theme whose bundle is built (Flow, Workspaces). Run from server/ (tests/run_suites.sh does).
 # Exit 77 when something it needs is missing (npm run build; make), 1 on a failure or if lord-server died.
 # HANDOFF_DEBUG=1 shows the logs.
 cd "$(dirname "$0")/.." || exit 1

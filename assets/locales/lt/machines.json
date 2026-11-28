@@ -712,6 +712,7 @@
   "agent.toolsAutoFailed": "Automatinis atnaujinimas nepavyko ({have} → {want}).",
   "agent.toolsUpdateBtn": "Atnaujinti",
   "agent.st.needsTools": "Reikia įrankių",
+  "agent.st.oldLordos": "Atnaujinkite joje LordOS",
   "agent.st.needsXclip": "Reikia xclip",
   "agent.toolsInstalled": "LordOS įrankiai įdiegti ir veikia mašinoje; jie vėl paleidžiami kiekvieną kartą prisijungus.",
   "agent.timesync": "Nustatyti laikrodį",
@@ -880,6 +881,8 @@
   "un.how.preseed": "Atsakymai įrašomi į pačios diegimo programos paleidimo failus, jūsų slaptažodis – tik kaip maiša, ir jie pašalinami, kai sistema įdiegiama.",
   "un.how.autoinstall": "Atsakymai įrašomi į nedidelį diską, kurį skaito diegimo programa, jūsų slaptažodis – tik kaip maiša, o diskas pašalinamas, kai sistema įdiegiama.",
   "un.how.kickstart": "Atsakymai įrašomi į nedidelį diską, kurį skaito diegimo programa, jūsų slaptažodis – tik kaip maiša, o diskas pašalinamas, kai sistema įdiegiama.",
+  "un.how.kali": "Atsakymai įrašomi į pačios diegimo programos paleidimo failus, jūsų slaptažodis – tik kaip maiša, ir jie pašalinami, kai sistema įdiegiama.",
+  "un.how.lordos": "Atsakymai įrašomi į nedidelį diską, kurį skaito diegimo programa, jūsų slaptažodis – tik kaip maiša, o diskas pašalinamas, kai sistema įdiegiama.",
   "un.image": "Diegiama iš {file}, taip pat patikrinto pagal gamintojo pasirašytą sąrašą",
   "un.review": "Be klausimų: paskyra {user} kompiuteryje {host}",
   "un.reviewOff": "Į diegimo programos klausimus atsakote jūs",
@@ -1100,6 +1103,7 @@
   "apps.menu": "Programos",
   "apps.needsAgent": "Programų režimui reikia prijungto mašinos agento",
   "win.appsNeedsTools": "Programų režimui mašinoje reikia LordOS arba Windows su LordOS įrankiais",
+  "win.appsOldLordos": "Programų režimui mašinoje reikia LordOS {version} ar naujesnės. Atnaujinkite LordOS mašinoje; vien LordOS įrankių neužtenka.",
   "apps.noApps": "Mašina dar nepateikė savo programų sąrašo",
   "apps.gone": "Šis langas mašinoje užsidarė",
   "apps.dropTitle": "Numeskite, kad šie failai atitektų šiam mašinos langui",
@@ -2027,5 +2031,7 @@
   "req.row.answers": "Diegimo atsakymai",
   "req.use.answers": "Juos sukuria pati Machines: nieko nereikia diegti",
   "req.st.download": "Kuriant",
-  "req.st.builtin": "Įtaisyta"
+  "req.st.builtin": "Įtaisyta",
+  "cfg.closeOnStop": "Uždaryti langą, kai mašina sustoja",
+  "cfg.closeOnStopNote": "Po išjungimo arba „Išjungti“. Jei ji sustoja dėl problemos, langas lieka atidarytas ir parodo, kas nutiko."
 }

@@ -13,15 +13,15 @@ Podés tener hasta nueve.
 
 La vista general muestra las ventanas de este escritorio y, arriba, todos tus escritorios.
 
-- **Lord Flow:** Vista general en el menú Ventana, o ⌃↑ si las flechas con Ctrl están activadas (ver abajo).
-- **Lord Classic:** ❖Tab, o el botón al lado de la búsqueda.
+- **Flow:** Vista general en el menú Ventana, o ⌃↑ si las flechas con Ctrl están activadas (ver abajo).
+- **Classic:** ❖Tab, o el botón al lado de la búsqueda.
 
 Hacé clic en una ventana para ir a ella y en un escritorio para verlo. Con **+** agregás un escritorio, y con la ×
 de un escritorio lo cerrás: sus ventanas pasan al siguiente. Arrastrá una ventana a un escritorio para moverla.
 
 ## Cambiar de escritorio
 
-| | Lord Flow | Lord Classic |
+| | Flow | Classic |
 |---|---|---|
 | Escritorio anterior o siguiente | ❖⌃← ❖⌃→ (también ⌃← ⌃→ si están activadas) | ❖⌃← ❖⌃→ |
 | Nuevo escritorio | En la vista general | ❖⌃D |
@@ -39,7 +39,7 @@ Menú Ventana → **Mover a escritorio**. Las apps con barra propia lo tienen en
 
 ## Ctrl y las flechas
 
-En muchas apps ⌃← y ⌃→ mueven por palabras, así que en Lord Flow quedan para la app. Si preferís usar
+En muchas apps ⌃← y ⌃→ mueven por palabras, así que en Flow quedan para la app. Si preferís usar
 ⌃↑ ⌃↓ ⌃← ⌃→ para los escritorios, activá **Usar Ctrl + flechas para los escritorios** en
 [Ajustes → Escritorio y Dock](settings:dock). ❖⌃← y ❖⌃→ siempre cambian de escritorio.
 

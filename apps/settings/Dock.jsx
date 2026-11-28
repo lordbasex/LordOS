@@ -2,7 +2,7 @@
 // only while a window covers it, always: issue #46) and recent apps; in the Classic theme, the taskbar
 // position. Saved in settings.json (sdk/dock.js: DOCK_DEFAULTS) and the theme applies it live, including
 // the work area. «Reset Dock to defaults» puts the theme's apps back (dock.reset), after a confirmation in the page.
-// Menu Bar (Taskbar in Lord Classic) and Control Center: what the bar and the panel show (issue #58,
+// Menu Bar (Taskbar in Classic) and Control Center: what the bar and the panel show (issue #58,
 // sdk/menubarmodel.js); everything is on until the user turns it off. Title bars: the side of the window buttons in
 // both themes (sdk/windowbuttons.js, issue #58). Their size, ❖ + drag and the Window menu's tiling options are in
 // Appearance → Window options (WindowPrefs.jsx, #151, #219).
@@ -93,7 +93,7 @@ function MenuBarSection({ classic }) {
   const { t: tr } = useLocale();
   const [s, set] = useSettings();
   const p = menuBarPrefs(s);
-  // text: the row's own text keys when they differ from the setting's (the taskbar's wording in Lord Classic)
+  // text: the row's own text keys when they differ from the setting's (the taskbar's wording in Classic)
   const row = (key, on, hint, text = key) => (
     <SettingRow key={key} label={tr(`settings.dock.menubar.${text}`)} hint={hint ? tr(`settings.dock.menubar.${text}Hint`) : undefined}>
       <Toggle small on={on} onChange={(v) => set(menuBarPatch(s, key, v))} />
@@ -101,7 +101,7 @@ function MenuBarSection({ classic }) {
   );
   return (
     <Section title={tr(classic ? 'settings.dock.menubar.titleTaskbar' : 'settings.dock.menubar.title')} footer={tr('settings.dock.menubar.footer')}>
-      {/* a full bar on each display: Lord Flow's menu bar, Lord Classic's taskbar (the same setting) */}
+      {/* a full bar on each display: Flow's menu bar, Classic's taskbar (the same setting) */}
       {row('everyDisplay', menuBarEveryDisplay(s), true, classic ? 'everyDisplayTaskbar' : 'everyDisplay')}
       {getApp('cleaner') ? row('cleaner', cleanerItemShown(s), true) : null}
       {row('keyboard', p.keyboard, true)}
@@ -112,7 +112,7 @@ function MenuBarSection({ classic }) {
   );
 }
 
-// Lord Flow's Control Center: the tiles that can go (issue #114 added Do Not Disturb, Night Light, brightness and Log
+// Flow's Control Center: the tiles that can go (issue #114 added Do Not Disturb, Night Light, brightness and Log
 // Out, all shown unless turned off). Dark mode, transparency, sound and the wallpaper stay.
 function ControlCenterSection() {
   const { t: tr } = useLocale();
@@ -137,9 +137,9 @@ function ControlCenterSection() {
   );
 }
 
-// Where the close, minimize and maximize buttons go: the theme's own side, the left or the right, in Lord Flow and
-// Lord Classic alike (and for Linux apps that draw their own title bar).
-// plain: a theme other than Lord Flow and Lord Classic (the footers name theirs)
+// Where the close, minimize and maximize buttons go: the theme's own side, the left or the right, in Flow and
+// Classic alike (and for Linux apps that draw their own title bar).
+// plain: a theme other than Flow and Classic (the footers name theirs)
 function WindowsSection({ classic, plain }) {
   const { t: tr } = useLocale();
   const [s, set] = useSettings();
@@ -173,7 +173,7 @@ export function DockSettings() {
   const p = dockPrefs(s);
   const current = themes.current();
   const classic = current === 'classic';
-  // (0.8.9) a theme Settings doesn't know by id that brings its own choices (theme.json "options", Lord Workspaces): it
+  // (0.8.9) a theme Settings doesn't know by id that brings its own choices (theme.json "options", Workspaces): it
   // has no Dock or taskbar here; its desktops and the title bars' buttons are the same as everywhere
   const info = classic || current === 'default' ? null : themes.info();
   if (info && info.options.length) {

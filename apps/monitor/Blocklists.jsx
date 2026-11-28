@@ -71,7 +71,8 @@ export function BlocklistsPrivacy() {
   const foot = (text, color) => <Text style={{ fontSize: typeScale.caption, color: color || t.textDim, lineHeight: 1.4, marginHorizontal: spacing.xs, textAlign: 'start' }}>{text}</Text>;
   const on = st.lists.filter((l) => l.on).length;
   return (
-    <View style={{ gap: 20 }}>
+    // handsDeny: the blocklists are the person's own (docs/HANDS.md)
+    <View handsDeny style={{ gap: 20 }}>
       <View style={{ gap: 6 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', minHeight: 22, paddingHorizontal: spacing.xs, gap: spacing.s }}>
           <Text style={{ flex: 1, fontSize: typeScale.body, fontWeight: 600, color: t.text, textAlign: 'start' }}>{tr('firewall.lists.title')}</Text>
@@ -91,7 +92,7 @@ export function BlocklistsPrivacy() {
                 onRemove={l.custom ? () => { try { firewall.removeList(l.id); } catch (e) { setMsg(e.message); } refresh(); } : null} />)}
               {topic === 'custom' ? (
                 <View style={{ gap: spacing.s, paddingVertical: spacing.s }}>
-                  <TextInput value={url} onChange={setUrl} placeholder={tr('firewall.lists.urlPlaceholder')} onSubmit={add} />
+                  <TextInput spellCheck={false} value={url} onChange={setUrl} placeholder={tr('firewall.lists.urlPlaceholder')} onSubmit={add} />
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.s }}>
                     <Segmented small value={format} onChange={setFormat}
                       options={[['hosts', tr('firewall.lists.format.hosts')], ['domains', tr('firewall.lists.format.domains')], ['ips', tr('firewall.lists.format.ips')]]} />

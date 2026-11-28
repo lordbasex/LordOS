@@ -4,7 +4,7 @@
 //
 //   node tools/wl-conformance.mjs                 static + dynamic (a headless lord-server) + X11 + real clients
 //   make -C server wl-conformance                 the same (builds lord-server and the theme first)
-//   options: --static-only  --no-x11  --no-smoke  --only <global,...>  --json <file>  --record (docs/wayland-conformance.json)
+//   options: --static-only  --no-x11  --no-smoke  --no-toolkits  --only <global,...>  --json <file>  --record (docs/wayland-conformance.json)
 //            --claims <file> (default docs/wayland-protocols.json)  --xml-dirs <dir:dir>  --allow <file>  --verbose
 //
 // Inputs: the protocol XML files (the build's wayland-protocols, /usr/share/wayland, vendored copies in the
@@ -18,7 +18,11 @@
 //   X11      build/x11-conformance-client (server/tests/x11_conformance.c) against Xwayland on that server:
 //            ICCCM, EWMH, selections (INCR both ways), plus patterns in xwm.c and the unit tests;
 //   clients  real programs that are installed (weston-simple-*, foot, vkcube, GTK and Qt demos, ...), each pass or
-//            fail with the globals it bound (reported, not scored).
+//            fail with the globals it bound (reported, not scored);
+//   toolkits the toolkit audit (docs/TOOLKIT-AUDIT.md): build/lordos-testbench --toolkits --json with this tree's
+//            harnesses (tools/toolkit-audit) against the same server, scored as the installed command scores them
+//            (GTK 3/4, Qt 5/6, plain X11; a row whose bindings aren't installed says so). Its own section: it
+//            changes none of the globals' scores.
 // Weights: a request 3, an event 2, an error 1, a protocol-specific dynamic check 3, a generic bind/destroy 1,
 // an X11 dynamic check 3, an X11 source pattern or unit test 1. Allowed exceptions (tools/wl-conformance/allow.json,
 // each with its reason) count as passed and are listed. Skipped checks don't count, but an item with skips, without
@@ -43,6 +47,7 @@ const OPTS = {
   staticOnly: flag('--static-only'),
   x11: !flag('--no-x11'),
   smoke: !flag('--no-smoke'),
+  toolkits: !flag('--no-toolkits'),
   only: opt('--only', '') ? opt('--only', '').split(',') : null,
   json: opt('--json', path.join(BUILD, 'wl-conformance.json')),
   record: flag('--record'),
@@ -372,10 +377,21 @@ async function startServer() {
   const D = fs.mkdtempSync(path.join(os.tmpdir(), 'lwconf.'));
   fs.chmodSync(D, 0o700);
   fs.mkdirSync(path.join(D, 'home', '.config', 'lordos'), { recursive: true });
-  fs.writeFileSync(path.join(D, 'home', '.config', 'lordos', 'settings.json'), '{"schema": 9, "desktopChosen": true, "language": "en"}\n');
+  // the welcome seen too: the Help window opening mid-run took the keyboard from the toolkit harnesses
+  fs.writeFileSync(path.join(D, 'home', '.config', 'lordos', 'settings.json'), '{"schema": 9, "desktopChosen": true, "welcomeShown": true, "language": "en"}\n');
   fs.writeFileSync(path.join(D, 'theme.js'), fs.readFileSync(theme, 'utf8') + THEME_HOOK);
   const env = { ...process.env, XDG_RUNTIME_DIR: D, HOME: path.join(D, 'home'), LORD_GPU: '0', LANG: 'en_US.UTF-8', LORD_HEADLESS_DRAW: '1' };
   for (const k of ['WAYLAND_DISPLAY', 'WAYLAND_SOCKET', 'DISPLAY', 'XAUTHORITY', 'LORD_SESSIOND', 'LORDOS_SESSIOND', 'DBUS_SESSION_BUS_ADDRESS']) delete env[k];
+  // a private session bus, as a session has: lord-server serves the portal on it, and the toolkit harnesses' theme
+  // check compares the toolkit with it (without one it failed for nothing; docs/TOOLKIT-AUDIT.md). Skipped without
+  // dbus-daemon.
+  let bus = null;
+  if (fs.existsSync('/usr/bin/dbus-daemon')) {
+    bus = spawn('/usr/bin/dbus-daemon', ['--session', `--address=unix:path=${path.join(D, 'bus')}`, '--nofork', '--nopidfile'],
+      { stdio: 'ignore', detached: true });
+    for (let i = 0; i < 50 && !fs.existsSync(path.join(D, 'bus')); i++) await sleep(100);
+    if (fs.existsSync(path.join(D, 'bus'))) env.DBUS_SESSION_BUS_ADDRESS = `unix:path=${path.join(D, 'bus')}`;
+  }
   const out = fs.openSync(path.join(D, 'server.log'), 'w');
   // --user: the session's services, among them the X socket (Xwayland starts on the first X11 connection)
   // --test-hooks (build/lord-server-test only): the pointer, a graphics tablet, a VR headset and an Xwayland-like connection (src/testhooks.h)
@@ -383,13 +399,14 @@ async function startServer() {
     { cwd: SERVER, env, stdio: ['ignore', out, out], detached: true });
   let sock = '';
   for (let i = 0; i < 120 && !sock; i++) { await sleep(250); sock = fs.readdirSync(D).find((n) => /^wayland-\d+$/.test(n)) || ''; }
-  if (!sock) { try { process.kill(-P.pid, 'SIGTERM'); } catch {} throw new Error(`lord-server made no Wayland socket (log: ${D}/server.log)`); }
+  if (!sock) { try { process.kill(-P.pid, 'SIGTERM'); } catch {} if (bus) try { process.kill(-bus.pid, 'SIGTERM'); } catch {} throw new Error(`lord-server made no Wayland socket (log: ${D}/server.log)`); }
   await sleep(2500);                               // the theme is up
   const logs = () => ['server.log', 'home/.cache/lordos/shell.log', 'home/.cache/lordos/compositor.log'].map((f) => { try { return fs.readFileSync(path.join(D, f), 'utf8'); } catch { return ''; } }).join('\n');
   const display = () => { const m = logs().match(/xwayland: DISPLAY=(:\d+)/); return m ? m[1] : ''; };
   const clientEnv = { ...env, WAYLAND_DISPLAY: sock };
   // SIGTERM, then SIGKILL after 3 s: a lord-server stuck in a loop ignores SIGTERM (its group: Xwayland too)
   const stop = () => {
+    if (bus) { try { process.kill(-bus.pid, 'SIGTERM'); } catch {} bus = null; }
     try { process.kill(-P.pid, 'SIGTERM'); } catch { return; }
     const wait = new Int32Array(new SharedArrayBuffer(4));
     for (let i = 0; i < 30; i++) { try { process.kill(P.pid, 0); } catch { return; } Atomics.wait(wait, 0, 0, 100); }
@@ -631,6 +648,10 @@ async function x11Section(S, src, spec) {
   add('ewmh.wm_state', { kind: 'dynamic', id: 'layer_changes_reach_theme', what: '_NET_WM_STATE_ABOVE', weight: W.x11dyn, result: toggled ? 'pass' : 'fail', msg: `the theme was told the layers ${JSON.stringify(layerEv)} (off, on, below expected)` });
   const pager = ev.some((e) => e.type === 'pager' && String(e.title).startsWith('wlconf-x11') && e.d && e.d.skip === true);
   add('ewmh.wm_state', { kind: 'dynamic', id: 'skip_pager_reaches_theme', what: '_NET_WM_STATE_SKIP_PAGER', weight: W.x11dyn, result: pager ? 'pass' : 'fail', msg: pager ? 'the theme was told to leave it out of the Overview' : 'no pager event reached the theme' });
+  // fullscreen asked for before the first frame: the theme is told (map's "fullscreen" and the "fullscreen" event)
+  const fsf = mapOf('wlconf-x11-fsfirst');
+  const fsfTold = !!fsf && fsf.d.fullscreen === true && ev.some((e) => e.type === 'fullscreen' && e.title === 'wlconf-x11-fsfirst');
+  add('ewmh.wm_state', { kind: 'dynamic', id: 'fullscreen_before_map_reaches_theme', what: '_NET_WM_STATE_FULLSCREEN', weight: W.x11dyn, result: fsfTold ? 'pass' : 'fail', msg: fsfTold ? `the theme got the window at its own size (${fsf.d.width}x${fsf.d.height}) and was told it is fullscreen` : (fsf ? 'the window mapped but the theme was not told it is fullscreen' : 'the window never mapped') });
   add('ewmh.wm_icon', { kind: 'dynamic', id: 'icon_reaches_theme', what: '_NET_WM_ICON', weight: W.x11dyn, result: icon ? 'pass' : 'fail', msg: icon ? 'the theme got the icon' : 'a _NET_WM_ICON never reached the theme' });
   // selections, both ways
   const wlb = path.join(BUILD, 'wl-conformance-client');
@@ -702,6 +723,30 @@ function hintWhere(hint, src) {
     return src.find(new RegExp(`\\b${r[1]}_send_${r[2]}\\s*\\(`));
   }
   return null;
+}
+
+// The toolkit audit against this server: the installed command's code and scoring, this tree's harnesses. A private
+// cache folder, so the developer's own ~/.cache/lordos/toolkit-audit.json is untouched.
+function toolkitsSection(S) {
+  const bin = path.join(BUILD, 'lordos-testbench');
+  if (!fs.existsSync(bin)) sh('make', ['-C', SERVER, 'build/lordos-testbench']);
+  if (!fs.existsSync(bin)) return { run: 'not run: build/lordos-testbench doesn\'t build' };
+  const env = {
+    PATH: process.env.PATH, HOME: path.join(S.D, 'home'), XDG_RUNTIME_DIR: S.D, XDG_CACHE_HOME: path.join(S.D, 'tk-cache'),
+    WAYLAND_DISPLAY: S.sock, LANG: 'C.UTF-8', LORDOS_TOOLKIT_AUDIT_DIR: path.join(ROOT, 'tools', 'toolkit-audit'),
+  };
+  if (S.env.DBUS_SESSION_BUS_ADDRESS) env.DBUS_SESSION_BUS_ADDRESS = S.env.DBUS_SESSION_BUS_ADDRESS;
+  const disp = S.display();
+  if (disp) { env.DISPLAY = disp; env.XAUTHORITY = path.join(S.D, `lord-xauth.${disp.slice(1)}`); }
+  // 9 harnesses, each killed at 8 s, plus the import probes
+  const r = sh(bin, ['--toolkits', '--json'], { env, cwd: SERVER, timeout: 240000 });
+  const line = (r.stdout || '').trim().split('\n').pop() || '';
+  let j = null;
+  try { j = JSON.parse(line); } catch {}
+  if (!j || j.tool !== 'lordos-testbench' || j.mode !== 'toolkits' || !Array.isArray(j.combos)) {
+    return { run: `not run: lordos-testbench --toolkits gave no result (${r.signal || r.status})` };
+  }
+  return { run: disp ? 'ran' : 'ran (no X display: the X11 rows are no-display)', score: j.score, ran: j.ran, weights: j.weights, combos: j.combos, matrix: j.matrix };
 }
 
 async function main() {
@@ -797,6 +842,7 @@ async function main() {
     for (const it of x11.items) it.complete = it.score === 100 && !it.skipped && it.checks.some((c) => c.kind === 'dynamic');
   }
   if (S && OPTS.smoke && !OPTS.only) smokeRes = await smoke(S);
+  const toolkits = S && OPTS.toolkits && !OPTS.only ? toolkitsSection(S) : null;
   if (S) { if (!S.alive()) notes.push('lord-server was not alive at the end'); S.stop(); if (!OPTS.verbose) fs.rmSync(S.D, { recursive: true, force: true }); else console.error(`kept ${S.D}`); }
 
   const result = {
@@ -824,6 +870,7 @@ async function main() {
     protocols: items,
     xwayland: x11,
     clients: smokeRes,
+    toolkits,
     seconds: Math.round((Date.now() - t0) / 1000),
   };
   fs.mkdirSync(path.dirname(OPTS.json), { recursive: true });
@@ -851,6 +898,15 @@ function printReport(r) {
   if (r.clients.length) {
     console.log('\nReal clients (not scored)');
     for (const c of r.clients) console.log(`  ${pad(c.client, 30)} ${pad(c.result, 5)} ${c.msg}${c.bound?.length ? ` — bound ${c.bound.length} globals` : ''}`);
+  }
+  if (r.toolkits) {
+    console.log(`\nToolkits (lordos-testbench --toolkits; ${r.toolkits.run})`);
+    for (const c of r.toolkits.combos || []) {
+      const fails = (c.checks || []).filter((k) => k.result === 'fail').map((k) => k.id);
+      const what = c.status === 'ran' ? `${(c.score ?? 0).toFixed(1)} %` : c.status === 'fatal' ? `0.0 % (${c.fatal})` : c.status;
+      console.log(`  ${pad(c.id, 16)} ${pad(c.version || '', 12)} ${lpad(what, 8)}${fails.length ? `  fails: ${fails.join(', ')}` : ''}`);
+    }
+    if (r.toolkits.score != null) console.log(`  global ${r.toolkits.score} % over ${r.toolkits.ran} combinations`);
   }
   console.log('\nFailing checks');
   for (const i of [...r.protocols, ...(r.xwayland?.items || [])]) for (const c of i.checks) if (c.result === 'fail') console.log(`  ${i.global || i.id}: ${c.id} — ${c.msg}${c.where ? `  [${c.where}]` : ''}`);

@@ -3,7 +3,7 @@
 // click picks one; "Copy" puts it on the clipboard.
 import {
   View, Text, Button, Segmented, ScrollView, SidebarItem, Toolbar, ToolbarSpacer, Hairline, SearchField, EmptyState, useTheme, clipboard, emoji,
-  EmojiGrid, EmojiToneBar, typeScale, t as tr, useSidebar, SidebarToggle, SidebarOverlay,
+  EmojiGrid, EmojiToneBar, typeScale, t as tr, useSidebar, SidebarToggle, SidebarOverlay, SkinRegion, useSkinned, commandBar, pickCommand, listPane, pickItem,
 } from '@lordos/sdk';
 import { useMemo, useState } from 'react';
 
@@ -109,8 +109,21 @@ export default function Characters() {
       <View style={{ height: 10 }} />
     </ScrollView>
   );
+  // (0.8.9.6.2) app skins (docs/THEMES-GUIDE.md, "App skins → the shared shapes"): the two tabs as a command bar and the
+  // groups or blocks as a list pane; the grid, the search and the copying stay Characters'
+  const skinned = useSkinned('characters');
+  const sk = skinned ? (() => {
+    const bar = commandBar({ commands: [['emoji', 'characters.tab.emoji'], ['symbols', 'characters.tab.symbols']].map(([id, k]) => ({ id, label: tr(k), active: tab === id })) });
+    const pane = listPane({ title: tr(tab === 'emoji' ? 'characters.tab.emoji' : 'characters.tab.symbols'),
+      items: side.map(([id, label]) => ({ key: String(id), label, selected: tab === 'emoji' ? (!q.trim() && group === id) : block === id })) });
+    return {
+      toolbar: { app: 'characters', ...bar, actions: { command: (id) => { const c = pickCommand(bar, id); if (c) { setTab(c); setPick(null); } } } },
+      sidebar: { app: 'characters', ...pane, actions: { select: (key) => { const k = pickItem(pane, key); if (k == null) return; if (tab === 'emoji') { setQ(''); setGroup(k); } else setBlock(Number(k)); } } },
+    };
+  })() : null;
   return (
     <View style={{ flex: 1 }}>
+      <SkinRegion app="characters" region="toolbar" model={sk && sk.toolbar}>
       <Toolbar>
         <SidebarToggle shown={sb.shown} onClick={sb.toggle} />
         <Segmented appearance="neutral" value={tab} onChange={(v) => { setTab(v); setPick(null); }}
@@ -120,8 +133,9 @@ export default function Characters() {
         {tab === 'emoji' && <SearchField value={q} onChange={setQ} placeholder={tr('emoji.search')}
           width={sb.narrow ? undefined : 180} style={sb.narrow ? { flex: 1, minWidth: 80, maxWidth: 180 } : null} />}
       </Toolbar>
+      </SkinRegion>
       <View style={{ flex: 1, flexDirection: 'row' }}>
-        {sb.shown && !sb.narrow ? <View style={{ width: 180, backgroundColor: th.sidebarBg }}>{sidebar}<Hairline edge="end" /></View> : null}
+        {sb.shown && !sb.narrow ? <SkinRegion app="characters" region="sidebar" model={sk && sk.sidebar}><View style={{ width: 180, backgroundColor: th.sidebarBg }}>{sidebar}<Hairline edge="end" /></View></SkinRegion> : null}
         <View style={{ flex: 1, minWidth: 0 }}>
           <View style={{ flex: 1, minWidth: 0, direction: 'ltr' }}>
             {tab === 'emoji' ? (

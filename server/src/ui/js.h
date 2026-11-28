@@ -8,6 +8,8 @@ int    js_init(const char *bundle_path);
 /* js_init/js_init_app return JS_REFUSED when the code was refused by the verified-code check
  * (sec/codesig.h): the caller falls back to another theme or to js_init_recovery(). */
 #define JS_REFUSED (-2)
+/* the running theme is a community theme (its code in its own realm, js_theme.c) */
+int js_community_theme(void);
 /* A theme switch (lord.themes.use, main.c switch_theme). js_theme_prepare reads and verifies the bundle asked for
  * while the running theme still runs: 0, JS_REFUSED (the verified-code check refused it) or -1 (unreadable).
  * js_init_prepared starts a new context with those same bytes (js_init if none were prepared for that path).
@@ -51,10 +53,13 @@ void   js_media_event(int id, const char *type, const char *json);
 void   js_term_event(int id, const char *type, const char *data);
 void   js_sound_event(const char *type, const char *json);
 void   js_net_event(const char *what);
+void   js_vm_library_event(void);           /* Machines: the library changed (vm/vmlistcache.h) → __lordVm('library') */
+void   js_vm_state_event(const char *json); /* Machines: what runs or is in apps mode changed → __lordVm('state', json) */
 void   js_disk_event(const char *what);      /* Disks app: something changed (disk/disk.c) */
 void   js_backup_event(const char *json);    /* Backups → __lordBackup */
 void   js_cloud_event(const char *json);     /* Cloud → __lordCloud */
 void   js_cloud_reply(int req, const char *json);   /* Cloud: a link's answer → __lordCloudReply */
+void   js_fswatch_dispatch(double now);  /* every pass: lord.fs.watch's calls that are due (fswatch.c) */
 void   js_fs_dispatch(void);             /* fsasync_fd() is readable: lord.fs.*Async answers → __lordFsReply */
 void   js_admin_event(int id, const char *kind, const char *text);
 void   js_logs_event(const char *kind, int id, const char *name);   /* app Registros */

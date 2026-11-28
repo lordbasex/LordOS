@@ -93,7 +93,7 @@ const src = (app) => readFileSync(path.join(root, 'apps', app, 'index.jsx'), 'ut
 check('Files walks its folder history', /useNavigateButtons\(\(d\) => goHistory\(d === 'back' \? -1 : 1\)\)/.test(src('files')));
 check('the Store leaves and reopens an app\'s page', /useNavigateButtons\(/.test(src('store')) && /setApp\(null\)/.test(src('store')));
 check('Mail goes back to the list in one pane', /useNavigateButtons\(\(d\) => \{ if \(single\) setOpened/.test(src('mail')));
-check('Settings walks its sections', /useVisitHistory\(section,/.test(src('settings')));
+check('Settings walks its sections and their sub-pages', /useVisitHistory\(placeOf\(section, sub\),/.test(src('settings')));
 check('Help walks its articles', /useVisitHistory\(article, setArticle\)/.test(src('help')));
 
 console.log(`navbuttons-test: ${checks} checks, ${fails} failures`);

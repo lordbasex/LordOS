@@ -39,9 +39,11 @@ LT_SRC := src/doc/helper.c src/doc/h_tts.c src/tts/hiss.c src/doc/wire.c src/sec
 build/lord-tts: $(LT_SRC) build/lib/tts/libaudiocpp.so.0 $(wildcard src/doc/*.h) src/tts/hiss.h src/sec/sandbox.h src/sec/cgroup.h src/sec/json.h
 	$(CC) $(CPPFLAGS) -DLORD_HELPER_TTS $(CFLAGS) $(WARN) -std=c11 -isystem $(AUDIOCPP_DIR)/include -o $@ $(LT_SRC) \
 		-Lbuild/lib/tts -l:libaudiocpp.so.0 -Wl,-rpath,'$$ORIGIN/../lib/tts:$$ORIGIN/lib/tts' -lm
+	chmod g-w $@
 
 build/lord-say: src/tts/say.c src/tts/saytext.c src/tts/saytext.h src/tts/levels.c src/tts/levels.h src/doc/wire.c src/sec/json.c src/doc/wire.h src/doc/proto.h src/sec/json.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ src/tts/say.c src/tts/saytext.c src/tts/levels.c src/doc/wire.c src/sec/json.c -lm
+	chmod g-w $@
 
 # how say splits text into sentences (tests/saytext_test.c), the bands of the player's wave (tests/levels_test.c) and
 # lord-tts's hiss measure (tests/hiss_test.c); lord-tts's own test needs a model (tests/tts_test.sh)

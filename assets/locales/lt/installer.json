@@ -128,5 +128,6 @@
   "user.user": "Naudotojo vardas",
   "user.userHint": "Mažosios raidės, skaitmenys, - ir _. Tai bus administratorius (sudo).",
   "welcome.text": "Šis vediklis įdiegia LordOS į šio kompiuterio diską. Pasirinksite kalbą, klaviatūrą, diską ir savo naudotoją. Diegiant pasirinktas diskas ištrinamas, nebent diegiate šalia to, kas jame yra, arba skaidinius pasirenkate patys.",
-  "welcome.title": "Sveiki atvykę į LordOS"
+  "welcome.title": "Sveiki atvykę į LordOS",
+  "disk.unreadable": "Nepavyko perskaityti vieno disko aprašo, todėl jo nėra sąraše. Ieškokite dar kartą; jei vis tiek trūksta, praneškite."
 }

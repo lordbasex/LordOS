@@ -234,6 +234,7 @@
   "fs.moveRemoveFailed": "コピーしましたが、元のファイルを削除できませんでした：{errno}",
   "fs.noTrash": "その場所にはゴミ箱がありません",
   "fs.notFile": "ファイルではありません",
+  "fs.notFolder": "フォルダではありません",
   "fs.notInTrash": "ゴミ箱にありません",
   "fs.notRegular": "通常のファイルではありません（リンクですか？）",
   "fs.openFailed": "ファイルを開けませんでした：{errno}",
@@ -243,11 +244,13 @@
   "fs.systemFolder": "ファイルはシステムの内部フォルダ（/proc、/sys、/dev、/run）を表示しません",
   "fs.tooLarge": "ファイルが大きすぎます（最大 {max}）",
   "fs.tooManyCopies": "実行中のコピーが多すぎます。いずれかが終わってからもう一度お試しください",
+  "fs.tooManyWatches": "監視しているフォルダが多すぎます (最大 {max})",
   "fs.trashBadOrigin": "元の場所が無効です",
   "fs.trashEntryFailed": "ゴミ箱の項目を作成できませんでした",
   "fs.trashOriginGone": "元のフォルダはもう存在しません",
   "fs.trashOtherDisk": "ゴミ箱とは別のディスク上にあります",
   "fs.trashRestoreExists": "元の場所に同じ名前のファイルがすでにあります",
+  "fs.watchRemote": "クラウドやネットワークのフォルダの変更は追跡できません。代わりにフォルダを再度一覧表示します",
   "fw.bpfConfig": "BPF を設定できませんでした：{errno}",
   "fw.bpfMaps": "BPF マップを作成できませんでした：{errno}",
   "fw.bpfMissing": "{program} プログラムがありません",
@@ -962,5 +965,9 @@
   "sentinela.notBlocked": "そのプログラムはブロックリストに入っていません。",
   "sentinela.noAppNetwork": "このプロセスには、ネットワークをブロックできる専用のアプリがありません。",
   "sys.failed": "問題が発生しました。",
-  "sys.unsupported": "このバージョンの LordOS ではできません。"
+  "sys.unsupported": "このバージョンの LordOS ではできません。",
+  "theme.notAllowed": "{call} はコミュニティテーマでは使用できません",
+  "theme.noHost": "デスクトップスタイルの LordOS 部分がありません",
+  "hands.refused": "これはあなただけが行えます。AI エージェントの入力では行えません",
+  "install.diskTooManyParts": "このディスクはパーティションが多すぎるため、インストーラーで一覧表示できません"
 }

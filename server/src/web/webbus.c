@@ -17,11 +17,11 @@
  *     the bus says the caller's pid is the lord-server that started this lord-web; the desktop's light or dark mode,
  *     org.lordos.WebApp1.SetColorScheme("light" | "dark"), with the same check (webscheme.h); the profile's Browser
  *     identity, org.lordos.WebApp1.SetUserAgent("chrome" | "edge" | "firefox" | "lordos"), with the same check (webpage.h);
- *   - the page's context menu: org.lordos.WebApps1.Menu(app, profile, items) on lord-server, which shows LordOS's own
- *     menu with those items (names from webedit.h, never the page's text) and answers the one chosen.
+ *   - (the page's context menu, org.lordos.WebApps1.Menu, and its save dialog are webmenu.c's)
  * Every call is asynchronous: nothing here waits for another program. */
 #include "web.h"
 #include "webwin.h"
+#include "webcall.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -39,6 +39,12 @@
 typedef struct { guint32 id; WebKitNotification *n; char token[256]; } Note;
 static Note notes[MAX_NOTES];
 static Web *web;
+/* the notify: log line's tag hash (webpage_notify_line): keyed with this, picked at start and never written */
+static WebTagIds tag_ids;              /* this run's tags, in the order they came (the log's "tag N") */
+/* the last page notification WebKit withdrew (its tag's hash) and when: one with the same tag right after replaced it */
+#define REPLACE_MS 1000.0
+static unsigned long long closed_tag;   /* the tag WebKit withdrew last (webpage_tag_key: memory only) */
+static double closed_ms = -1;
 
 static Note *note_by_id(guint32 id) {
     for (int i = 0; i < MAX_NOTES; i++) if (notes[i].id == id && notes[i].n) return &notes[i];
@@ -97,6 +103,8 @@ typedef struct { WebKitNotification *n; int inspect; } NotifyCall;
 
 static void on_page_closed(WebKitNotification *n, gpointer d) {
     (void)d;
+    const char *tag = webkit_notification_get_tag(n);
+    if (tag && tag[0]) { closed_tag = webpage_tag_key(tag); closed_ms = web_now_ms(); }
     for (int i = 0; i < MAX_NOTES; i++) if (notes[i].n == n) {
         if (web->bus) g_dbus_connection_call(web->bus, NOTIFY_NAME, NOTIFY_PATH, NOTIFY_NAME, "CloseNotification", g_variant_new("(u)", notes[i].id),
                                              NULL, G_DBUS_CALL_FLAGS_NONE, -1, NULL, NULL, NULL);
@@ -153,8 +161,16 @@ void webbus_notify(Web *w, WebKitNotification *n) {
         const char *t = notes[i].n ? webkit_notification_get_tag(notes[i].n) : NULL;
         if (t && !strcmp(t, tag)) { replaces = notes[i].id; note_drop(&notes[i]); break; }
     }
-    /* WebKit 2.48 doesn't tell a notification's "silent" option: 0 */
+    /* WebKit (2.48 to 2.54) doesn't tell a notification's "silent" option: 0 */
     double now = web_now_ms();
+    /* one line in the app's log, without any of its text (webpage_notify_line); "replaced" also when WebKit withdrew
+     * the one with the same tag just before (it does so itself, before showing the new one) */
+    int replaced = replaces != 0;
+    if (!replaced && tag && tag[0] && closed_ms >= 0 && now - closed_ms <= REPLACE_MS) {
+        replaced = webpage_tag_key(tag) == closed_tag;
+    }
+    char line[128];
+    if (webpage_notify_line(webpage_tag_id(&tag_ids, tag), -1, -1, replaced, line, sizeof line)) webcall_log_as("notify", line);
     int quiet = webpage_sound_suppress(w->app.notify_sound, w->state.own_sound, 0, w->audio_ms, now);
     if (!w->state.own_sound && webpage_sound_learns(w->app.notify_sound, now, w->audio_ms)) {
         w->state.own_sound = 1;                     /* the page started its sound just before: it has its own */
@@ -302,8 +318,8 @@ void webbus_ask(Web *w, int kind, WebAskDone cb, void *data) {
 /* ---- editing: the shell's Edit menu and the page's context menu ---- */
 
 /* cmd >= 0: Edit; CALL_SCHEME: SetColorScheme(arg); CALL_UA: SetUserAgent(arg) */
-enum { CALL_SCHEME = -1, CALL_UA = -2 };
-typedef struct { Web *w; int cmd, arg; } EditCall;
+enum { CALL_SCHEME = -1, CALL_UA = -2, CALL_WRITE = -3 };
+typedef struct { Web *w; int cmd, arg; char *text; } EditCall;
 
 static void on_edit_pid(GObject *src, GAsyncResult *res, gpointer d) {
     EditCall *ec = d;
@@ -314,62 +330,27 @@ static void on_edit_pid(GObject *src, GAsyncResult *res, gpointer d) {
         if (ec->cmd >= 0) web_edit(ec->w, ec->cmd);
         else if (ec->cmd == CALL_SCHEME) web_set_scheme(ec->w, ec->arg);
         else if (ec->cmd == CALL_UA) web_set_user_agent(ec->w, ec->arg);
+        else if (ec->cmd == CALL_WRITE && ec->text) web_menu_ai_replace(ec->w, ec->text);
     } else fprintf(stderr, "lord-web: %s call from a process that is not lord-server: refused\n",
-                   ec->cmd >= 0 ? "an Edit" : ec->cmd == CALL_SCHEME ? "a SetColorScheme" : "a SetUserAgent");
+                   ec->cmd >= 0 ? "an Edit" : ec->cmd == CALL_SCHEME ? "a SetColorScheme" : ec->cmd == CALL_WRITE ? "a WriteReplace" : "a SetUserAgent");
+    if (ec->text) { memset(ec->text, 0, strlen(ec->text)); g_free(ec->text); }
     g_free(ec);
 }
 
 /* the bus answers from the caller's socket credentials, never from the caller */
-static void check_caller(Web *w, const char *sender, int cmd, int arg) {
+static void check_caller_text(Web *w, const char *sender, int cmd, int arg, const char *text) {
     if (!w->bus || !sender) return;
     EditCall *ec = g_new0(EditCall, 1);
     ec->w = w;
     ec->cmd = cmd;
     ec->arg = arg;
+    ec->text = text ? g_strdup(text) : NULL;
     g_dbus_connection_call(w->bus, "org.freedesktop.DBus", "/org/freedesktop/DBus", "org.freedesktop.DBus", "GetConnectionUnixProcessID",
                            g_variant_new("(s)", sender), G_VARIANT_TYPE("(u)"), G_DBUS_CALL_FLAGS_NONE, 5000, NULL, on_edit_pid, ec);
 }
 
+static void check_caller(Web *w, const char *sender, int cmd, int arg) { check_caller_text(w, sender, cmd, arg, NULL); }
+void webbus_write_replace(Web *w, const char *sender, const char *text) { if (text && strlen(text) <= WEBAI_MAX) check_caller_text(w, sender, CALL_WRITE, 0, text); }
 void webbus_edit(Web *w, const char *sender, int cmd) { if (cmd >= 0) check_caller(w, sender, cmd, 0); }
 void webbus_scheme(Web *w, const char *sender, int scheme) { if (webscheme_name(scheme)) check_caller(w, sender, CALL_SCHEME, scheme); }
 void webbus_user_agent(Web *w, const char *sender, int kind) { if (webreg_ua_name(kind)) check_caller(w, sender, CALL_UA, kind); }
-
-typedef struct { Web *w; int items[WEBMENU_N], n; char *link, *image; } MenuCall;
-
-static void on_menu(GObject *src, GAsyncResult *res, gpointer d) {
-    MenuCall *mc = d;
-    GError *e = NULL;
-    GVariant *r = g_dbus_connection_call_finish(G_DBUS_CONNECTION(src), res, &e);
-    mc->w->menu_open = 0;
-    int item = -1;
-    if (r) {
-        const char *s = NULL;
-        g_variant_get(r, "(&s)", &s);
-        int k = s && s[0] ? webmenu_item(s) : -1;
-        for (int i = 0; i < mc->n; i++) if (mc->items[i] == k) item = k;     /* only one this menu had */
-        g_variant_unref(r);
-    } else {
-        fprintf(stderr, "lord-web: no context menu (%s)\n", e ? e->message : "?");
-        g_clear_error(&e);
-    }
-    if (item >= 0) web_menu_chosen(mc->w, item, mc->link, mc->image);
-    g_free(mc->link);
-    g_free(mc->image);
-    g_free(mc);
-}
-
-void webbus_menu(Web *w, const int *items, int n, const char *link, const char *image) {
-    if (!w->bus || !w->profile || n < 1 || n > WEBMENU_N || w->menu_open) return;
-    GVariantBuilder b;
-    g_variant_builder_init(&b, G_VARIANT_TYPE("as"));
-    for (int i = 0; i < n; i++) g_variant_builder_add(&b, "s", webmenu_name(items[i]));
-    MenuCall *mc = g_new0(MenuCall, 1);
-    mc->w = w;
-    mc->n = n;
-    for (int i = 0; i < n; i++) mc->items[i] = items[i];
-    mc->link = link ? g_strdup(link) : NULL;
-    mc->image = image ? g_strdup(image) : NULL;
-    w->menu_open = 1;
-    g_dbus_connection_call(w->bus, ASK_NAME, ASK_PATH, ASK_NAME, "Menu", g_variant_new("(ssas)", w->app.id, w->profile->id, &b),
-                           G_VARIANT_TYPE("(s)"), G_DBUS_CALL_FLAGS_NO_AUTO_START, ASK_TIMEOUT_MS, NULL, on_menu, mc);
-}

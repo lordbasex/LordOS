@@ -15,4 +15,10 @@ int webdl_name(const char *suggested, char *out, size_t n);
 /* name, or "stem (2).ext", "stem (3).ext"… : the first that doesn't exist in the folder dirfd. 0, or -1 after 999. */
 int webdl_unique(int dirfd, const char *name, char *out, size_t n);
 
+/* "Save Image As…" and "Save Video As…" (the page's context menu): the file the person chose in LordOS's save dialog
+ * (the FileChooser portal). 1 when path may be written: absolute, in home (not home itself), no "." or ".." part, no
+ * part that starts with a dot (the hidden folders hold what starts programs and LordOS's settings), no control
+ * character, and not a launcher (*.desktop); else 0. */
+int webdl_target_ok(const char *home, const char *path);
+
 #endif

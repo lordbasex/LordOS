@@ -1,4 +1,4 @@
-// workspaces_scene.mjs — the scene of tests/workspaces_test.mjs (not run by itself), 0.8.9: Lord Workspaces over a stub
+// workspaces_scene.mjs — the scene of tests/workspaces_test.mjs (not run by itself), 0.8.9: Workspaces over a stub
 // `lord` with three monitors side by side, the main one in the middle. It checks a group frame per display, the spine on
 // the main one, each display's work area, no timer per second at idle, tiling per display (split on the main one, single
 // on the right), a window moved by hand leaving its tile, Save layout, a monitor unplugged (its window joins the main
@@ -303,6 +303,31 @@ await flush();
   const items = aw.appMenuItems(sdk.launcherIdOf(sdk.wm.get(m2)), desk, R, null, true);
   check('app menu: its window, then New window', items.map((x) => (x === '-' ? '-' : x.label)), ['Work - Chrome second line', '-', sdk.t('shell.dock.newWindow')]);
   for (const id of [m1, m2]) sdk.wm.close(id, true);
+  // (ws170 QA BUG-32) two windows on one display, tiled in Two halves and in One at a time: both in the bar (the
+  // Terminal and the Calculator are single-window apps already open on another display in this scene: two others)
+  for (const lay of ['halves', 'single']) {
+    tiler.setLayout(desk, 'HDMI-A-1', lay);
+    for (let i = 0; i < 2; i++) await flush();
+    const c0 = new Map(trays().map((id) => [id, iconsIn(id).length]));
+    const tt = sdk.wm.open('extra42', { frame: { x: R.x + 200, y: 200, w: 700, h: 480 } });
+    for (let i = 0; i < 2; i++) await flush();
+    const cc = sdk.wm.open('extra43', { frame: { x: R.x + 1000, y: 220, w: 300, h: 430 } });
+    for (let i = 0; i < 3; i++) await flush();
+    const grew = trays().map((id) => iconsIn(id).length - (c0.get(id) || 0));
+    check(`bar (${lay}): two tiled windows both in the display's bar`, grew.includes(2), true);
+    for (const id of [tt, cc]) sdk.wm.close(id, true);
+    for (let i = 0; i < 2; i++) await flush();
+    await new Promise((res) => setTimeout(res, 1100));     // the tiler's passes per second start again
+  }
+  // (BUG-32, the cause) a window placed above the work area (restored, launched or opened there) never covers the
+  // display's bar: it goes down to the work area, its size kept, in Free and over tiles (floating)
+  tiler.setLayout(desk, 'HDMI-A-1', 'free');
+  for (let i = 0; i < 2; i++) await flush();
+  const hi = sdk.wm.open('extra44', { frame: { x: R.x + 300, y: R.y + 14, w: 700, h: 500 } });
+  for (let i = 0; i < 3; i++) await flush();
+  check('bar: a window opened over the bar goes down to the work area, its size kept', [frameOf(hi).y, frameOf(hi).w, frameOf(hi).h], [plan(R).work.y, 700, 500]);
+  sdk.wm.close(hi, true);
+  await new Promise((res) => setTimeout(res, 1100));
   tiler.setLayout(desk, 'HDMI-A-1', 'single');
   await flush();
 }
@@ -400,7 +425,7 @@ await flush();
   for (let i = 0; i < 3; i++) await flush();
 }
 
-// the layout flyout and the drop target (Lord Workspaces only)
+// the layout flyout and the drop target (Workspaces only)
 {
   const snapT = await import('../../themes/workspaces/components/SnapTargets.jsx');
   await new Promise((res) => setTimeout(res, 1100));
@@ -727,7 +752,7 @@ await flush();
   sdk.settings.set(sdk.wallpaperPatch(sdk.settings.get(), sdk.settings.get().wallpaper, null));
   await flush();
   check('wallpaper: all displays again', [L, M, R].map(wallOf), before);
-  // never chosen (null since 0.8.9): Lord Workspaces' own default, Cyberpunk City HD's panorama
+  // never chosen (null since 0.8.9): Workspaces' own default, Cyberpunk City HD's panorama
   sdk.settings.set({ wallpaper: null, wallpapers: {} });
   await flush();
   check('wallpaper: the theme\'s default when none was chosen', [L, M, R].map(wallOf).every((src) => src.includes('lordos-cyberpunk-panorama')), true);
@@ -969,7 +994,7 @@ check('idle again: still no timer every second', intervals(1000), 0);
 }
 
 
-// ❖` (sdk/appswitcher.jsx cycleAppWindows, in Lord Workspaces' table and Settings → Keyboard): the next window of the app
+// ❖` (sdk/appswitcher.jsx cycleAppWindows, in Workspaces' table and Settings → Keyboard): the next window of the app
 // in front, only among that app's windows in the activity in view; a window of the same app in another activity is left
 {
   tiler.forgetLaunches();                // the profile launches above never showed a window

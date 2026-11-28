@@ -34,9 +34,11 @@ import { LANGUAGE_NAMES } from './langnames.js';
 import { ShieldGlyph } from './sentinelaglyph.js';
 import { admin } from './admin.js';
 import { llmPackageOk } from './llmcatalog.js';
+import { brainBackend, brainThreads } from './aistore.js';
+import { vmAnyActive } from './vmlibrary.js';
 import {
   SENTINELA_DEFAULTS, TRIGGER_DEFAULTS, createTracker, buildSummary, systemPrompt, parseVerdict, ignoreMatch, ruleAction, factLines,
-  placeOf, clean, presentAlert, buildInvestigation, investigateSystemPrompt, parseInvestigation, evidenceOf, translateSystemPrompt,
+  placeOf, clean, presentAlert, buildInvestigation, investigationFindings, applyRiskFloor, investigateSystemPrompt, parseInvestigation, evidenceOf, translateSystemPrompt,
   translateInput, parseTranslation, INVESTIGATE_ACTIONS,
 } from './sentinelamodel.js';
 import {
@@ -62,6 +64,44 @@ export function setSentinelaPrefs(patch) {
 
 export function sentinelaOnBattery() {
   try { const b = lord.power.state(); return !!(b && b.hasBattery && b.onAC === false); } catch (e) { return false; }
+}
+
+// (0.8.9.6.2) where the engine computes (settings.brain.backend: 'auto' | 'cpu' | 'gpu'; Settings → AI, "Where they
+// run"), told to lord-server whenever it changes; the engine restarts there at its next job (engine.h llm_set_backend)
+let brainMode = null;
+function syncBrainBackend() {
+  const a = api();
+  if (!a || typeof a.backend !== 'function') return;
+  const m = brainBackend(settings.get());
+  if (m === brainMode) return;
+  try { a.backend(m); brainMode = m; } catch (e) { /* an older server: the processor only */ }
+}
+// (0.8.9.6.2) the Brain's processor cores (settings.brain.cpuThreads, 0 automatic; Settings → AI), told to lord-server
+// once the slider rests (each new count restarts an idle engine: engine.h llm_set_threads); at start at once
+let brainThreadsSent = null;
+let threadsTimer = null;
+function syncBrainThreads() {
+  const a = api();
+  if (!a || typeof a.threads !== 'function') return;
+  if (brainThreads(settings.get()) === brainThreadsSent) return;
+  if (threadsTimer) clearTimeout(threadsTimer);
+  threadsTimer = setTimeout(() => {
+    threadsTimer = null;
+    const n = brainThreads(settings.get());
+    if (n === brainThreadsSent) return;
+    try { a.threads(n); brainThreadsSent = n; } catch (e) { /* an older server: two threads */ }
+    refreshSentinelaEngine();
+  }, brainThreadsSent === null ? 0 : 700);
+}
+export function setBrainThreads(n) {
+  const v = Number.isFinite(n) && n > 0 ? Math.round(n) : 0;
+  settings.set((s) => ({ ...s, brain: { ...(s.brain || {}), cpuThreads: v } }));
+  syncBrainThreads();
+}
+export function setBrainBackend(mode) {
+  settings.set((s) => ({ ...s, brain: { ...(s.brain || {}), backend: mode } }));
+  syncBrainBackend();
+  refreshSentinelaEngine();
 }
 
 export function refreshSentinelaEngine() {
@@ -108,10 +148,12 @@ function loadAlerts() {
     if (Array.isArray(j)) sentinelaAlerts.set(() => j.filter((a) => a && typeof a.id === 'string').slice(0, HISTORY));
   } catch (e) { /* none yet */ }
 }
+let alertsDirMade = false;
 function saveAlerts() {
   try {
-    for (const d of ['.local', '.local/share', '.local/share/lordos', '.local/share/lordos/sentinela']) { try { fs.mkdir(d); } catch (e) { /* there */ } }
-    fs.write(ALERTS, `${JSON.stringify(sentinelaAlerts.get().slice(0, HISTORY))}\n`);
+    if (!alertsDirMade) { for (const d of ['.local', '.local/share', '.local/share/lordos', '.local/share/lordos/sentinela']) { try { fs.mkdir(d); } catch (e) { /* there */ } } alertsDirMade = true; }
+    // on a worker (the store is what's read; a busy disk never holds the interface, QA ws174)
+    fs.writeAsync(ALERTS, `${JSON.stringify(sentinelaAlerts.get().slice(0, HISTORY))}\n`).catch(() => { /* a full disk: the alerts stay in memory */ });
   } catch (e) { /* a full disk: the alerts stay in memory */ }
 }
 function putAlert(a) {
@@ -341,10 +383,16 @@ let started = false, watching = false, tracker = null, uid = null, lastAutostart
 
 // the machines now: lord.vm.list(), lord.vm.stats(dir) of the running ones and their network counts (null: no new
 // sample this tick, so no network sample is taken)
+// Read only while lord-server says a machine is active (vmlibrary.js), and once more after the last one stopped, so an
+// end is seen: no lord.vm call at all while nothing runs (docs/VIRTUALIZATION.md, "The shell and the machines")
 const VM_ACTIVE = new Set(['starting', 'running', 'paused', 'stopping']);
+let vmWasActive = false;
 function machineRows() {
   const v = vmApi();
   if (!v) return null;
+  const now = vmAnyActive();
+  if (!now && !vmWasActive) return null;
+  vmWasActive = now;
   let list = [];
   try { list = v.list() || []; } catch (e) { return null; }
   let net = null;
@@ -409,6 +457,10 @@ export function sentinelaTick(now = Date.now()) {
 export function startSentinela() {
   if (started || typeof lord === 'undefined' || !lord.sentinela || typeof lord.greeter !== 'undefined') return;
   started = true;
+  syncBrainBackend();
+  settings.subscribe(syncBrainBackend);
+  syncBrainThreads();
+  settings.subscribe(syncBrainThreads);
   loadAlerts();
   refreshBlocked();
   sentinelaTick();
@@ -444,14 +496,23 @@ export async function investigateProcess(p, { started = '', conns = null } = {})
   try { r = await job(a.investigate(ready.model, investigateSystemPrompt(language), user_, p.pid, p.st), ANSWER_MAX_MS); } catch (e) { return { ok: false, error: e.code || 'llm.failed' }; }
   if (!r) return { ok: false, error: 'llm.timeout' };
   if (!r.ok) return { ok: false, error: r.error || 'llm.failed' };
-  const v = parseInvestigation(r.content);
+  const v = applyRiskFloor(parseInvestigation(r.content), investigationFindings(p, facts, home()));
   if (!v) return { ok: false, error: 'sentinela.lumo.rejected', evidence: evidenceOf(r.evidence) };
   return { ok: true, result: v, evidence: evidenceOf(r.evidence), ms: r.ms || 0, facts: facts && facts.ok ? facts : null };
 }
 
 // "Translate with Lumo": an English description into the person's language (kept per language by sdk/describe.js)
-export async function translateWithLumo(text) {
-  const ready = lumoReady();
+// model: try this installed model (Settings → AI's sheet) whenever a function that uses the model is on (Sentinela, or
+// Writing unless turned off), not only Sentinela's own
+export async function translateWithLumo(text, { model = null } = {}) {
+  let ready = lumoReady();
+  if (model) {
+    const eng = refreshSentinelaEngine();
+    const writingOff = (settings.get().writing || {}).on === false;
+    const fnOn = sentinelaPrefs().on || !writingOff;
+    ready = !api() || !eng.available ? { ok: false, why: 'noEngine' } : !eng.models.some((m) => m.id === model) ? { ok: false, why: 'noModel' }
+      : !fnOn ? { ok: false, why: 'off' } : { ok: true, model };
+  }
   if (!ready.ok) return { ok: false, error: `sentinela.lumo.${ready.why}` };
   const nonce = Array.from({ length: 16 }, () => '0123456789abcdef'[Math.floor(Math.random() * 16)]).join('');
   const language = langName(locale.get().lang);

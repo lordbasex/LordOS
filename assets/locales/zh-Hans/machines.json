@@ -712,6 +712,7 @@
   "agent.toolsAutoFailed": "自动更新未成功（{have} → {want}）。",
   "agent.toolsUpdateBtn": "更新",
   "agent.st.needsTools": "需要工具",
+  "agent.st.oldLordos": "更新其中的 LordOS",
   "agent.st.needsXclip": "需要 xclip",
   "agent.toolsInstalled": "LordOS 工具已在虚拟机中安装并运行；每次登录时会再次启动。",
   "agent.timesync": "校准时钟",
@@ -880,6 +881,8 @@
   "un.how.preseed": "答案会写入安装程序自己的启动文件，你的密码只以哈希值保存，系统安装完成后这些文件会被移除。",
   "un.how.autoinstall": "答案会写入安装程序读取的一个小磁盘，你的密码只以哈希值保存，系统安装完成后该磁盘会被移除。",
   "un.how.kickstart": "答案会写入安装程序读取的一个小磁盘，你的密码只以哈希值保存，系统安装完成后该磁盘会被移除。",
+  "un.how.kali": "答案会写入安装程序自己的启动文件，你的密码只以哈希值保存，系统安装完成后这些文件会被移除。",
+  "un.how.lordos": "答案会写入安装程序读取的一个小磁盘，你的密码只以哈希值保存，系统安装完成后该磁盘会被移除。",
   "un.image": "从 {file} 安装，同样会对照其发行方签名的列表进行检查",
   "un.review": "无提问：{host} 上的账户 {user}",
   "un.reviewOff": "由你回答安装程序的提问",
@@ -1100,6 +1103,7 @@
   "apps.menu": "应用程序",
   "apps.needsAgent": "应用模式需要已连接的机器代理",
   "win.appsNeedsTools": "应用模式需要机器中装有 LordOS 工具的 LordOS 或 Windows",
+  "win.appsOldLordos": "应用模式需要机器内装有 LordOS {version} 或更高版本。请更新机器中的 LordOS；仅靠 LordOS 工具无法实现。",
   "apps.noApps": "机器尚未列出其应用",
   "apps.gone": "此窗口已在机器中关闭",
   "apps.dropTitle": "松开以把这些文件交给机器中的这个窗口",
@@ -2027,5 +2031,7 @@
   "req.row.answers": "安装应答",
   "req.use.answers": "由 Machines 自行生成：无需安装",
   "req.st.download": "创建时",
-  "req.st.builtin": "内置"
+  "req.st.builtin": "内置",
+  "cfg.closeOnStop": "虚拟机停止时关闭窗口",
+  "cfg.closeOnStopNote": "在关机或“关闭电源”之后。若因故障停止，窗口会保持打开以显示发生了什么。"
 }

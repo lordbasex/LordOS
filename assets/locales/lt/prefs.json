@@ -203,6 +203,7 @@
   "power.healthNormal": "Akumuliatoriaus būklė: {pct}% (normali)",
   "power.healthService": "Akumuliatoriaus būklė: {pct}% (rekomenduojama techninė priežiūra)",
   "power.healthUnknown": "Akumuliatoriaus būklė: nežinoma",
+  "power.h": "{h} val.",
   "power.hm": "{h} val. {m} min.",
   "power.immediately": "Iš karto",
   "power.left": "Liko {time}",

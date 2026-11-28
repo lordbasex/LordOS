@@ -712,6 +712,7 @@
   "agent.toolsAutoFailed": "La actualización automática no funcionó ({have} → {want}).",
   "agent.toolsUpdateBtn": "Actualizar",
   "agent.st.needsTools": "Necesita las herramientas",
+  "agent.st.oldLordos": "Actualizá LordOS adentro",
   "agent.st.needsXclip": "Necesita xclip",
   "agent.toolsInstalled": "Las herramientas de LordOS están instaladas y funcionando en la máquina; arrancan de nuevo en cada inicio de sesión.",
   "agent.timesync": "Poner en hora",
@@ -880,6 +881,8 @@
   "un.how.preseed": "Las respuestas van dentro de los archivos de arranque del instalador, tu contraseña solo como hash, y se borran una vez instalado el sistema.",
   "un.how.autoinstall": "Las respuestas van en un disco chico que lee el instalador, tu contraseña solo como hash, y el disco se quita una vez instalado el sistema.",
   "un.how.kickstart": "Las respuestas van en un disco chico que lee el instalador, tu contraseña solo como hash, y el disco se quita una vez instalado el sistema.",
+  "un.how.kali": "Las respuestas van dentro de los archivos de arranque del instalador, tu contraseña solo como hash, y se borran una vez instalado el sistema.",
+  "un.how.lordos": "Las respuestas van en un disco chico que lee el instalador, tu contraseña solo como hash, y el disco se quita una vez instalado el sistema.",
   "un.image": "Se instala desde {file}, también comprobada con la lista firmada de quien la hace",
   "un.review": "Sin preguntas: cuenta {user} en {host}",
   "un.reviewOff": "Vos respondés las preguntas del instalador",
@@ -1100,6 +1103,7 @@
   "apps.menu": "Aplicaciones",
   "apps.needsAgent": "El modo apps necesita el agente de la máquina, conectado",
   "win.appsNeedsTools": "El modo apps necesita LordOS o Windows en la máquina, con sus herramientas de LordOS",
+  "win.appsOldLordos": "El modo apps necesita LordOS {version} o posterior dentro de la máquina. Actualizá LordOS en la máquina; las herramientas de LordOS solas no alcanzan.",
   "apps.noApps": "La máquina todavía no listó sus apps",
   "apps.gone": "Esta ventana se cerró en la máquina",
   "apps.dropTitle": "Soltá para darle estos archivos a esta ventana de la máquina",
@@ -2027,5 +2031,7 @@
   "req.row.answers": "Respuestas de instalación",
   "req.use.answers": "Las arma Machines: no hay nada que instalar",
   "req.st.download": "Al crear",
-  "req.st.builtin": "Incluido"
+  "req.st.builtin": "Incluido",
+  "cfg.closeOnStop": "Cerrar la ventana cuando la máquina se apaga",
+  "cfg.closeOnStopNote": "Después de un apagado o de Apagar. Si se detiene por un problema, la ventana queda abierta para mostrar qué pasó."
 }

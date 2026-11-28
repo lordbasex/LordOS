@@ -1,6 +1,6 @@
 // "Classic" theme — the second full appearance of LordOS: a centered taskbar with a start menu,
 // pinned and open apps, a tray with quick settings and a notification panel, window snapping
-// (halves, thirds, quarters) and the SDK's Overview. The apps are the same as in Lord Flow: this theme
+// (halves, thirds, quarters) and the SDK's Overview. The apps are the same as in Flow: this theme
 // only supplies the window frame and the shell, and restyles the SDK's shared controls through its
 // tokens (tokens.js), so every app adapts on its own. See themes/README.md and docs/DESIGN.md.
 //
@@ -20,9 +20,10 @@ import {
   menuBarPrefs, menuBarEveryDisplay, barDisplays, pointerDisplay, keepWindowsInWorkAreas,
   guestAppsMode,
   titleBarPx,
+  windowFrameKey,
 } from '@lordos/sdk';
 import { apps } from '@lordos/apps';
-import { useEffect, useRef, useState, Fragment } from 'react';
+import { useEffect, useMemo, useRef, useState, Fragment } from 'react';
 import { makeTheme } from './tokens.js';
 import { Window, TITLE_H, MENU_H } from './components/Window.jsx';
 import { Taskbar, BAR_H, taskbarEntries } from './components/Taskbar.jsx';
@@ -88,7 +89,7 @@ function SnapPreview({ t }) {
   );
 }
 
-// Lord Classic's own shortcuts (the common ones are in sdk/shortcuts.js). `ui` is a ref to what the
+// Classic's own shortcuts (the common ones are in sdk/shortcuts.js). `ui` is a ref to what the
 // shell's state offers at that moment.
 const switchApps = (e) => openSwitcher(switcherHold(e), e.shift);
 const openFiles = () => launchApp('files');
@@ -124,9 +125,9 @@ const classicTable = (ui) => {
 };
 
 function App() {
-  startDeskWidgets();      // the desktop widgets' grid and data (sdk/deskwidgets.jsx), as in Lord Workspaces
+  startDeskWidgets();      // the desktop widgets' grid and data (sdk/deskwidgets.jsx), as in Workspaces
   const [s] = useTrackedSettings();   // the desktop renders again only for the settings it reads (sdk/settings.js)
-  const t = makeTheme(s);
+  const t = useMemo(() => makeTheme(s), [s]);   // the same tokens until a setting they read changes (memo Window)
   const { mounted, focused } = useWindows();
   const taskView = !!useStore(overview);
   const [panel, setPanel] = useState(null);           // { name: 'start' | 'quick' | 'notif', display: id } | null
@@ -206,7 +207,7 @@ function App() {
         {mounted.map((w) => (
           <Fragment key={w.id}>
             {preview && w === top ? <SnapPreview t={t} /> : null}
-            <Window win={w} t={t} focused={!taskView && w.id === focused} app={getApp(w.id)} />
+            <Window win={w} t={t} focused={!taskView && w.id === focused} app={getApp(w.id)} frameKey={windowFrameKey(w)} />
           </Fragment>
         ))}
         {!ga && <DesktopWidgets layer="above" />}

@@ -136,6 +136,15 @@ EOF
     ime "ime-test: hangul Shift jamo" hangul 'dl+T_qk+R_rk+Rk_dl+Tdj_r+O_d+P_+dl+T_' "" <<'EOF'
 committed: 있 밖 가까 있어 걔 예 있
 EOF
+    # (ws170 QA BUG-20) a key that is no jamo (Space, punctuation, Enter) commits the syllable first, then types itself;
+    # js_key renders that commit before the key reaches the field
+    ime "ime-test: hangul Space and punctuation commit first" hangul 'rk_+Qk_dk.x' "" <<'EOF'
+committed: 가 빠 아.
+preedit: ㅌ
+EOF
+    ime "ime-test: hangul Enter commits first" hangul 'rk^' "" <<'EOF'
+committed: 가
+EOF
     # every double final consonant, and how one splits when a vowel follows
     ime "ime-test: hangul double finals" hangul 'rkrt_ahrt_dksw_dksg_ekfr_tkfa_sjfq_rhft_gkfx_dmfv_dlfg_djqt_ekfrl_dkswdk_djqtdj_' "" <<'EOF'
 committed: 갃 몫 앉 않 닭 삶 넓 곬 핥 읊 잃 없 달기 앉아 없어
@@ -174,6 +183,11 @@ EOF
     if ! have python3 || ! python3 -c 'import PIL, numpy' 2>/dev/null; then skip "gen-mascot --check" "python3 with Pillow and NumPy"
     else run "gen-mascot --check (assets/mascot)" python3 -I ../tools/gen-mascot.py --check; fi
 
+    # the toolkit audit's plain X11 harness (lordos-testbench --toolkits, docs/TOOLKIT-AUDIT.md) against a private Xvfb
+    if ! have python3; then skip "toolkit-audit x11.py" "python3"
+    elif ! have Xvfb; then skip "toolkit-audit x11.py" "Xvfb"
+    else run "toolkit-audit x11.py" python3 -I ../tools/toolkit-audit/x11_test.py; fi
+
     run "sound-test" build/sound-test
     # lordos-issue's parsers of untrusted text (packaging/bin/lordos-issue): the WAYLAND_DEBUG scrubbing, the programs on the
     # Wayland and X11 sockets, lordos-testbench --globals' summary, --app with a fake program (tests/data/lordos-issue)
@@ -202,7 +216,12 @@ EOF
     else skip "portal-gs-test" "dbus-run-session"; fi
     if have dbus-run-session; then run "portal-cast-test (ScreenCast restore token, Screenshot, FileChooser lending)" dbus-run-session -- build/portal-cast-test
     else skip "portal-cast-test" "dbus-run-session"; fi
+    if have dbus-run-session; then run "webalive-test (a web app that hangs is started again, over a private bus)" dbus-run-session -- build/webalive-test
+    else skip "webalive-test" "dbus-run-session"; fi
     run "fsasync-test" build/fsasync-test
+    run "bgsave-test (#250: saves off the interface's thread)" build/bgsave-test
+    run "fswatch-test" build/fswatch-test
+    if have node; then run "fs-watch-sdk-test (sdk/fs.js watch)" node tests/fs_watch_sdk_test.mjs; fi
     run "sign-test" build/sign-test
     # migration 008: a tablet's power-button defaults (packaging/migrations, issue #131)
     run "migration 008 tablet-power" sh tests/migration_tablet_power_test.sh
@@ -232,14 +251,26 @@ EOF
     # the firewall rule sheet's parser (sdk/fwrule.js) against the same cases as build/fwdest-test
     if have node; then run "remotecert-test (sdk/remotecert.js)" node tests/remotecert_test.mjs; fi
     if have node; then run "remotedesk-test (sdk/remotedeskmodel.js)" node tests/remotedesk_test.mjs; fi
+    if have node; then run "store-subscribers-test (sdk/store.js: one failing subscriber skips none)" node tests/store_subscribers_test.mjs; fi
+    if have node; then run "monitor-denied-test (Monitor → Network: Recently denied, every direction)" node tests/monitor_denied_test.mjs; fi
     if have node; then run "place-model-test (sdk/placemodel.js)" node tests/place_model_test.mjs; fi
+    if have node; then run "hands-model-test (sdk/handsmodel.js, Hands' reader)" node tests/hands_model_test.mjs; fi
+    if have node; then run "hands-deny-test (sdk/handsdeny.js, the surfaces an agent never reaches)" node tests/hands_deny_test.mjs; fi
+    # Hands end to end: lordos-mcp --headless against a private desktop (Notes import, a permission prompt, the banner's Stop)
+    if have python3; then python3 -I tests/hands_e2e.py >"$T/out" 2>&1; rc=$?; if [ $rc = 0 ]; then ok "hands-e2e (lordos-mcp --headless)"; elif [ $rc = 77 ]; then skip "hands-e2e" "npm run build and make"; else bad "hands-e2e (lordos-mcp --headless)"; fi; fi
     if have node; then run "protect-model-test (sdk/protectmodel.js, Machines' protected machines)" node tests/protect_model_test.mjs; fi
     run "spectrum-test" build/spectrum-test
     if have node; then run "soundwave-model-test (sdk/soundwavemodel.js, widgetgrid.js pins)" node tests/soundwave_model_test.mjs; fi
+    if have node; then run "crashreport-test (sdk/crashreport.js, an app crash's Copy details)" node tests/crashreport_test.mjs; fi
+    if have node; then run "admin-js-test (sdk/admin.js: PROGRESS is progress, not the answer)" node tests/admin_js_test.mjs; fi
+    if have node; then run "installer-disk-model-test (apps/installer/diskmodel.js, #280)" node tests/installer_disk_model_test.mjs; fi
+    if have node; then run "filepicker-model-test (sdk/filepickermodel.js, the system file dialog)" node tests/filepicker_model_test.mjs; fi
+    if have node; then run "calculator-model-test (apps/calculator/model.js, % and ±, #271)" node tests/calculator_model_test.mjs; fi
     if have node; then run "statusplace-test (sdk/statusplace.js)" node tests/statusplace_test.mjs; fi
     if have node; then run "logfile-test (sdk/logfile.js)" node tests/logfile_test.mjs; fi
     if have node; then run "browserframe-notes-test (sdk/browserframe.js, #222)" node tests/browserframe_notes_test.mjs; fi
     if have node; then run "menubar-model-test (sdk/menubarmodel.js, sdk/ticker.js)" node tests/menubar_model_test.mjs; fi
+    if have node; then run "themes-sync-test (tools/themes-sync.mjs: themes/<id> is the pinned LordOS-themes commit)" node tests/themes_sync_test.mjs; fi
     if have node; then run "editor-scrollbar-test (apps/editor/scrollbar.js)" node tests/editor_scrollbar_test.mjs; fi
     if have node; then run "editor-recent-test (apps/editor/recent.js, File → Open Recent, #113)" node tests/editor_recent_test.mjs; fi
     if have node; then run "backup-model-test (apps/backup/model.js exclusions, FilePicker cloud={false}, #200)" node tests/backup_model_test.mjs; fi
@@ -249,7 +280,12 @@ EOF
     if have node; then run "vm-xfer-test (apps/machines/xfer.js, apps/files/quarantine.js: the file copy panel, files from a machine)" node tests/vm_xfer_test.mjs; fi
     if have node; then run "guest-apps-test (sdk/guestappsmodel.js, guest apps in the launcher)" node tests/guest_apps_test.mjs; fi
     if have node; then run "theme-gallery-test (sdk/themegallery.js, Settings → Appearance)" node tests/theme_gallery_test.mjs; fi
+    if have node; then run "themec-test (tools/themec/themec.js: the community theme compiler and its checks)" node tests/themec_test.mjs; fi
+    if have node; then run "power-model-test (sdk/powermodel.js: a countdown a community theme started never confirms)" node tests/power_model_test.mjs; fi
+    if have node; then run "theme-keys-model-test (sdk/themekeysmodel.js: a theme never hears keys LordOS takes)" node tests/theme_keys_model_test.mjs; fi
+    if have node; then run "theme-focus-model-test (sdk/themefocusmodel.js: a theme's text focus is its own, never LordOS's)" node tests/theme_focus_model_test.mjs; fi
     if have node; then run "gpu-report-test (sdk/gpureport.js, Settings → Graphics cards' compatibility report)" node tests/gpu_report_test.mjs; fi
+    if have node; then run "toolkit-pkgs-test (the toolkit audit's bindings and Qt theme in both images and the Recommends)" node tests/toolkit_pkgs_test.mjs; fi
     if have node; then run "iso-firmware-test (tools/iso/build.sh firmware list vs the Store map, #227)" node tests/iso_firmware_test.mjs; fi
     if have node; then run "vm-cli-test (apps/machines/model.js cliPlan, the machines command's session requests)" node tests/vm_cli_test.mjs; fi
     if have node; then run "vm-group-model-test (apps/machines/model.js groupPlan: a machine group's start and stop order, its link)" node tests/vm_group_model_test.mjs; fi
@@ -294,12 +330,33 @@ EOF
         77) skip "popup-reopen" "build/lord-server and the default theme (make, npm run build)" ;;
         *) bad "popup-reopen (tests/popup_client.c, headless lord-server, #159)" ;;
     esac
+    # the keyboard back at once after a window closes, a menu opened then kept, a late older copy dropped (toolkit audit)
+    sh tests/popup_headless.sh focusback-client >"$T/out" 2>&1
+    case $? in
+        0) ok "focus-back (tests/focusback_client.c, headless lord-server: keyboard, menu, clipboard)" ;;
+        77) skip "focus-back" "build/lord-server and the default theme (make, npm run build)" ;;
+        *) bad "focus-back (tests/focusback_client.c, headless lord-server: keyboard, menu, clipboard)" ;;
+    esac
     # (#219) Move and resize with: Off (the default) takes no press; ❖ + drag moves and resizes a Wayland and an X11 window
     sh tests/moddrag_headless.sh >"$T/out" 2>&1
     case $? in
         0) ok "moddrag (tests/moddrag_client.c, moddrag_x11.c, headless lord-server-test: off, move, resize, lock, shortcuts)" ;;
         77) skip "moddrag" "build/lord-server-test and the default theme (make, npm run build)" ;;
         *) bad "moddrag (tests/moddrag_client.c, moddrag_x11.c, headless lord-server-test)"; cat "$T/out" ;;
+    esac
+    # Machines: lord.vm.list's cache and lord-server's events for the shell over a throwaway library (no machine runs)
+    sh tests/vm_list_headless.sh >"$T/out" 2>&1
+    case $? in
+        0) ok "vm-list-cache (tests/vm_list_headless.sh: cached under 1 ms, a change seen, state events for a start and a lord-vm gone)" ;;
+        77) skip "vm-list-cache" "build/lord-server and OVMF (make, ovmf)" ;;
+        *) bad "vm-list-cache (tests/vm_list_headless.sh)"; cat "$T/out" ;;
+    esac
+    # the maintainer's rule (2026-11-26): an idle desktop with machines and none running makes no lord.vm call
+    sh tests/vm_idle_headless.sh >"$T/out" 2>&1
+    case $? in
+        0) ok "vm-idle (tests/vm_idle_headless.sh: Lord Flow idle with 14 machines, none running: no lord.vm call, no stall line)" ;;
+        77) skip "vm-idle" "build/lord-server and the default theme (make, npm run build)" ;;
+        *) bad "vm-idle (tests/vm_idle_headless.sh)"; cat "$T/out" ;;
     esac
     # (#232) a fullscreen window's desync subsurface (Firefox's page) repaints its own box, checked against a full repaint
     sh tests/fsub_headless.sh >"$T/out" 2>&1
@@ -328,7 +385,7 @@ EOF
     python3 -I tests/vm_qemu_args_test.py >"$T/out" 2>&1
     case $? in
         0) ok "vm-qemu-args (tests/vm_qemu_args_test.py: $(grep -c '^ok:' "$T/out") rows of settings against QEMU's arguments)" ;;
-        77) skip "vm-qemu-args" "KVM, QEMU, qemu-img, passt, unshare and python3" ;;
+        77) skip "vm-qemu-args" "KVM, QEMU, qemu-img, passt, unshare, python3 and the tree outside the home folder" ;;
         *) bad "vm-qemu-args (tests/vm_qemu_args_test.py)"; cat "$T/out" ;;
     esac
     # protected windows (docs/PRIVACY.md): drawn on the display, the protected fill in a screenshot, the remote desktop's
@@ -347,14 +404,21 @@ EOF
         77) skip "testbench-globals" "build/lord-server-test, build/lordos-testbench, the default theme and python3" ;;
         *) bad "testbench-globals (tests/testbench_globals_headless.sh, headless lord-server-test)" ;;
     esac
-    # Lord Workspaces: a window launched from a display's bar lands on that display, in that activity and its slot, even
+    # (ws170 QA BUG-24) the test bench's clipboard and primary-selection checks while another client holds both selections
+    sh tests/testbench_selection_headless.sh >"$T/out" 2>&1
+    case $? in
+        0) ok "testbench-selection (tests/testbench_selection_headless.sh: its own text back with another client's selection there)" ;;
+        77) skip "testbench-selection" "build/lord-server-test, build/lordos-testbench, the default theme and python3" ;;
+        *) bad "testbench-selection (tests/testbench_selection_headless.sh)"; cat "$T/out" ;;
+    esac
+    # Workspaces: a window launched from a display's bar lands on that display, in that activity and its slot, even
     # after a profile picker and with another activity in view; a dialog told its parent late goes over it; the bar
     # marks a minimized window (themes/workspaces/model/launches.js; left to right and right to left)
     for lp in en ar; do
         mkdir -p -m 700 "$T/launchplace"; LAUNCHPLACE_LANG=$lp LAUNCHPLACE_DIR="$T/launchplace" sh tests/launchplace_headless.sh >"$T/out" 2>&1
         case $? in
             0) ok "launch-placement-$lp (tests/launchplace_headless.sh, headless lord-server-test, a fake Chrome with a profile picker)" ;;
-            77) skip "launch-placement-$lp" "build/lord-server-test, build/launchplace-client, python3 and node with esbuild" ;;
+            77) skip "launch-placement-$lp" "build/lord-server-test, build/launchplace-client, python3 with PIL and node with esbuild" ;;
             *) bad "launch-placement-$lp (tests/launchplace_headless.sh)"; cat "$T/out" ;;
         esac
     done
@@ -362,7 +426,7 @@ EOF
     # and a copy running with no window shows a new one (the 2026-11-23 Google Chrome case)
     sh tests/handoff_headless.sh >"$T/out" 2>&1
     case $? in
-        0) ok "handoff (tests/handoff_client.c, headless lord-server: relaunch of a running app, Lord Flow and Lord Workspaces)" ;;
+        0) ok "handoff (tests/handoff_client.c, headless lord-server: relaunch of a running app, Flow and Workspaces)" ;;
         77) skip "handoff" "build/lord-server, build/handoff-client and the default theme (make, npm run build)" ;;
         *) bad "handoff (tests/handoff_client.c, headless lord-server: relaunch of a running app)"; cat "$T/out" ;;
     esac
@@ -388,6 +452,14 @@ EOF
         0) ok "theme-switch-fails (tests/theme_switch_headless.sh, headless lord-server)" ;;
         77) skip "theme-switch-fails" "build/lord-server (make)" ;;
         *) bad "theme-switch-fails (tests/theme_switch_headless.sh, headless lord-server)"; cat "$T/out" ;;
+    esac
+    # a quiet desktop stays quiet in every desktop and after five switches: a window's spinning title draws only that
+    # window, never every window, widget, bar and Dock icon (BUG-9 of the 0.8.9.6.2 QA)
+    sh tests/idle_rerender_headless.sh >"$T/out" 2>&1
+    case $? in
+        0) ok "idle-rerender (tests/idle_rerender_headless.sh, headless lord-server, five desktops)" ;;
+        77) skip "idle-rerender" "build/lord-server, node and esbuild (make, npm install)" ;;
+        *) bad "idle-rerender (tests/idle_rerender_headless.sh, headless lord-server, five desktops)"; cat "$T/out" ;;
     esac
     # explicit sync's kernel side (src/wl/syncobj.c) on this machine's render node
     ./build/syncobj-kernel-test >"$T/out" 2>&1
@@ -616,6 +688,14 @@ EOF
     else skip "osk-model-test (sdk/oskmodel.js)" node; fi
     if have node; then run "motion-model-test (sdk/motionmodel.js)" node tests/motion_model_test.mjs; else skip "motion-model-test" node; fi
     if have node; then run "wallpaper-model-test (sdk/wallpapermodel.js)" node tests/wallpaper_model_test.mjs; else skip "wallpaper-model-test" node; fi
+    run "wallpaper-admin-test (wallpaper-get keeps a picture as .jpg and a video as .mp4, wallpaper-remove, still cat:<id>, the shipped catalog)" build/wallpaper-admin-test
+    if have node; then run "wallpaper-gallery-test (sdk/wallpapergallery.js, Settings → Wallpaper)" node tests/wallpaper_gallery_test.mjs; else skip "wallpaper-gallery-test" node; fi
+    if have node; then run "ai-store-test (sdk/aistore.js, Settings → Artificial intelligence)" node tests/ai_store_test.mjs; else skip "ai-store-test" node; fi
+    if have node; then run "settings-search-test (apps/settings/searchmodel.js: AI by its functions, every page by its row labels, in every language)" node tests/settings_search_test.mjs; else skip "settings-search-test" node; fi
+    if have node; then run "locale-dates-test (no toLocaleString() without a locale in apps, sdk, themes)" node tests/locale_dates_test.mjs; else skip "locale-dates-test" node; fi
+    if have node; then run "admin-sync-test (sdk/adminsyncmodel.js: a mirrored setting's admin action once per choice, no retry storm)" node tests/admin_sync_test.mjs; else skip "admin-sync-test" node; fi
+    if have node; then run "spell-model-test (sdk/spellmodel.js, the spell checker's words, lines and menu)" node tests/spell_model_test.mjs; else skip "spell-model-test" node; fi
+    if have node; then run "writing-model-test (sdk/writingmodel.js, ✨ AI on selected text)" node tests/writing_model_test.mjs; else skip "writing-model-test" node; fi
     if have node; then run "display-apps-model-test (sdk/displayappsmodel.js)" node tests/display_apps_model_test.mjs; else skip "display-apps-model-test" node; fi
     if have node; then run "slideshow-model-test (sdk/slideshowmodel.js)" node tests/slideshow_model_test.mjs; else skip "slideshow-model-test" node; fi
     if have node; then run "widget-grid-test (sdk/widgetgrid.js)" node tests/widget_grid_test.mjs; else skip "widget-grid-test" node; fi
@@ -651,7 +731,7 @@ EOF
     if have node; then run "vpn-model-test (sdk/vpnmodel.js)" node tests/vpn_model_test.mjs; else skip "vpn-model-test" node; fi
     if have node; then run "claude-widget-model-test (sdk/claudewidgetmodel.js)" node tests/claude_widget_model_test.mjs; else skip "claude-widget-model-test" node; fi
     if have node; then run "stream-model-test (sdk/streammodel.js)" node tests/stream_model_test.mjs; else skip "stream-model-test" node; fi
-    # (0.8.8.8, #112) Lord Flow's minimize effect: which windows start it, none with Reduce motion
+    # (0.8.8.8, #112) Flow's minimize effect: which windows start it, none with Reduce motion
     if have node; then run "minimize-model-test (themes/default/minimize.js)" node tests/minimize_model_test.mjs; else skip "minimize-model-test" node; fi
     if have node; then run "share-model-test (sdk/sharemodel.js)" node tests/share_model_test.mjs
     else skip "share-model-test" "node"; fi
@@ -690,6 +770,12 @@ EOF
     # session restore's data rules (sdk/sessionmodel.js)
     if have node; then run "session-model-test (sdk/sessionmodel.js)" node tests/session_model_test.mjs
     else skip "session-model-test" "node"; fi
+    # (0.8.9.6.2) the recently changed files from a walk on lord-server's workers, never on the interface's thread
+    if have node; then run "fs-recent-cache-test (sdk/fs.js recentCached)" node tests/fs_recent_cache_test.mjs
+    else skip "fs-recent-cache-test" "node"; fi
+    # (0.8.9.6.2) the crown menu's update count is read off the shell's first render, then at most once a minute
+    if have node; then run "lazy-count-test (sdk/lazycount.js)" node tests/lazy_count_test.mjs
+    else skip "lazy-count-test" "node"; fi
     # window snapping geometry (sdk/snap.js): zones without gaps or overlaps, drop zones, Super+arrows
     if have node; then run "snap-test (sdk/snap.js)" node tests/snap_test.mjs
     else skip "snap-test" "node"; fi
@@ -805,6 +891,8 @@ EOF
     # (0.8.8.8) Linux apps' tray icons: which show, a dbusmenu layout as the SDK's menu, where it opens (sdk/traymodel.js)
     if have node; then run "tray-model-test (sdk/traymodel.js)" node tests/tray_model_test.mjs
     else skip "tray-model-test" "node"; fi
+    # (0.8.9.6.2) style packs and app skins: the checks, the switches per part, Files' view model (docs/THEMES-GUIDE.md)
+    if have node; then run "appskin-test (sdk/appskinmodel.js, apps/files/skinmodel.js, apps/settings/skinmodel.js)" node tests/appskin_test.mjs; fi
     # (0.8.8.8) SVG icons of Linux apps: PNG as it is, SVG at the size shown, symbolic ones in the bar's color (sdk/iconsrc.js)
     if have node; then run "iconsrc-test (sdk/iconsrc.js)" node tests/iconsrc_test.mjs
     else skip "iconsrc-test" "node"; fi
@@ -873,6 +961,10 @@ EOF
     else skip "textfield-menu-test" "node and the repository's node_modules (npm install)"; fi
     # (#238) Notes' storage over a real temporary home: the format, titles, geometry, attachments (odd names, links,
     # folders, a huge file) and what a link or image may reach (file://, javascript:, absolute paths, ..); writes stay in ~/Notes
+    # (0.8.9.6.2) Notes' pure logic: the rescan merge, the widget catalog's pick list, placing a note on a display, import
+    if have node; then run "notes-model-test (apps/notes/notesmodel.js)" node tests/notes_model_test.mjs; else skip "notes-model-test" node; fi
+    # (0.8.9.6.2) Notes' editor rows: wrapped as drawn (no row wider than the editor), the caret and clicks, the line cache
+    if have node; then run "notes-wrap-test (apps/notes/wrapmodel.js)" node tests/notes_wrap_test.mjs; else skip "notes-wrap-test" node; fi
     if have node && [ -d ../node_modules/esbuild ]; then run "notes-store-test (apps/notes/store.js, links.js)" node tests/notes_store_test.mjs
     else skip "notes-store-test" "node and the repository's node_modules (npm install)"; fi
     if have node; then run "sysopen-untrusted-test (sdk/runscode.js: attachments that would run never reach a Linux app)" node tests/sysopen_untrusted_test.mjs; else skip "sysopen-untrusted-test" node; fi
@@ -883,6 +975,13 @@ EOF
         run "notes-breaks-scene (sdk/markdown.jsx breaks, apps/notes)" node tests/textfield_menu_test.mjs notes_breaks_scene.mjs
         # (#166) Screenshots' markup editor: New Screenshot and Ctrl+N bring the capture panel back, the editor staying open
         run "screenshots-newcapture-scene (apps/screenshots/editor.jsx)" node tests/textfield_menu_test.mjs screenshots_newcapture_scene.mjs
+        # (#252) Screenshots with several displays: Print Screen copies the main display's capture, a thumbnail per display
+        # inside it, the markup editor inside one display (side by side, main listed second; another above-left at 200 %)
+        run "screenshots-displays-scene (apps/screenshots/index.jsx)" node tests/textfield_menu_test.mjs screenshots_displays_scene.mjs
+        # (ws170 QA BUG-31) a web app's right-click menu closes with its app's last window (lord-web keeps running)
+        run "webapp-menu-orphan-scene (sdk/hardware.jsx WebAppMenu)" node tests/textfield_menu_test.mjs webapp_menu_orphan_scene.mjs
+        # (ws170 QA BUG-28) the selection's overlays closed from elsewhere end it: Space, C and T reach a field again
+        run "screenshots-overlay-close-scene (apps/screenshots/index.jsx)" node tests/textfield_menu_test.mjs screenshots_overlay_close_scene.mjs
         # the Screenshots toolbar: modes, the primary button, the Options menu and its choices saved in settings
         run "screenshots-toolbar-scene (apps/screenshots/toolbar.jsx)" node tests/textfield_menu_test.mjs screenshots_toolbar_scene.mjs
         # (#200) Backups: Choose… for the destination (no Cloud folder) and the exclusions (inside home), typing still works
@@ -924,12 +1023,20 @@ EOF
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "webapps-get-scene (apps/store/getweb.js)" node tests/textfield_menu_test.mjs webapps_get_scene.mjs
     else skip "webapps-get-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.9.6.2) Settings → Web apps → Refresh icon: busy, then the icon or the reason, one closed log line per failure
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "webapps-icon-settings-scene (apps/settings/WebApps.jsx)" node tests/textfield_menu_test.mjs webapps_icon_settings_scene.mjs
+        run "webapps-restart-settings-scene (Restart, Force Quit, Restart web apps engine)" node tests/textfield_menu_test.mjs webapps_restart_settings_scene.mjs
+        run "window-sheet-scene (sdk/layers.js WindowSheet: an app's sheet stays in its window)" node tests/textfield_menu_test.mjs window_sheet_scene.mjs
+    else skip "webapps-icon-settings-scene" "node and the repository's node_modules (npm install)"; fi
     # (0.8.8.9) the trademark notice of the Store's Web apps section and of each web app's page
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "store-trademark-scene (apps/store/trademark.js)" node tests/textfield_menu_test.mjs store_trademark_scene.mjs
         run "battery-settings-scene (apps/settings/Battery.jsx)" node tests/textfield_menu_test.mjs battery_settings_scene.mjs
         # Sentinela (docs/SENTINELA.md): a rule's desktop notification with the closed actions, and its Settings page
         run "sentinela-notify-scene (sdk/sentinela.js)" node tests/textfield_menu_test.mjs sentinela_notify_scene.mjs
+        # (QA of 0.8.9.6.2) a banner whose time is up stays in the centre with its buttons and its icon
+        run "notify-expiry-scene (sdk/notify.js)" node tests/textfield_menu_test.mjs notify_expiry_scene.mjs
         run "sentinela-settings-scene (apps/settings/Sentinela.jsx)" node tests/textfield_menu_test.mjs sentinela_settings_scene.mjs
     else skip "store-trademark-scene" "node and the repository's node_modules (npm install)"; fi
     # (0.8.9.5) the Store's long lists load their next page near the end of the scroll
@@ -957,15 +1064,23 @@ EOF
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "vm-keys-scene (sdk/components.jsx AppHost, sdk/windows.js hasKeyboard, apps/machines guestKeys)" node tests/focus_scene_test.mjs vm_keys_scene.mjs
     else skip "vm-keys-scene" "node and the repository's node_modules (npm install)"; fi
+    # (ws170 QA MEJORA-1) a TextInput's first selection (Files' rename: the name without its extension)
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "textinput-select-scene (sdk/components.jsx TextInput select, apps/files/names.js renameSelection)" node tests/focus_scene_test.mjs textinput_select_scene.mjs
+    else skip "textinput-select-scene" "node and the repository's node_modules (npm install)"; fi
+    # (ws170 QA BUG-20) an input method's commit and the key that ended the syllable, in one turn, both reach a field
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "ime-commit-scene (sdk/components.jsx TextInput: 가 then Space is \"가 \")" node tests/focus_scene_test.mjs ime_commit_scene.mjs
+    else skip "ime-commit-scene" "node and the repository's node_modules (npm install)"; fi
     # (0.8.8.8) menus from the keyboard in both themes: arrows, type-ahead, submenus, the hover pause, F10 and ⌥ alone
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "menu-keys-test (themes/default Menu, themes/classic Menu, sdk/shortcuts.js)" node tests/menu_keys_test.mjs
     else skip "menu-keys-test" "node and the repository's node_modules (npm install)"; fi
-    # (0.8.8.6, #48) Lord Classic's power menu: a click on Lock Screen or Switch User reaches the session
+    # (0.8.8.6, #48) Classic's power menu: a click on Lock Screen or Switch User reaches the session
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "classic-startmenu-power-test (themes/classic StartMenu)" node tests/classic_startmenu_power_test.mjs
     else skip "classic-startmenu-power-test" "node and the repository's node_modules (npm install)"; fi
-    # (#210) Lord Classic's start menu by category: the groups and counts, mouse and keyboard, RTL, the remembered view
+    # (#210) Classic's start menu by category: the groups and counts, mouse and keyboard, RTL, the remembered view
     if have node; then run "app-groups-model-test (sdk/appgroupsmodel.js)" node tests/app_groups_model_test.mjs; fi
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "classic-startmenu-categories-scene (themes/classic StartMenu, sdk/appgroupsmodel.js)" node tests/classic_startmenu_power_test.mjs classic_startmenu_categories_scene.mjs
@@ -974,7 +1089,7 @@ EOF
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "side-buttons-test (runtime/events.js)" node tests/side_buttons_test.mjs
     else skip "side-buttons-test" "node and the repository's node_modules (npm install)"; fi
-    # (0.8.8.6, #58) what the bar shows: Lord Flow's Control Center tiles, the output list, the clock's calendar
+    # (0.8.8.6, #58) what the bar shows: Flow's Control Center tiles, the output list, the clock's calendar
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "menubar-test (themes/default ControlCenter, NotificationCenter, MenuBars on every display, sdk/soundoutputs.js)" node tests/menubar_test.mjs
     else skip "menubar-test" "node and the repository's node_modules (npm install)"; fi
@@ -997,15 +1112,147 @@ EOF
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "monitor-describe-scene (apps/monitor/Describe.jsx)" node tests/menubar_test.mjs monitor_describe_scene.mjs
     else skip "monitor-describe-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.9.6.2) Files with every region a theme may draw replaced by a stub: the actions go through Files' own checks
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "files-skin-scene (apps/files regions, sdk/appskins.jsx)" node tests/menubar_test.mjs files_skin_scene.mjs
+    else skip "files-skin-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.9.6.2) Settings with its sidebar and home page replaced by stubs: each page stays Settings' own
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "settings-skin-scene (apps/settings regions, sdk/appskins.jsx)" node tests/menubar_test.mjs settings_skin_scene.mjs
+    else skip "settings-skin-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.9.6.2) the Terminal with its tab bar, status bar and context menu stubbed: no skin action types into a session
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "terminal-skin-scene (apps/terminal regions, sdk/appskins.jsx)" node tests/menubar_test.mjs terminal_skin_scene.mjs
+    else skip "terminal-skin-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.9.6.2) the Text Editor with its toolbar, tabs, status bar and context menu stubbed: the text is never a skin's
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "editor-skin-scene (apps/editor regions, sdk/appskins.jsx)" node tests/menubar_test.mjs editor_skin_scene.mjs
+    else skip "editor-skin-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.9.6.2) the Store with its pages' list and toolbar stubbed: only listed pages open, installs stay the Store's
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "store-skin-scene (apps/store regions, sdk/appskins.jsx)" node tests/menubar_test.mjs store_skin_scene.mjs
+    else skip "store-skin-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.9.6.2) Notes with every region a theme may draw stubbed (tests/app_skin_helpers.js)
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "notes-skin-scene (apps/notes regions)" node tests/menubar_test.mjs notes_skin_scene.mjs
+    else skip "notes-skin-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.9.6.2) Calculator with every region a theme may draw stubbed (tests/app_skin_helpers.js)
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "calculator-skin-scene (apps/calculator regions)" node tests/menubar_test.mjs calculator_skin_scene.mjs
+    else skip "calculator-skin-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.9.6.2) Photos with every region a theme may draw stubbed (tests/app_skin_helpers.js)
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "photos-skin-scene (apps/photos regions)" node tests/menubar_test.mjs photos_skin_scene.mjs
+    else skip "photos-skin-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.9.6.2) Player with every region a theme may draw stubbed (tests/app_skin_helpers.js)
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "player-skin-scene (apps/player regions)" node tests/menubar_test.mjs player_skin_scene.mjs
+    else skip "player-skin-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.9.6.2) Monitor with every region a theme may draw stubbed (tests/app_skin_helpers.js)
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "monitor-skin-scene (apps/monitor regions)" node tests/menubar_test.mjs monitor_skin_scene.mjs
+    else skip "monitor-skin-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.9.6.2) Clock with every region a theme may draw stubbed (tests/app_skin_helpers.js)
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "clock-skin-scene (apps/clock regions)" node tests/menubar_test.mjs clock_skin_scene.mjs
+    else skip "clock-skin-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.9.6.2) Screenshots with every region a theme may draw stubbed (tests/app_skin_helpers.js)
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "screenshots-skin-scene (apps/screenshots regions)" node tests/menubar_test.mjs screenshots_skin_scene.mjs
+    else skip "screenshots-skin-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.9.6.2) Disks with every region a theme may draw stubbed (tests/app_skin_helpers.js)
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "disks-skin-scene (apps/disks regions)" node tests/menubar_test.mjs disks_skin_scene.mjs
+    else skip "disks-skin-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.9.6.2) About with every region a theme may draw stubbed (tests/app_skin_helpers.js)
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "about-skin-scene (apps/about regions)" node tests/menubar_test.mjs about_skin_scene.mjs
+    else skip "about-skin-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.9.6.2) Help with every region a theme may draw stubbed (tests/app_skin_helpers.js)
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "help-skin-scene (apps/help regions)" node tests/menubar_test.mjs help_skin_scene.mjs
+    else skip "help-skin-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.9.6.2) Characters with every region a theme may draw stubbed (tests/app_skin_helpers.js)
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "characters-skin-scene (apps/characters regions)" node tests/menubar_test.mjs characters_skin_scene.mjs
+    else skip "characters-skin-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.9.6.2) Fonts with every region a theme may draw stubbed (tests/app_skin_helpers.js)
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "fonts-skin-scene (apps/fonts regions)" node tests/menubar_test.mjs fonts_skin_scene.mjs
+    else skip "fonts-skin-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.9.6.2) Logs with every region a theme may draw stubbed (tests/app_skin_helpers.js)
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "logs-skin-scene (apps/logs regions)" node tests/menubar_test.mjs logs_skin_scene.mjs
+    else skip "logs-skin-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.9.6.2) System Information with every region a theme may draw stubbed (tests/app_skin_helpers.js)
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "sysinfo-skin-scene (apps/sysinfo regions)" node tests/menubar_test.mjs sysinfo_skin_scene.mjs
+    else skip "sysinfo-skin-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.9.6.2) Backups with every region a theme may draw stubbed (tests/app_skin_helpers.js)
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "backup-skin-scene (apps/backup regions)" node tests/menubar_test.mjs backup_skin_scene.mjs
+    else skip "backup-skin-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.9.6.2) PDF Viewer with every region a theme may draw stubbed (tests/app_skin_helpers.js)
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "pdf-skin-scene (apps/pdf regions)" node tests/menubar_test.mjs pdf_skin_scene.mjs
+    else skip "pdf-skin-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.9.6.2) Force Quit with every region a theme may draw stubbed (tests/app_skin_helpers.js)
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "forcequit-skin-scene (apps/forcequit regions)" node tests/menubar_test.mjs forcequit_skin_scene.mjs
+    else skip "forcequit-skin-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.9.6.2) About App with every region a theme may draw stubbed (tests/app_skin_helpers.js)
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "appabout-skin-scene (apps/appabout regions)" node tests/menubar_test.mjs appabout_skin_scene.mjs
+    else skip "appabout-skin-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.9.6.2) Scanner with every region a theme may draw stubbed (tests/app_skin_helpers.js)
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "scanner-skin-scene (apps/scanner regions)" node tests/menubar_test.mjs scanner_skin_scene.mjs
+    else skip "scanner-skin-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.9.6.2) Voice Recorder with every region a theme may draw stubbed (tests/app_skin_helpers.js)
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "recorder-skin-scene (apps/recorder regions)" node tests/menubar_test.mjs recorder_skin_scene.mjs
+    else skip "recorder-skin-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.9.6.2) Camera with every region a theme may draw stubbed (tests/app_skin_helpers.js)
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "camera-skin-scene (apps/camera regions)" node tests/menubar_test.mjs camera_skin_scene.mjs
+    else skip "camera-skin-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.9.6.2) LordOS Imager with every region a theme may draw stubbed (tests/app_skin_helpers.js)
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "imager-skin-scene (apps/imager regions)" node tests/menubar_test.mjs imager_skin_scene.mjs
+    else skip "imager-skin-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.9.6.2) Install LordOS with every region a theme may draw stubbed (tests/app_skin_helpers.js)
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "installer-skin-scene (apps/installer regions)" node tests/menubar_test.mjs installer_skin_scene.mjs
+    else skip "installer-skin-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.9.6.2) Databases with every region a theme may draw stubbed (tests/app_skin_helpers.js)
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "databases-skin-scene (apps/databases regions)" node tests/menubar_test.mjs databases_skin_scene.mjs
+    else skip "databases-skin-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.9.6.2) Machines with every region a theme may draw stubbed (tests/app_skin_helpers.js)
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "machines-skin-scene (apps/machines regions)" node tests/menubar_test.mjs machines_skin_scene.mjs
+    else skip "machines-skin-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.9.6.2) Cleaner with every region a theme may draw stubbed (tests/app_skin_helpers.js)
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "cleaner-skin-scene (apps/cleaner regions)" node tests/menubar_test.mjs cleaner_skin_scene.mjs
+    else skip "cleaner-skin-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.9.6.2) LordOS Studio with every region a theme may draw stubbed (tests/app_skin_helpers.js)
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "studio-skin-scene (apps/studio regions)" node tests/menubar_test.mjs studio_skin_scene.mjs
+    else skip "studio-skin-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.9.6.2) Remote Desk with every region a theme may draw stubbed (tests/app_skin_helpers.js)
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "remote-desk-skin-scene (apps/remote-desk regions)" node tests/menubar_test.mjs remote-desk_skin_scene.mjs
+    else skip "remote-desk-skin-scene" "node and the repository's node_modules (npm install)"; fi
     # (#218) Files: dragging in a folder of 2000 files draws only the ghost and the drop highlights, never the whole window
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "files-drag-scene (apps/files/dnd.jsx)" node tests/menubar_test.mjs files_drag_scene.mjs
     else skip "files-drag-scene" "node and the repository's node_modules (npm install)"; fi
-    # (0.8.8.6) Lord Classic's taskbar on every display: three monitors, panels on the clicked bar's display, one timer
+    # (0.8.8.6) Classic's taskbar on every display: three monitors, panels on the clicked bar's display, one timer
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "classic-taskbar-test (themes/classic on every display, sdk/dock.js drop targets)" node tests/classic_taskbar_test.mjs
     else skip "classic-taskbar-test" "node and the repository's node_modules (npm install)"; fi
-    # (0.8.9) Lord Workspaces: three monitors, tiling per display, Save layout, a monitor unplugged and back, the styles
+    # (0.8.9) Workspaces: three monitors, tiling per display, Save layout, a monitor unplugged and back, the styles
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "workspaces-test (themes/workspaces on three displays)" node tests/workspaces_test.mjs
     else skip "workspaces-test" "node and the repository's node_modules (npm install)"; fi
@@ -1018,6 +1265,24 @@ EOF
             run "firststart-scene-$th (sdk/firststart.jsx over themes/$th)" node tests/workspaces_test.mjs firststart_scene.mjs "$th"
         done
     else skip "firststart-scene" "node and the repository's node_modules (npm install)"; fi
+    # (ws170 QA BUG-21) Settings → Keyboard's list: a modifier pressed alone is labelled so ("❖ alone · F4", not "❖ · F4")
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        for th in default classic; do
+            run "shortcuts-list-scene-$th (sdk/shortcuts.js shortcutList over themes/$th)" node tests/workspaces_test.mjs shortcuts_list_scene.mjs "$th"
+        done
+    else skip "shortcuts-list-scene" "node and the repository's node_modules (npm install)"; fi
+    # (ws170 QA BUG-28) the menu bar's search gets every key typed in it, and lists the recent files with nothing typed
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        for th in default classic; do
+            run "spotlight-keys-scene-$th (sdk/spotlight.js over themes/$th)" node tests/workspaces_test.mjs spotlight_keys_scene.mjs "$th"
+        done
+    else skip "spotlight-keys-scene" "node and the repository's node_modules (npm install)"; fi
+    # (ws170 QA BUG-11) the shell's glyph-only buttons (Flow's Dock and menu bar, Workspaces' column) have accessible names
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        for th in default workspaces; do
+            run "hands-names-scene-$th (accessible names over themes/$th)" node tests/workspaces_test.mjs hands_names_scene.mjs "$th"
+        done
+    else skip "hands-names-scene" "node and the repository's node_modules (npm install)"; fi
     # always on top in every theme: drawing order apart from the keyboard, the window menu's item, skip pager
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         for th in default classic workspaces celeste; do
@@ -1054,6 +1319,22 @@ EOF
     if [ -x build/web-backend-test ] && have bwrap && have xdg-dbus-proxy; then
         run "web-backend-test ($(cat build/gen/web_backend 2>/dev/null) backend)" build/web-backend-test
     else skip "web-backend-test" "wpe-webkit-2.0 (build/web-backend-test), bubblewrap and xdg-dbus-proxy"; fi
+    # the context menu's spelling suggestions from WebKit (docs/WEBAPPS.md, "Spelling"), WPEPlatform only
+    if [ -x build/web-menu-check ] && have bwrap && have xdg-dbus-proxy && ls /usr/share/hunspell/*.dic >/dev/null 2>&1; then
+        run "web-menu-check (spelling suggestions in the context menu)" build/web-menu-check
+    else skip "web-menu-check" "WPEPlatform (build/web-menu-check), bubblewrap, xdg-dbus-proxy and a hunspell dictionary"; fi
+    if [ -x build/web-ai-replace-check ] && have bwrap && have xdg-dbus-proxy; then
+        run "web-ai-replace-check (✨ AI's Replace in a textarea, a contenteditable box and a Lexical-like editor)" build/web-ai-replace-check
+    else skip "web-ai-replace-check" "WPEPlatform (build/web-ai-replace-check), bubblewrap and xdg-dbus-proxy"; fi
+    # (in development, docs/WEBAPPS.md "Calls") a Chrome profile's Client Hints and navigator.userAgentData against
+    # Chrome's own, SharedArrayBuffer only when cross-origin isolated, the call log; with an engine that has WebRTC, two
+    # peer connections in one page exchanging audio and video (Opus with VP8, then H.264). WPEPlatform only
+    if [ -x build/webcalls-check ] && have python3 && have bwrap && have xdg-dbus-proxy; then
+        run "webcalls-check (Client Hints, userAgentData, call log, WebRTC loopback)" python3 -I tests/webcalls_check.py build/webcalls-check
+    else skip "webcalls-check" "WPEPlatform (build/webcalls-check), bubblewrap, xdg-dbus-proxy and python3"; fi
+    if [ -x build/webhang-check ] && have bwrap && have xdg-dbus-proxy; then
+        for m in fine hang urgent; do run "webhang-check $m (a page that stops answering gets a new web process)" build/webhang-check $m; done
+    else skip "webhang-check" "WPEPlatform (build/webhang-check), bubblewrap and xdg-dbus-proxy"; fi
     # (0.8.8.6) Claude Code in the Terminal's footer: the status line bridge and the footer's model
     run "claude-bridge-test (lord-claude-status)" sh tests/claude_bridge_test.sh
     if have node; then run "terminal-claude-test (apps/terminal/claude.js)" node tests/terminal_claude_test.mjs
@@ -1062,6 +1343,12 @@ EOF
 
 full() {
     echo "== slow and environment-dependent suites (tests/run_suites.sh full)"
+    # (docs/WEBAPPS.md "Cameras") a web app's camera inside WebKit's sandbox: every capture device listed, each opened for
+    # a few frames, and the capture indicator's "camera-use" while it is held. Opens this computer's real cameras for a
+    # few seconds, so only here; without a camera it says so
+    if [ -x build/webcalls-check ] && [ -x build/camuse-check ] && have python3 && have bwrap && have xdg-dbus-proxy; then
+        run "webcam-check (a web app's camera in WebKit's sandbox, the capture indicator)" python3 -I tests/webcam_check.py build/webcalls-check build/camuse-check
+    else skip "webcam-check" "WPEPlatform (build/webcalls-check), build/camuse-check, bubblewrap, xdg-dbus-proxy and python3"; fi
     # media helper: a generated WAV (one second of a 440 Hz tone), probe, waveform and its confinement
     if [ -x build/lord-media ] && have python3; then
         python3 -I - "$T/tone.wav" <<'EOF'
@@ -1161,7 +1448,17 @@ EOF
             *) bad "files-renamelayout-scene $th (tests/files_renamelayout_scene, headless lord-server)" ;;
         esac
     done
-    # (0.8.9.6.1) Lord Workspaces' top band: the activity strip never over the status cluster (Arabic at 1600 px, German
+    # (0.8.9.6.2) About's list of facts: no label cut at its start ("Pausas de más de 50 ms"), in the long languages and
+    # right to left, at About's own size and in a narrow window
+    for lg in es de ar fi; do
+        SCENE_TIMEOUT=40 sh tests/app_scene_headless.sh about_labels_scene "$T/scene" default "$lg" >"$T/out" 2>&1
+        case $? in
+            0) ok "about-labels-scene $lg (tests/about_labels_scene, headless lord-server)" ;;
+            77) skip "about-labels-scene $lg" "build/lord-server and themes/default/theme.bundle.js (make, npm run build)" ;;
+            *) bad "about-labels-scene $lg (tests/about_labels_scene, headless lord-server)" ;;
+        esac
+    done
+    # (0.8.9.6.1) Workspaces' top band: the activity strip never over the status cluster (Arabic at 1600 px, German
     # on a narrow screen), the accent under the activity in view
     for c in "ar 1600x900" "de 1024x768" "en 1280x800"; do
         lg=${c% *} sz=${c#* }
