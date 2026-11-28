@@ -479,6 +479,14 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starts is marked failed; an unconfirmed one never runs.
 
 ### Fixed
+- **Raspberry Pi: background saves no longer hold the desktop during a copy to the SD card** (QA on ws174: the
+  interface stopped 2–8 s at a time in `lord.fs.write`'s `mkstemp`, and its rename was on the same thread). The
+  writer there was the end-to-end bench's channel (`tools/vm/e2e/driver.js`), which saved every command's answer with
+  the synchronous `lord.fs.write`; it now uses `fs.writeAsync` (fsasync's worker, in order per file). The shell's own
+  saves made in the background, whose memory copy is what's read, moved to `fs.writeAsync` too: Lumo's translated
+  descriptions (`sdk/describe.js`), Sentinela's alerts (`sdk/sentinela.js`), the search's recent use
+  (`sdk/spotlight.js`) and Music's library cache (`apps/player/library.js`), and their folders are made once a
+  session. None of them ran per frame; `lord.fs.write` stays for saves a person asks for and waits on.
 - **Changing Dark, the accent or the fonts no longer holds the desktop while the disk is busy** (QA on ws174:
   `portal.set` took 120–480 ms under disk IO). The GSettings keyfile that GTK apps read
   (`~/.config/glib-2.0/settings/keyfile`) was read, written and renamed on the interface's thread. It is now changed

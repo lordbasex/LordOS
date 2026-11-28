@@ -148,10 +148,12 @@ function loadAlerts() {
     if (Array.isArray(j)) sentinelaAlerts.set(() => j.filter((a) => a && typeof a.id === 'string').slice(0, HISTORY));
   } catch (e) { /* none yet */ }
 }
+let alertsDirMade = false;
 function saveAlerts() {
   try {
-    for (const d of ['.local', '.local/share', '.local/share/lordos', '.local/share/lordos/sentinela']) { try { fs.mkdir(d); } catch (e) { /* there */ } }
-    fs.write(ALERTS, `${JSON.stringify(sentinelaAlerts.get().slice(0, HISTORY))}\n`);
+    if (!alertsDirMade) { for (const d of ['.local', '.local/share', '.local/share/lordos', '.local/share/lordos/sentinela']) { try { fs.mkdir(d); } catch (e) { /* there */ } } alertsDirMade = true; }
+    // on a worker (the store is what's read; a busy disk never holds the interface, QA ws174)
+    fs.writeAsync(ALERTS, `${JSON.stringify(sentinelaAlerts.get().slice(0, HISTORY))}\n`).catch(() => { /* a full disk: the alerts stay in memory */ });
   } catch (e) { /* a full disk: the alerts stay in memory */ }
 }
 function putAlert(a) {
