@@ -479,6 +479,13 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starts is marked failed; an unconfirmed one never runs.
 
 ### Fixed
+- **Ctrl+Alt+Shift+Backspace from Classic stays in Flow** (QA on ws174: Flow came up, then Classic again after about
+  5 seconds). lord-server loads Flow without touching `settings.theme`, and Flow's `startShell` then asked for the theme
+  still saved there. When lord-server says this desktop was loaded in place of the chosen one (`lord.themes.fellBack()`:
+  the rescue keys, or a community theme the watchdog took off), the running theme becomes the choice and the other one
+  isn't asked for again; a failed community theme is still explained in a notification. `fellBack()` answers only once,
+  so it is now read in one place for both `startShell` and session restore (`themeFellBack`, `sdk/sessionrestore.jsx`,
+  `sdk/index.js`).
 - **Quick Settings: Dark, Transparency and the accent colour set from a community theme show at once** (QA on ws174:
   they showed only on the next render). A store tells each subscriber on its own now: one that throws (a native call
   refused while the theme's code is on the stack) no longer keeps the rest from hearing the change, and the error is

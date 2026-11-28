@@ -319,6 +319,16 @@ export function setRestoreBrowsers(on) { settings.set({ sessionBrowsers: !!on })
 
 // ---- start (startShell, once per JS context) ----
 
+// lord.themes.fellBack() answers true only once (js_theme.c): read here for both startShell (sdk/index.js, which keeps
+// the theme lord-server fell back to) and the restore below
+let fellBackSeen = null;
+export function themeFellBack() {
+  if (fellBackSeen === null) {
+    try { fellBackSeen = typeof lord.themes?.fellBack === 'function' && !!lord.themes.fellBack(); } catch (e) { fellBackSeen = false; }
+  }
+  return fellBackSeen;
+}
+
 export function startSessionRestore() {
   if (!allowed()) return;
   settings.subscribe(applyBrowsers);
@@ -332,9 +342,7 @@ export function startSessionRestore() {
   if (mode === 'off') { if (saved) settings.set({ sessionSaved: null }); hold = false; return; }
   // the same session in a new theme (themeReopen), or back in this one after the theme before failed or was left
   // (lord-server's watchdog, Ctrl+Alt+Shift+Backspace): that theme's "unclean" marker is no crash (QA 0.8.9.6.2)
-  let fellBack = false;
-  try { fellBack = typeof lord.themes?.fellBack === 'function' && !!lord.themes.fellBack(); } catch (e) { fellBack = false; }
-  const switched = sameSession(saved, fellBack);
+  const switched = sameSession(saved, themeFellBack());
   const list = cleanList(saved?.windows, SNAP_ZONES);
   const now = switched ? 'none' : restoreDecision(mode, saved?.clean === true, list.length);
   // from here on this session is the one that must end well; written now, so that a crash during
