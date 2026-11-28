@@ -13,7 +13,7 @@ import { pick, buildShareReport, summaryRows, summaryText, issueTitle, issueUrl,
 import { deviceKeys, communityFor, communitySummary } from '../../apps/sysinfo/community.js';
 import { compatibility } from '../../apps/sysinfo/model.js';
 import { embeddedReport, findAttachments, allowedUrl, fetchAttachment, parseLimited, privacyScan, plausibility, checkReport, labelsFor, commentBody, code, formVersion, MARKER, ALL_LABELS } from '../../tools/hwreport/lib.mjs';
-import { readReports, buildSnapshot, snapshotText, buildModel, renderSections, toolkitsHtml, toolkitSummary, SNAPSHOT_FILE, REPORTS_DIR } from '../../tools/hwreport/catalog.mjs';
+import { readReports, buildSnapshot, snapshotText, buildModel, renderSections, toolkitsHtml, toolkitSummary, boardLabel, plainName, SNAPSHOT_FILE, REPORTS_DIR } from '../../tools/hwreport/catalog.mjs';
 import { toolkitSection, toolkitLabels, toolkitRows, isFresh, isAudit, TOOLKIT_COMBOS, SHARED_CHECKS, TOOLKIT_LABELS, FRESH_MS } from '../../apps/sysinfo/toolkits.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -264,17 +264,45 @@ try {
 const model = buildModel(entries);
 eq('the page model', model.machines.map((m) => [m.name, m.kind, m.source, m.perf.map((p) => p.cat)]),
   [['QEMU Standard PC (Q35 + ICH9, 2009)', 'vm', 'reference', ['cpu', 'memory', 'gpu', 'storage']], ['Raspberry Pi 5 Model B Rev 1.1', 'board', 'reference', ['cpu', 'memory', 'gpu', 'storage']],
-    ['', 'desktop', 'community', ['cpu', 'memory', 'gpu']], ['', 'desktop', 'community', []], ['Acer Aspire R3-131T', 'laptop', 'community', ['cpu', 'memory', 'gpu']],
+    ['Acer Aspire R3-131T', 'laptop', 'community', ['cpu', 'memory', 'gpu']],
     ['Apple Inc. MacBookPro11,4', 'laptop', 'community', []], ['Apple Inc. MacBookPro12,1', 'laptop', 'community', []],
     ['ASUSTeK Computer Inc. K72F', 'laptop', 'community', []], ['ASUSTeK Computer Inc. K72F', 'laptop', 'community', []], ['ASUSTeK Computer Inc. K72F', 'laptop', 'community', []],
     ['Dell Inc. Inspiron 15 3511', 'laptop', 'community', []], ['Dell Inc. Latitude 7480', 'laptop', 'community', []], ['Gigabyte Technology Co., Ltd. B760M C', 'desktop', 'community', []], ['Hampoo P02BD6_HI-122LP', 'desktop', 'community', []],
-    ['HP HP EliteBook 840 G6', 'laptop', 'community', []], ['HUAWEI CREFG-XX', 'laptop', 'community', []], ['TECLAST X98Pro', 'desktop', 'community', []]]);
+    ['HP HP EliteBook 840 G6', 'laptop', 'community', []], ['HUAWEI CREFG-XX', 'laptop', 'community', []], ['TECLAST X98Pro', 'desktop', 'community', []],
+    ['', 'desktop', 'community', []], ['', 'desktop', 'community', ['cpu', 'memory', 'gpu']]]);
+eq('no system name: sorted by the motherboard', model.machines.filter((m) => !m.name).map((m) => [m.issue, m.board]),
+  [[221, 'ASUSTeK COMPUTER INC. F1A55-M LX'], [156, 'ASUSTeK COMPUTER INC. ROG STRIX X570-E GAMING']]);
+ok('named machines carry their board too, but are shown by name', model.machines.every((m) => typeof m.board === 'string'));
 eq('problems listed', model.problems.map((p) => [p.id, p.state, p.note]),
   [['power', 'limits', 'batteryWorn'], ['gpu', 'limits', 'cpu.rotated'], ['gpu', 'limits', 'cpu.no-context'], ['network', 'limits', 'notConnected'], ['power', 'limits', 'batteryWorn'], ['gpu', 'limits', 'cpu.software']]);
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const html = renderSections({ ...model, machines: [{ ...model.machines[0], name: '<img src=x onerror=alert(1)>' }] }, { reference: 'Reference', state: { works: 'Works' } }, esc, (k) => `https://github.com/x/issues/${k}`);
 ok('the page sections escape report text', !html.machines.includes('<img') && html.machines.includes('&lt;img'));
 ok('references are marked as such', html.machines.includes('class="hw-ref">Reference'));
+const unnamedT = { unnamed: { computer: 'Unnamed computer', laptop: 'Unnamed laptop' }, notes: { 'cpu.noContext': '(no context)' } };
+const unnamed = renderSections({ machines: [{ ...model.machines[0], name: '', kind: 'laptop' }, { ...model.machines[0], name: '', kind: 'desktop' }], gpus: [], problems: [{ machine: '', kind: 'laptop', id: 'gpu', state: 'limits', note: 'cpu.no-context', lordos: '0.8.9', fixedIn: null }] }, unnamedT, esc, (k) => `https://github.com/x/issues/${k}`);
+ok('a machine with no vendor or product gets the name of its kind', unnamed.machines.includes('<h3>Unnamed laptop</h3>') && unnamed.machines.includes('<h3>Unnamed computer</h3>') && !unnamed.machines.includes('<h3></h3>'));
+ok('the problems table names it the same way and finds the camelCase note', unnamed.problems.includes('<td>Unnamed laptop</td>') && unnamed.problems.includes('(no context)'));
+// no system name but a motherboard: "<board> (motherboard)"; the fallback stays for neither
+const boardT = { ...unnamedT, motherboard: '{board} (motherboard)' };
+const m0 = model.machines[0];
+const withBoard = renderSections({ machines: [{ ...m0, name: '', board: 'ASUS ROG STRIX X570-E GAMING', kind: 'desktop' }, { ...m0, name: 'Dell Inc. Latitude 7480', board: 'Dell Inc. 0X5F1G', kind: 'laptop' }, { ...m0, name: '', board: '', kind: 'laptop' }],
+  gpus: [], problems: [{ machine: '', board: 'ASUS ROG STRIX X570-E GAMING', kind: 'desktop', id: 'gpu', state: 'limits', note: null, lordos: '0.8.9', fixedIn: null }] }, boardT, esc, (k) => `https://github.com/x/issues/${k}`);
+ok('no system name: the card shows the motherboard', withBoard.machines.includes('<h3>ASUS ROG STRIX X570-E GAMING (motherboard)</h3>'));
+ok('a system name wins over the board', withBoard.machines.includes('<h3>Dell Inc. Latitude 7480</h3>') && !withBoard.machines.includes('0X5F1G'));
+ok('neither: the unnamed fallback stays', withBoard.machines.includes('<h3>Unnamed laptop</h3>'));
+ok('the problems table names the board the same way', withBoard.problems.includes('<td>ASUS ROG STRIX X570-E GAMING (motherboard)</td>'));
+ok('a board with "$&" in it is not a replace pattern', renderSections({ machines: [{ ...m0, name: '', board: 'A $& $1 B', kind: 'desktop' }], gpus: [], problems: [] }, boardT, esc, () => '').machines.includes('<h3>A $&amp; $1 B (motherboard)</h3>'));
+ok('no motherboard string: the unnamed fallback', renderSections({ machines: [{ ...m0, name: '', board: 'X', kind: 'laptop' }], gpus: [], problems: [] }, unnamedT, esc, () => '').machines.includes('<h3>Unnamed laptop</h3>'));
+// the board comes from an untrusted report: plain text, no controls or bidi, capped, placeholders ignored
+const hostile = boardLabel({ boardVendor: 'Evil\u202e\u2066Corp\u0085', boardName: '<script>alert(1)</script>\u200f' + 'X'.repeat(200) });
+ok('hostile board: no bidi or control characters', !/[\u0000-\u001f\u007f-\u009f\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/.test(hostile));
+ok('hostile board: capped', [...hostile].length === 64 && hostile.endsWith('…'));
+const hostileHtml = renderSections({ machines: [{ ...m0, name: '', board: hostile, kind: 'desktop' }], gpus: [], problems: [] }, boardT, esc, () => '').machines;
+ok('hostile board: escaped as text', !hostileHtml.includes('<script') && hostileHtml.includes('&lt;script&gt;'));
+eq('board placeholders are not names', [boardLabel({ boardVendor: 'ASUSTeK', boardName: 'To be filled by O.E.M.' }), boardLabel({ boardVendor: 'Default string', boardName: 'B450' }), boardLabel({ boardVendor: 'MSI', boardName: '' }), boardLabel(undefined)],
+  ['', 'B450', '', '']);
+eq('plainName', [plainName('  a\tb\u202ec  '), plainName('x'.repeat(70)).length], ['a b c', 64]);
 
 // ---- community data in the Compatibility panel (community.js) ----
 const keys = deviceKeys(laptop.system);

@@ -126,8 +126,8 @@
     "hardware": {
       "kicker": "Hardware",
       "title": "Tested hardware",
-      "lead": "Computers, boards and graphics cards LordOS has run on, what worked on each and how fast it was, from reports people share with System Information and from the project's own reference machines. So far it holds the reference machines and the first accepted community report.",
-      "compareText": "Every machine reported on GitHub, accepted here or not (22 so far: 14 with Intel graphics, 4 with AMD, none with NVIDIA), is compared in",
+      "lead": "Computers, boards and graphics cards LordOS has run on, what worked on each and how fast it was, from reports people share with System Information and from the project's own reference machines. It holds the project's two reference machines and 14 accepted community reports.",
+      "compareText": "Every machine reported on GitHub, accepted here or not (27 physical machines so far: 16 with Intel graphics, 5 with AMD, 2 with NVIDIA), is compared in",
       "compareLink": "the hardware reports",
       "machinesTitle": "Machines",
       "gpusTitle": "Graphics cards and drivers",
@@ -164,6 +164,15 @@
         "server": "Server",
         "desktop": "Desktop"
       },
+      "motherboard": "{board} (motherboard)",
+      "unnamed": {
+        "computer": "Unnamed computer",
+        "laptop": "Unnamed laptop",
+        "desktop": "Unnamed desktop computer",
+        "server": "Unnamed server",
+        "board": "Unnamed board",
+        "vm": "Unnamed virtual machine"
+      },
       "component": {
         "gpu": "Graphics",
         "display": "Displays",
@@ -196,7 +205,12 @@
         "batteryWorn": "(worn battery)",
         "missing.landlock": "(the kernel has no Landlock)",
         "missing.bpfLsm": "(the BPF security module is off)",
-        "missing.cgroup2": "(no unified cgroup tree)"
+        "missing.cgroup2": "(no unified cgroup tree)",
+        "cpu.noConfig": "(composed on the CPU: no suitable EGL configuration)",
+        "cpu.noContext": "(composed on the CPU: the GPU context could not be created)",
+        "cpu.shaders": "(composed on the CPU: the shaders failed to build)",
+        "cpu.notBuilt": "(composed on the CPU: this build has no GPU support)",
+        "cpu.envOff": "(composed on the CPU: turned off with LORD_GPU=0)"
       }
     },
     "language": {
@@ -693,8 +707,8 @@
     "hardware": {
       "kicker": "Hardware",
       "title": "Hardware probado",
-      "lead": "Computadoras, placas y tarjetas gráficas en las que corrió LordOS, qué funcionó en cada una y qué tan rápido fue, a partir de los reportes que la gente comparte con Información del Sistema y de las máquinas de referencia del propio proyecto. Por ahora tiene las máquinas de referencia y el primer reporte aceptado de la comunidad.",
-      "compareText": "Todas las máquinas reportadas en GitHub, aceptadas acá o no (22 hasta ahora: 14 con gráficos Intel, 4 con AMD, ninguna con NVIDIA), se comparan en",
+      "lead": "Computadoras, placas y tarjetas gráficas en las que corrió LordOS, qué funcionó en cada una y qué tan rápido fue, a partir de los reportes que la gente comparte con Información del Sistema y de las máquinas de referencia del propio proyecto. Tiene las dos máquinas de referencia del proyecto y 14 reportes aceptados de la comunidad.",
+      "compareText": "Todas las máquinas reportadas en GitHub, aceptadas acá o no (27 máquinas físicas hasta ahora: 16 con gráficos Intel, 5 con AMD, 2 con NVIDIA), se comparan en",
       "compareLink": "los reportes de hardware",
       "machinesTitle": "Máquinas",
       "gpusTitle": "Tarjetas gráficas y drivers",
@@ -731,6 +745,15 @@
         "server": "Servidor",
         "desktop": "Escritorio"
       },
+      "motherboard": "{board} (placa madre)",
+      "unnamed": {
+        "computer": "Equipo sin nombre",
+        "laptop": "Portátil sin nombre",
+        "desktop": "Equipo de escritorio sin nombre",
+        "server": "Servidor sin nombre",
+        "board": "Placa sin nombre",
+        "vm": "Máquina virtual sin nombre"
+      },
       "component": {
         "gpu": "Gráficos",
         "display": "Pantallas",
@@ -763,7 +786,12 @@
         "batteryWorn": "(batería gastada)",
         "missing.landlock": "(el kernel no tiene Landlock)",
         "missing.bpfLsm": "(el módulo de seguridad BPF está apagado)",
-        "missing.cgroup2": "(sin árbol de cgroups unificado)"
+        "missing.cgroup2": "(sin árbol de cgroups unificado)",
+        "cpu.noConfig": "(compuesto en la CPU: no hay una configuración EGL adecuada)",
+        "cpu.noContext": "(compuesto en la CPU: no se pudo crear el contexto de la GPU)",
+        "cpu.shaders": "(compuesto en la CPU: no se pudieron compilar los shaders)",
+        "cpu.notBuilt": "(compuesto en la CPU: esta compilación no tiene soporte de GPU)",
+        "cpu.envOff": "(compuesto en la CPU: apagada con LORD_GPU=0)"
       }
     },
     "language": {
@@ -1260,8 +1288,8 @@
     "hardware": {
       "kicker": "Hardware",
       "title": "Hardware testado",
-      "lead": "Computadores, placas e placas de vídeo em que o LordOS rodou, o que funcionou em cada um e quão rápido foi, a partir dos relatórios que as pessoas compartilham com as Informações do Sistema e das máquinas de referência do próprio projeto. Por enquanto tem as máquinas de referência e o primeiro relatório aceito da comunidade.",
-      "compareText": "Todas as máquinas relatadas no GitHub, aceitas aqui ou não (22 até agora: 14 com gráficos Intel, 4 com AMD, nenhuma com NVIDIA), são comparadas",
+      "lead": "Computadores, placas e placas de vídeo em que o LordOS rodou, o que funcionou em cada um e quão rápido foi, a partir dos relatórios que as pessoas compartilham com as Informações do Sistema e das máquinas de referência do próprio projeto. Tem as duas máquinas de referência do projeto e 14 relatórios aceitos da comunidade.",
+      "compareText": "Todas as máquinas relatadas no GitHub, aceitas aqui ou não (27 máquinas físicas até agora: 16 com gráficos Intel, 5 com AMD, 2 com NVIDIA), são comparadas",
       "compareLink": "nos relatórios de hardware",
       "machinesTitle": "Máquinas",
       "gpusTitle": "Placas de vídeo e drivers",
@@ -1298,6 +1326,15 @@
         "server": "Servidor",
         "desktop": "Desktop"
       },
+      "motherboard": "{board} (placa-mãe)",
+      "unnamed": {
+        "computer": "Computador sem nome",
+        "laptop": "Notebook sem nome",
+        "desktop": "Computador de mesa sem nome",
+        "server": "Servidor sem nome",
+        "board": "Placa sem nome",
+        "vm": "Máquina virtual sem nome"
+      },
       "component": {
         "gpu": "Gráficos",
         "display": "Telas",
@@ -1330,7 +1367,12 @@
         "batteryWorn": "(bateria desgastada)",
         "missing.landlock": "(o kernel não tem Landlock)",
         "missing.bpfLsm": "(o módulo de segurança BPF está desligado)",
-        "missing.cgroup2": "(sem árvore de cgroups unificada)"
+        "missing.cgroup2": "(sem árvore de cgroups unificada)",
+        "cpu.noConfig": "(composto na CPU: não há configuração EGL adequada)",
+        "cpu.noContext": "(composto na CPU: não foi possível criar o contexto da GPU)",
+        "cpu.shaders": "(composto na CPU: os shaders não compilaram)",
+        "cpu.notBuilt": "(composto na CPU: esta compilação não tem suporte a GPU)",
+        "cpu.envOff": "(composto na CPU: desligada com LORD_GPU=0)"
       }
     },
     "language": {
