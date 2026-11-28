@@ -201,6 +201,7 @@
   "power.healthNormal": "バッテリーの状態：{pct}%（正常）",
   "power.healthService": "バッテリーの状態：{pct}%（修理を推奨）",
   "power.healthUnknown": "バッテリーの状態：不明",
+  "power.h": "{h} 時間",
   "power.hm": "{h} 時間 {m} 分",
   "power.immediately": "すぐに",
   "power.left": "残り {time}",

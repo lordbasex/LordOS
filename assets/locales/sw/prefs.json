@@ -202,6 +202,7 @@
   "power.healthNormal": "Afya ya betri: {pct}% (kawaida)",
   "power.healthService": "Afya ya betri: {pct}% (huduma inapendekezwa)",
   "power.healthUnknown": "Afya ya betri: haijulikani",
+  "power.h": "saa {h}",
   "power.hm": "saa {h} dak {m}",
   "power.immediately": "Mara moja",
   "power.left": "Zimebaki {time}",

@@ -9,7 +9,8 @@ import { useEffect, useState } from 'react';
 import { GroupBox, SettingRow, PageHeader, PopUp, Stack, Badge } from './ui.jsx';
 
 const mins = (m) => m * 60;
-const duration = (tr, m) => (m >= 60 ? tr('prefs.power.hm', { h: Math.floor(m / 60), m: m % 60 }) : tr('prefs.power.m', { m }));
+// whole hours without "0 min" (QA of 0.8.9.6.2: "1 h 0 min")
+const duration = (tr, m) => (m >= 60 ? (m % 60 ? tr('prefs.power.hm', { h: Math.floor(m / 60), m: m % 60 }) : tr('prefs.power.h', { h: m / 60 })) : tr('prefs.power.m', { m }));
 
 function BatteryCard({ b, tr }) {
   const t = useTheme();

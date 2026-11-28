@@ -479,6 +479,9 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starts is marked failed; an unconfirmed one never runs.
 
 ### Fixed
+- **Settings → Energy: whole hours read "1 h", not "1 h 0 min"** (seen on VM 127 while checking BUG-B: "Require
+  password after the display turns off" offered "1 h 0 min"). A new `prefs.power.h` text, in every language, for a
+  duration of whole hours (the sleep lists' 1, 2 and 3 h too).
 - **Login screen: no "No users" flash when a locked session comes back from a text console** (QA of 0.8.9.6.2:
   Ctrl+Alt+F2 then Ctrl+Alt+F1 showed a login screen with no users for a moment before the lock screen). The greeter
   drew its user area before lord-sessiond's first answer, so its empty list read as "No users"; it now draws nothing

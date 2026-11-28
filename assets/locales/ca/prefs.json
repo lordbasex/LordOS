@@ -202,6 +202,7 @@
   "power.healthNormal": "Estat de la bateria: {pct}% (normal)",
   "power.healthService": "Estat de la bateria: {pct}% (es recomana revisar-la)",
   "power.healthUnknown": "Estat de la bateria: desconegut",
+  "power.h": "{h} h",
   "power.hm": "{h} h {m} min",
   "power.immediately": "Immediatament",
   "power.left": "Queden {time}",

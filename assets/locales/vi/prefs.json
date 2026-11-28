@@ -201,6 +201,7 @@
   "power.healthNormal": "Tình trạng pin: {pct}% (bình thường)",
   "power.healthService": "Tình trạng pin: {pct}% (nên bảo hành)",
   "power.healthUnknown": "Tình trạng pin: không rõ",
+  "power.h": "{h} giờ",
   "power.hm": "{h} giờ {m} phút",
   "power.immediately": "Ngay lập tức",
   "power.left": "Còn {time}",

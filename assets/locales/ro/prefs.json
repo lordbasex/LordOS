@@ -203,6 +203,7 @@
   "power.healthNormal": "Starea bateriei: {pct}% (normală)",
   "power.healthService": "Starea bateriei: {pct}% (se recomandă service)",
   "power.healthUnknown": "Starea bateriei: necunoscută",
+  "power.h": "{h} h",
   "power.hm": "{h} h {m} min",
   "power.immediately": "Imediat",
   "power.left": "{time} rămase",

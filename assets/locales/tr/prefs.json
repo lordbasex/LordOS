@@ -202,6 +202,7 @@
   "power.healthNormal": "Pil sağlığı: %{pct} (normal)",
   "power.healthService": "Pil sağlığı: %{pct} (servis önerilir)",
   "power.healthUnknown": "Pil sağlığı: bilinmiyor",
+  "power.h": "{h} sa",
   "power.hm": "{h} sa {m} dk",
   "power.immediately": "Hemen",
   "power.left": "{time} kaldı",

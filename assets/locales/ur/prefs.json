@@ -202,6 +202,7 @@
   "power.healthNormal": "بیٹری کی صحت: {pct}% (معمول کے مطابق)",
   "power.healthService": "بیٹری کی صحت: {pct}% (سروس تجویز کی جاتی ہے)",
   "power.healthUnknown": "بیٹری کی صحت: نامعلوم",
+  "power.h": "{h} گھنٹے",
   "power.hm": "{h} گھنٹے {m} منٹ",
   "power.immediately": "فوراً",
   "power.left": "{time} باقی",

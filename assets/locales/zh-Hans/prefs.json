@@ -201,6 +201,7 @@
   "power.healthNormal": "电池健康度：{pct}%（正常）",
   "power.healthService": "电池健康度：{pct}%（建议维修）",
   "power.healthUnknown": "电池健康度：未知",
+  "power.h": "{h} 小时",
   "power.hm": "{h} 小时 {m} 分钟",
   "power.immediately": "立即",
   "power.left": "剩余 {time}",

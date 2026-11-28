@@ -202,6 +202,7 @@
   "power.healthNormal": "Състояние на батерията: {pct}% (нормално)",
   "power.healthService": "Състояние на батерията: {pct}% (препоръчва се сервиз)",
   "power.healthUnknown": "Състояние на батерията: неизвестно",
+  "power.h": "{h} ч",
   "power.hm": "{h} ч {m} мин",
   "power.immediately": "Веднага",
   "power.left": "Остават {time}",

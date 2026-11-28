@@ -202,6 +202,7 @@
   "power.healthNormal": "Batterijconditie: {pct}% (normaal)",
   "power.healthService": "Batterijconditie: {pct}% (onderhoud aanbevolen)",
   "power.healthUnknown": "Batterijconditie: onbekend",
+  "power.h": "{h} u",
   "power.hm": "{h} u {m} min",
   "power.immediately": "Direct",
   "power.left": "{time} resterend",

@@ -202,6 +202,7 @@
   "power.healthNormal": "État de la batterie : {pct} % (normal)",
   "power.healthService": "État de la batterie : {pct} % (remplacement conseillé)",
   "power.healthUnknown": "État de la batterie : inconnu",
+  "power.h": "{h} h",
   "power.hm": "{h} h {m} min",
   "power.immediately": "Immédiatement",
   "power.left": "{time} restantes",

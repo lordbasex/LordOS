@@ -202,6 +202,7 @@
   "power.healthNormal": "Battery health: {pct}% (normal)",
   "power.healthService": "Battery health: {pct}% (service recommended)",
   "power.healthUnknown": "Battery health: unknown",
+  "power.h": "{h} h",
   "power.hm": "{h} h {m} min",
   "power.immediately": "Immediately",
   "power.left": "{time} remaining",
