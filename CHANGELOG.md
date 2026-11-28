@@ -492,6 +492,11 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   `build/engine-test` `test_gpu_cover` (every frame equal to a full repaint, the same list of app windows, no covered
   window painted; GPU path 6.2 → 0.55 ms a frame); `test_damage_fuzz`, `test_damage_pipeline` and the drag hashes
   unchanged. Docs: `docs/MONITOR.md`, `docs/LAYERS.md`.
+- **Machines: an OVA export shows its progress** (VM 116 QA: "0 %" for the whole ~4 minutes). `lord-vm --export`
+  wrote a progress line only after each disk was converted, so a one-disk machine stayed at 0 % until the end. qemu-img's
+  own percentage is now passed on within the disk's share of the job (95 % for a `.lordvm`, 85 % for an OVA, whose
+  checksums and package follow at 92 %) (`exp_tool_progress` in `server/src/vm/lordvm.c`). Test:
+  `tests/vm_storage_test.sh` ("OVA: progress during the conversion").
 - **Machines: the LordOS and Kali cards' "Install without questions" note, and the computer's name after changing
   cards** (QA on the maintainer's PC, ws174). The note showed the raw keys `machines.un.how.lordos` and
   `machines.un.how.kali`; it now says where the answers go (LordOS: the small `LORDOSAUTO` disk the installer reads,

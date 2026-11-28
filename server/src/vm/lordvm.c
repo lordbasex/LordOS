@@ -12483,6 +12483,16 @@ static int copy_sparse_fd(int a, const char *to) {
 }
 
 static void exp_progress(double pct) { printf("{\"progress\":%.1f}\n", pct); fflush(stdout); }
+/* while a disk is converted: qemu-img's own percentage within that disk's share of the job (an OVA's one disk was the
+ * whole wait, and the line came only at its end: "0 %" for minutes, VM 116 QA). exp_from, exp_span: the share. The
+ * line is written only when it moves a tenth of a percent. */
+static double exp_from, exp_span, exp_last = -1;
+static void exp_tool_progress(double pct) {
+    double v = exp_from + exp_span * pct / 100.0;
+    if (v - exp_last < 0.1) return;
+    exp_last = v;
+    exp_progress(v);
+}
 
 /* a machine's disk (format, plus its base for a linked clone) converted to out with qemu-img, jailed: reads the disk
  * and the base, writes only in out_dir. ofmt "qcow2" (encrypted again under the key when the machine is) or "vmdk"
@@ -12606,11 +12616,17 @@ static int cmd_export(const char *dir, int argc, char **argv) {
         } else if (i) snprintf(p2, sizeof p2, "%s/data-%d.%s", dd, i, ext);
         else snprintf(p2, sizeof p2, "%s/system.%s", dd, ext);
         int bad;
+        /* the disks take 95 % of the job (an OVA's 85 %: its checksums and its package come after) */
+        double share = ova ? 85.0 : 95.0;
+        exp_from = total > 0 ? share * (double)done / (double)total : 0;
+        exp_span = total > 0 ? share * (double)s2.st_blocks * 512 / (double)total : share;
+        tool_progress = exp_tool_progress;
         if (convert) bad = exp_convert(&m, p1, m.raw, i == 0 ? m.base : NULL, ova ? "vmdk" : ext, p2, ova ? tmp : dd, err, sizeof err);
         else { bad = copy_reflink(p1, p2) && copy_sparse(p1, p2); if (bad) snprintf(err, sizeof err, "%s", strerror(errno)); }
+        tool_progress = NULL;
         if (bad) { fprintf(stderr, "lord-vm: exporting disk %d failed: %.200s\n", i + 1, err); goto out; }
         done += (long long)s2.st_blocks * 512;
-        exp_progress(total > 0 ? 95.0 * (double)done / (double)total : 95.0);
+        exp_progress(total > 0 ? share * (double)done / (double)total : share);
         if (ova) {
             oi.disk[i].file = vmdk_name[i];
             oi.disk[i].capacity = (uint64_t)(i ? m.data_gb[i - 1] : m.disk_gb) << 30;
@@ -12640,6 +12656,7 @@ static int cmd_export(const char *dir, int argc, char **argv) {
             if (sha256_file(p2, sums[i + 1])) { free(ovf); fprintf(stderr, "lord-vm: can't read %s\n", p2); goto out; }
         }
         for (int i = 0; i <= nd; i++) sump[i] = sums[i];
+        exp_progress(92);
         char *mf = vmx_mf(names, sump, nd + 1);
         int of = open(dreal, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW, 0600);
         long long now = (long long)time(NULL);
