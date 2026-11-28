@@ -292,8 +292,8 @@ static JSValue job_call(JSContext *c, int argc, JSValueConst *argv) {
 }
 static JSValue f_host_microtask(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t;
-    if (argc < 1 || !JS_IsFunction(c, argv[0])) return JS_ThrowTypeError(c, "hostMicrotask: a function");
-    if (S.realm && JS_IsFunctionOfRealm(c, argv[0], S.realm)) return JS_ThrowTypeError(c, "hostMicrotask: not a theme's function");
+    if (argc < 1 || !JS_IsFunction(c, argv[0])) return js_throw_code(c, "theme.notAllowed", "call", "hostMicrotask", NULL);
+    if (S.realm && JS_IsFunctionOfRealm(c, argv[0], S.realm)) return js_throw_code(c, "theme.notAllowed", "call", "hostMicrotask", NULL);
     if (JS_EnqueueTrustedJob(c, job_call, 1, argv) < 0) return JS_EXCEPTION;
     return JS_UNDEFINED;
 }
