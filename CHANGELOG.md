@@ -85,6 +85,13 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   tag, and the salt and its fallback are gone. The "replaced" check compares an in-memory 64-bit key that is never
   logged (`webpage_tag_key`). docs/WEBAPPS.md updated. Test: `build/webapp-test` (numbering, another run's other
   order, a full table, the tag never in the line).
+- **Notes: a crafted first line no longer freezes the desktop when a file is imported** (security scan of 0.8.9.6.2,
+  F7). `titleOf` ran its image pattern (`!\[[^\]]*\]\([^)]*\)`) over the whole first line, up to 8 MB, before cutting
+  the title to 60 characters: a `notes.md` whose first line was a long run of `![` without `]` was quadratic on
+  lord-server's JS thread (100,000 of them: about 10 s in V8, longer in QuickJS) on each import and each rescan of
+  `~/Notes`. Now the line is cut to 512 code points before any pattern, the image pattern is bounded
+  (`{0,256}`/`{0,1024}`, no line breaks) and only the first 4,096 lines are looked at for the title. Test:
+  `tests/notes_model_test.mjs` (100,000 and 4,000,000 `![` in under a second, an image still stripped).
 
 ### Added
 - **Text Editor: a horizontal scroll bar for lines wider than the window** (GitHub #264, first part; soft word wrap

@@ -32,6 +32,16 @@ eq('title: markdown marks out', titleOf('## **Groceries** `list`'), 'Groceries l
 eq('title: direction overrides and isolates removed', titleOf('a\u202eb\u202ac\u2066d\u2069e'), 'abcde');
 eq('title: control characters and line separators become spaces', titleOf('a\u0007b\u2028c\u2029d\u0085e').replace(/ +/g, ' '), 'a b c d e');
 eq('title: at most 60 characters', titleOf('x'.repeat(100)).length, 60);
+// security scan 0.8.9.6.2, F7: a long run of "![" (an imported file) is no quadratic work
+{
+  const t0 = Date.now();
+  const t1 = titleOf(`${'!['.repeat(100000)}\nsecond`);
+  const t2 = titleOf(`${'!['.repeat(4000000)}`);
+  eq('title: 100,000 and 4,000,000 "![" without "]" take no time', Date.now() - t0 < 1000, true);
+  eq('title: … and give their first characters', [t1.length <= 60, t2.length <= 60, t1.startsWith('![')], [true, true, true]);
+  eq('title: an image still comes out', titleOf('![a picture](img/a.png) Trip notes'), 'Trip notes');
+  eq('title: a long image address is not stripped past its bound', titleOf(`![a](${'x'.repeat(2000)}) t`).startsWith('!['), true);
+}
 eq('a note from its header: a bidi title is cleaned', noteFrom('s', '---\ntitle: "\u202eevil"\n---\nbody', 0).title, 'evil');
 
 // ---- the merge of a fresh read with the notes in memory ----

@@ -41,10 +41,14 @@ export function serialize(n) {
 }
 
 // Title: the first line with text, without the markdown marks. Control characters and direction overrides are left
-// out (a title is shown in the list and written in the note's header, GitHub #238).
+// out (a title is shown in the list and written in the note's header, GitHub #238). Bounded work (security scan
+// 0.8.9.6.2, F7: an imported file whose first line was 200 KB of "![" made the image pattern quadratic on lord-server's
+// JS thread): the line is cut to TITLE_SCAN code points before any pattern, and the image pattern itself is bounded.
+const TITLE_SCAN = 512;
 export function titleOf(body) {
-  const line = String(body).split('\n').find((l) => l.trim() && !/^(`{3,}|---)/.test(l.trim())) || '';
-  return line.replace(/^\s*(#{1,6}\s+|>\s*|[-*+]\s+(\[[ xX]\]\s+)?|\d+[.)]\s+)/, '').replace(/[*_`~]|!\[[^\]]*\]\([^)]*\)/g, '')
+  const first = String(body).split('\n', 4096).find((l) => l.trim() && !/^(`{3,}|---)/.test(l.trim())) || '';
+  const line = [...first.slice(0, TITLE_SCAN * 2)].slice(0, TITLE_SCAN).join('');
+  return line.replace(/^\s*(#{1,6}\s+|>\s*|[-*+]\s+(\[[ xX]\]\s+)?|\d+[.)]\s+)/, '').replace(/[*_`~]|!\[[^\]\n]{0,256}\]\([^)\n]{0,1024}\)/g, '')
     .replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/g, ' ').replace(/[\u202a-\u202e\u2066-\u2069]/g, '').trim().slice(0, 60);
 }
 
