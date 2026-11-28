@@ -881,6 +881,8 @@
   "un.how.preseed": "Jawaban dimasukkan ke berkas awal milik penginstal, kata sandi Anda hanya sebagai hash, dan dihapus setelah sistem terpasang.",
   "un.how.autoinstall": "Jawaban disimpan di disk kecil yang dibaca penginstal, kata sandi Anda hanya sebagai hash, dan disk dilepas setelah sistem terpasang.",
   "un.how.kickstart": "Jawaban disimpan di disk kecil yang dibaca penginstal, kata sandi Anda hanya sebagai hash, dan disk dilepas setelah sistem terpasang.",
+  "un.how.kali": "Jawaban dimasukkan ke berkas awal milik penginstal, kata sandi Anda hanya sebagai hash, dan dihapus setelah sistem terpasang.",
+  "un.how.lordos": "Jawaban disimpan di disk kecil yang dibaca penginstal, kata sandi Anda hanya sebagai hash, dan disk dilepas setelah sistem terpasang.",
   "un.image": "Dipasang dari {file}, juga diperiksa terhadap daftar bertanda tangan pembuatnya",
   "un.review": "Tanpa pertanyaan: akun {user} di {host}",
   "un.reviewOff": "Anda menjawab pertanyaan penginstal",

@@ -267,6 +267,14 @@ export function hostnameFor(name) {
   return h || 'machine';
 }
 
+// the computer's name the Set up step shows for a machine called name: the one made from the name while the field is
+// empty or still holds the one made for an earlier name (auto: the last one filled in by itself, as going back from
+// Debian to LordOS); a name the person typed stays
+export function hostnameNext(current, auto, name) {
+  const cur = String(current || '');
+  return !cur || (auto && cur === auto) ? hostnameFor(name) : cur;
+}
+
 // an account name from the person's own: "Federico Pereira" or "lordbasex" → "lordbasex"
 export function userFor(home) {
   const u = String(home || '').split('/').filter(Boolean).pop() || '';

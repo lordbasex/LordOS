@@ -479,6 +479,13 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starts is marked failed; an unconfirmed one never runs.
 
 ### Fixed
+- **Machines: the LordOS and Kali cards' "Install without questions" note, and the computer's name after changing
+  cards** (QA on the maintainer's PC, ws174). The note showed the raw keys `machines.un.how.lordos` and
+  `machines.un.how.kali`; it now says where the answers go (LordOS: the small `LORDOSAUTO` disk the installer reads,
+  removed with the ISO once the system is installed; Kali: the installer's own start files, as Debian's), in every
+  language. Going back from Debian to LordOS left the computer's name at `debian-13`: the name made from the machine's
+  name now follows it while it is still the one filled in by itself; a name the person typed stays
+  (`hostnameNext` in `apps/machines/catalog.js`, `apps/machines/assistant.jsx`). Test: `tests/vm_catalog_test.mjs`.
 - **Settings → Appearance: Try Again on a theme that couldn't start takes effect at once** (seen on VM 127 while
   checking BUG-H: Try Again cleared the theme's failure record, but the card kept "Couldn't start" and a disabled
   Apply until the page was left and opened again). The gallery renders again after it (`galleryRev`).

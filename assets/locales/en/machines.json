@@ -881,6 +881,8 @@
   "un.how.preseed": "The answers go into the installer's own start files, your password only as a hash, and they are removed once the system is installed.",
   "un.how.autoinstall": "The answers go on a small disk the installer reads, your password only as a hash, and the disk is removed once the system is installed.",
   "un.how.kickstart": "The answers go on a small disk the installer reads, your password only as a hash, and the disk is removed once the system is installed.",
+  "un.how.kali": "The answers go into the installer's own start files, your password only as a hash, and they are removed once the system is installed.",
+  "un.how.lordos": "The answers go on a small disk the installer reads, your password only as a hash, and the disk is removed once the system is installed.",
   "un.image": "Installs from {file}, also checked against its maker's signed list",
   "un.review": "Without questions: account {user} on {host}",
   "un.reviewOff": "You answer the installer's questions",

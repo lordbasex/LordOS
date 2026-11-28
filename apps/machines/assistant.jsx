@@ -19,7 +19,7 @@
 import { View, Text, TextInput, FilePicker, Toggle, ScrollView, admin, fs, openUrl, userDirs, settings, locale, useFilesDrop, FilesDropHint, t as tr } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import CATALOG from '../../assets/machines/systems.json';
-import { systemsFor, entryOf, listingNames, newest, pickImage, pinnedImage, cardSize, versionIn, progressOf, resumedOf, unattendedOf, checkSetup, hostnameFor, userFor, lordosLang } from './catalog.js';
+import { systemsFor, entryOf, listingNames, newest, pickImage, pinnedImage, cardSize, versionIn, progressOf, resumedOf, unattendedOf, checkSetup, hostnameNext, userFor, lordosLang } from './catalog.js';
 import { newKey } from './keyflow.js';
 import { validateDraft, createRequest, missingFor, systemOf, versionOf, archOf, isoArch, suggestName, gfxFor, no3dReason, winfspFor, gvtGpu, defaultCard, detectPlan, dropSource } from './model.js';
 import { allProfiles, profileById, builtinProfile, defaultProfileId, onHost, setPatch, shareAbs, DEFAULT_PROFILE } from './profiles.js';
@@ -98,6 +98,9 @@ export function Assistant({ host, mode, names, groupNames, onClose, onCreated, o
   const [un, setUn] = useState({ on: true, user: userFor(typeof lord !== 'undefined' && lord.fs?.home ? lord.fs.home() : ''), password: '', hostname: '', timezone: hd.timezone, keymap: hd.keymap });
   const [alt, setAlt] = useState(null);
   const altSeq = useRef(0);
+  // the computer's name filled in by itself: it follows the machine's while it is still that one (going back from
+  // Debian to LordOS, or from Windows), never one the person typed
+  const autoHost = useRef('');
   // Windows: { mode: 'own' | 'eval', phase: 'wait' | 'hashing' | 'ready' | 'error', iso: { path, name, lang, label }, pct, err, lang }
   const [win, setWin] = useState(null);
   const [edition, setEdition] = useState('Windows 11 Pro');
@@ -219,7 +222,7 @@ export function Assistant({ host, mode, names, groupNames, onClose, onCreated, o
     const timer = setInterval(look, 2000);
     return () => clearInterval(timer);
   }, [windows, win?.mode, win?.phase, arch]);
-  useEffect(() => { if (windows) setUn((u) => ({ ...u, hostname: windowsHostname(name) })); }, [windows, name]);
+  useEffect(() => { if (windows) setUn((u) => ({ ...u, hostname: (autoHost.current = windowsHostname(name)) })); }, [windows, name]);
   // the clipboard both ways when the profile says so (the review's switch starts there)
   useEffect(() => { setShareClip(pv.clipboard === 'both'); }, [profile]);
   // a system the person added: its verified image, the profile it says
@@ -279,7 +282,15 @@ export function Assistant({ host, mode, names, groupNames, onClose, onCreated, o
     resolve(uo.image, arch).then((img) => { if (seq === altSeq.current) setAlt({ id: uo.image, arch, phase: 'ready', image: img }); })
       .catch((err) => { if (seq === altSeq.current) setAlt({ id: uo.image, arch, phase: 'error', err: err.message || String(err) }); });
   }, [needAlt, uo?.image, arch]);
-  useEffect(() => { if (name && !un.hostname && !windows) setUn((u) => ({ ...u, hostname: hostnameFor(name) })); }, [name]);
+  useEffect(() => {
+    if (!name || windows) return;
+    setUn((u) => {
+      const hostname = hostnameNext(u.hostname, autoHost.current, name);
+      if (hostname === u.hostname) return u;
+      autoHost.current = hostname;
+      return { ...u, hostname };
+    });
+  }, [name, windows]);
   const setup = windows ? checkWindowsSetup(un) : checkSetup(un);
   const plan = windows ? editionPlan(winE, win?.mode, edition, winKey) : null;
   // what is downloaded and installed: the card's image, or the unattended install's own

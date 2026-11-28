@@ -881,6 +881,8 @@
   "un.how.preseed": "De antwoorden gaan in de eigen startbestanden van het installatieprogramma, je wachtwoord alleen als hash, en ze worden verwijderd zodra het systeem is geïnstalleerd.",
   "un.how.autoinstall": "De antwoorden komen op een kleine schijf die het installatieprogramma leest, je wachtwoord alleen als hash, en de schijf wordt verwijderd zodra het systeem is geïnstalleerd.",
   "un.how.kickstart": "De antwoorden komen op een kleine schijf die het installatieprogramma leest, je wachtwoord alleen als hash, en de schijf wordt verwijderd zodra het systeem is geïnstalleerd.",
+  "un.how.kali": "De antwoorden gaan in de eigen startbestanden van het installatieprogramma, je wachtwoord alleen als hash, en ze worden verwijderd zodra het systeem is geïnstalleerd.",
+  "un.how.lordos": "De antwoorden komen op een kleine schijf die het installatieprogramma leest, je wachtwoord alleen als hash, en de schijf wordt verwijderd zodra het systeem is geïnstalleerd.",
   "un.image": "Installeert vanaf {file}, ook gecontroleerd met de ondertekende lijst van de maker",
   "un.review": "Zonder vragen: account {user} op {host}",
   "un.reviewOff": "Jij beantwoordt de vragen van het installatieprogramma",

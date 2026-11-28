@@ -881,6 +881,8 @@
   "un.how.preseed": "Atsakymai įrašomi į pačios diegimo programos paleidimo failus, jūsų slaptažodis – tik kaip maiša, ir jie pašalinami, kai sistema įdiegiama.",
   "un.how.autoinstall": "Atsakymai įrašomi į nedidelį diską, kurį skaito diegimo programa, jūsų slaptažodis – tik kaip maiša, o diskas pašalinamas, kai sistema įdiegiama.",
   "un.how.kickstart": "Atsakymai įrašomi į nedidelį diską, kurį skaito diegimo programa, jūsų slaptažodis – tik kaip maiša, o diskas pašalinamas, kai sistema įdiegiama.",
+  "un.how.kali": "Atsakymai įrašomi į pačios diegimo programos paleidimo failus, jūsų slaptažodis – tik kaip maiša, ir jie pašalinami, kai sistema įdiegiama.",
+  "un.how.lordos": "Atsakymai įrašomi į nedidelį diską, kurį skaito diegimo programa, jūsų slaptažodis – tik kaip maiša, o diskas pašalinamas, kai sistema įdiegiama.",
   "un.image": "Diegiama iš {file}, taip pat patikrinto pagal gamintojo pasirašytą sąrašą",
   "un.review": "Be klausimų: paskyra {user} kompiuteryje {host}",
   "un.reviewOff": "Į diegimo programos klausimus atsakote jūs",

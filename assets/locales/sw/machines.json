@@ -881,6 +881,8 @@
   "un.how.preseed": "Majibu yanaenda kwenye faili za kuanzia za kisakinishi chenyewe, nenosiri lako kama hashi tu, na yanaondolewa mfumo ukishasakinishwa.",
   "un.how.autoinstall": "Majibu yanaenda kwenye diski ndogo ambayo kisakinishi kinasoma, nenosiri lako kama hashi tu, na diski inaondolewa mfumo ukishasakinishwa.",
   "un.how.kickstart": "Majibu yanaenda kwenye diski ndogo ambayo kisakinishi kinasoma, nenosiri lako kama hashi tu, na diski inaondolewa mfumo ukishasakinishwa.",
+  "un.how.kali": "Majibu yanaenda kwenye faili za kuanzia za kisakinishi chenyewe, nenosiri lako kama hashi tu, na yanaondolewa mfumo ukishasakinishwa.",
+  "un.how.lordos": "Majibu yanaenda kwenye diski ndogo ambayo kisakinishi kinasoma, nenosiri lako kama hashi tu, na diski inaondolewa mfumo ukishasakinishwa.",
   "un.image": "Inasakinisha kutoka {file}, pia imekaguliwa dhidi ya orodha iliyotiwa sahihi na mtengenezaji wake",
   "un.review": "Bila maswali: akaunti {user} kwenye {host}",
   "un.reviewOff": "Unajibu maswali ya kisakinishi",
