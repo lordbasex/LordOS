@@ -670,7 +670,7 @@ test: build/kms-recover-test
 build/kms-recover-test: tests/kms_recover_test.c src/kms.c src/kms.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) -O1 -g $(WARN) -std=c11 -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer \
-	    -o $@ tests/kms_recover_test.c src/kms.c
+	    -DKMS_TEST -o $@ tests/kms_recover_test.c src/kms.c -lpthread
 	./$@ || { rm -f $@; exit 1; }
 # tests/wdog_test.c: the compositor's watchdog (src/wdog.c): stalls seen, priority dropped, endless JS stopped
 test: build/wdog-test

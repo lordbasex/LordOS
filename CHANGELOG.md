@@ -479,6 +479,17 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   starts is marked failed; an unconfirmed one never runs.
 
 ### Fixed
+- **Waking from s2idle on virtio-gpu no longer hangs in the flip-stall recovery** (QA on ws174). After the watchdog
+  drops a page flip that never completed (BUG-B), the next frame is a full modeset, and on virtio-gpu that
+  `SETCRTC` blocked in the kernel with the whole desktop. That one modeset (only the one after a dropped flip; the
+  first one after the boot splash and Settings → Displays are unchanged) now runs on a thread of its own, and the
+  frame waits for it at most 250 ms. A real card's modeset answers well within that and goes on exactly as before.
+  Past it, the frame counts as a flip still pending: no watchdog drops it again, the cursor leaves that CRTC alone, the
+  loop looks for the answer every 50 ms and completes the frame when it comes; a failed modeset hands its buffer back
+  and the next frame tries again, on a thread again (`server/src/kms.c`, `kms_recover_poll`, `server/src/main.c`).
+  Checked in the test only; it still needs a suspend and wake on a real PC and on the VM. Test:
+  `build/kms-recover-test` (an answer at once, one held past the bound, a failure, the CPU path, and closing while it
+  runs).
 - **Raspberry Pi: background saves no longer hold the desktop during a copy to the SD card** (QA on ws174: the
   interface stopped 2–8 s at a time in `lord.fs.write`'s `mkstemp`, and its rename was on the same thread). The
   writer there was the end-to-end bench's channel (`tools/vm/e2e/driver.js`), which saved every command's answer with
